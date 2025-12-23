@@ -47,7 +47,7 @@ export function AppSidebar() {
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/user-management", icon: Users, label: "User Management" },
     { href: "/academics", icon: Briefcase, label: "Academics" },
-    { href: "/questions/new", icon: BookPlus, label: "Numerical Management" },
+    { href: "/numerical-management", icon: BookPlus, label: "Numerical Management" },
     { href: "/worksheets", icon: FilePlus2, label: "Worksheet Generator" },
     { href: "#", icon: Building2, label: "Economy Setting" },
   ];
@@ -82,7 +82,7 @@ export function AppSidebar() {
 
     return menuItems.map((item) => (
          <SidebarMenuItem key={item.href + item.label}>
-            <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
+            <SidebarMenuButton asChild tooltip={item.label} isActive={pathname.startsWith(item.href) && (item.href !== '/dashboard' || pathname === '/dashboard')}>
                 <Link href={item.href}><item.icon /><span>{item.label}</span></Link>
             </SidebarMenuButton>
         </SidebarMenuItem>
