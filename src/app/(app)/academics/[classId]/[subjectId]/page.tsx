@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { arrayUnion, collection, doc, query, updateDoc, where } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus } from "lucide-react";
+import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where } from "firebase/firestore";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Subject, Unit, Category, CustomTab } from "@/types";
@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -217,18 +217,23 @@ export default function SubjectWorkspacePage() {
     const firestore = useFirestore();
     
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    
     const [isAddTabDialogOpen, setAddTabDialogOpen] = useState(false);
     const [newTabName, setNewTabName] = useState("");
+
+    const [isEditTabDialogOpen, setEditTabDialogOpen] = useState(false);
+    const [editingTab, setEditingTab] = useState<CustomTab | null>(null);
+    const [editedTabName, setEditedTabName] = useState("");
+
+    const [isDeleteTabDialogOpen, setDeleteTabDialogOpen] = useState(false);
+    const [deletingTab, setDeletingTab] = useState<CustomTab | null>(null);
 
     const subjectDocRef = useMemoFirebase(() => firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null, [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
     
     useEffect(() => {
-        if (!isUserProfileLoading && userProfile && userProfile.role === 'student') {
-            return; // Students are allowed to view, so do nothing.
-        }
-        if (!isUserProfileLoading && userProfile?.role !== 'admin' && userProfile?.role !== 'teacher') {
-            router.push('/dashboard'); // Redirect other non-privileged users
+        if (!isUserProfileLoading && !userProfile) {
+            router.push('/dashboard');
         }
     }, [userProfile, isUserProfileLoading, router]);
 
@@ -249,12 +254,49 @@ export default function SubjectWorkspacePage() {
         setNewTabName('');
         setAddTabDialogOpen(false);
     }
+    
+    const openEditTabDialog = (tab: CustomTab) => {
+        setEditingTab(tab);
+        setEditedTabName(tab.label);
+        setEditTabDialogOpen(true);
+    };
+
+    const handleEditCustomTab = async () => {
+        if (!firestore || !editedTabName.trim() || !subject || !editingTab) return;
+        const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {...t, label: editedTabName} : t);
+        const subjectRef = doc(firestore, 'subjects', subjectId);
+        await updateDoc(subjectRef, { customTabs: updatedTabs });
+        setEditTabDialogOpen(false);
+        setEditingTab(null);
+    }
+
+    const openDeleteTabDialog = (tab: CustomTab) => {
+        setDeletingTab(tab);
+        setDeleteTabDialogOpen(true);
+    };
+    
+    const handleDeleteCustomTab = async () => {
+        if (!firestore || !deletingTab || !subject) return;
+        const subjectRef = doc(firestore, 'subjects', subjectId);
+        await updateDoc(subjectRef, { customTabs: arrayRemove(deletingTab) });
+        setDeleteTabDialogOpen(false);
+        setDeletingTab(null);
+    }
+
+    const handleToggleTabVisibility = async (tab: CustomTab) => {
+        if (!firestore || !subject) return;
+        const updatedTabs = subject.customTabs?.map(t => t.id === tab.id ? {...t, hidden: !t.hidden} : t);
+        const subjectRef = doc(firestore, 'subjects', subjectId);
+        await updateDoc(subjectRef, { customTabs: updatedTabs });
+    }
 
     const description = subject?.description || "Manage the subject curriculum.";
     const shouldTruncate = description.length > 150;
     const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 150)}...` : description;
 
     const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
+    
+    const visibleCustomTabs = userIsEditor ? subject?.customTabs : subject?.customTabs?.filter(t => !t.hidden);
 
     if (isUserProfileLoading || isSubjectLoading) {
         return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -284,8 +326,32 @@ export default function SubjectWorkspacePage() {
                         <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
                         <TabsTrigger value="worksheet">Worksheet</TabsTrigger>
                         <TabsTrigger value="archivers">Archivers</TabsTrigger>
-                        {subject?.customTabs?.map(tab => (
-                            <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
+                        {visibleCustomTabs?.map(tab => (
+                             <div key={tab.id} className="relative group">
+                                <TabsTrigger value={tab.id} className={userIsEditor ? 'pr-8' : ''}>{tab.label}</TabsTrigger>
+                                {userIsEditor && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="absolute top-1/2 right-0.5 -translate-y-1/2 h-6 w-6 opacity-60 group-hover:opacity-100">
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => openEditTabDialog(tab)}>
+                                                <Edit className="mr-2 h-4 w-4" /> Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
+                                                {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                                                {tab.hidden ? 'Show to Students' : 'Hide from Students'}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive">
+                                                <Trash className="mr-2 h-4 w-4" /> Delete Tab
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
+                            </div>
                         ))}
                     </TabsList>
                     {userIsEditor && (
@@ -323,7 +389,7 @@ export default function SubjectWorkspacePage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
-                 {subject?.customTabs?.map(tab => (
+                 {visibleCustomTabs?.map(tab => (
                     <TabsContent key={tab.id} value={tab.id}>
                         <Card className="mt-6">
                             <CardHeader>
@@ -337,6 +403,7 @@ export default function SubjectWorkspacePage() {
                 ))}
             </Tabs>
 
+            {/* Add Tab Dialog */}
             <Dialog open={isAddTabDialogOpen} onOpenChange={setAddTabDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -358,6 +425,46 @@ export default function SubjectWorkspacePage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+             {/* Edit Tab Dialog */}
+            <Dialog open={isEditTabDialogOpen} onOpenChange={setEditTabDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Tab Name</DialogTitle>
+                        <DialogDescription>Rename the tab '{editingTab?.label}'.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <Label htmlFor="edit-tab-name">New Tab Name</Label>
+                        <Input 
+                            id="edit-tab-name" 
+                            value={editedTabName} 
+                            onChange={e => setEditedTabName(e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditTabDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleEditCustomTab}>Save Changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+             {/* Delete Tab Dialog */}
+            <AlertDialog open={isDeleteTabDialogOpen} onOpenChange={setDeleteTabDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the tab '{deletingTab?.label}' and all its content. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeleteTabDialogOpen(false)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteCustomTab} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            Delete Tab
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

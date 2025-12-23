@@ -23,6 +23,7 @@ export interface CustomTab {
     id: string;
     label: string;
     content: string;
+    hidden?: boolean;
 }
 
 export interface Subject {
