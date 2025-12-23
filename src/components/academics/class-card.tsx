@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Class } from "@/types";
 
-export function ClassCard({ classItem, onEdit, onDelete, isStudentView = false }: { classItem: Class, onEdit: (c: Class) => void, onDelete: (c: Class) => void, isStudentView?: boolean }) {
+export function ClassCard({ classItem, onEdit, onDelete, isStudentView = false }: { classItem: Class, onEdit?: (c: Class) => void, onDelete?: (c: Class) => void, isStudentView?: boolean }) {
     const router = useRouter();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
@@ -19,7 +19,7 @@ export function ClassCard({ classItem, onEdit, onDelete, isStudentView = false }
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg font-headline">{classItem.name}</CardTitle>
-                {!isStudentView && (
+                {!isStudentView && onEdit && onDelete && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">

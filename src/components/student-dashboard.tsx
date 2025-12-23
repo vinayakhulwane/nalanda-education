@@ -42,8 +42,6 @@ function StudentAcademics() {
                             <ClassCard
                                 key={c.id}
                                 classItem={c}
-                                onEdit={() => {}} 
-                                onDelete={() => {}}
                                 isStudentView={true}
                             />
                         ))}
