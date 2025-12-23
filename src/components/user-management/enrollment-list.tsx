@@ -7,9 +7,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, UserX, X } from "lucide-react";
+import { Loader2, UserX, X, Users, Filter } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 type SubjectEnrollmentInfo = {
     subject: Subject;
@@ -21,6 +22,8 @@ export function EnrollmentList() {
     const firestore = useFirestore();
     const [selectedSubject, setSelectedSubject] = useState<SubjectEnrollmentInfo | null>(null);
     const [isDialogOpen, setDialogOpen] = useState(false);
+    const [classFilter, setClassFilter] = useState<string>('all');
+
 
     // Fetch all necessary data
     const subjectsRef = useMemoFirebase(() => firestore && collection(firestore, 'subjects'), [firestore]);
@@ -49,6 +52,14 @@ export function EnrollmentList() {
             };
         });
     }, [subjects, classes, users]);
+
+    const filteredEnrollmentData = useMemo(() => {
+        if (classFilter === 'all') {
+            return enrollmentData;
+        }
+        return enrollmentData.filter(data => data.subject.classId === classFilter);
+    }, [enrollmentData, classFilter]);
+
 
     const handleViewStudents = (data: SubjectEnrollmentInfo) => {
         setSelectedSubject(data);
@@ -92,12 +103,27 @@ export function EnrollmentList() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Subject Name</TableHead>
-                                <TableHead>Class</TableHead>
+                                <TableHead>
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="h-4 w-4 text-muted-foreground" />
+                                        <Select value={classFilter} onValueChange={setClassFilter}>
+                                            <SelectTrigger className="w-[180px] h-8 text-xs">
+                                                <SelectValue placeholder="Filter by class..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Classes</SelectItem>
+                                                {classes?.map(c => (
+                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </TableHead>
                                 <TableHead className="text-center">Enrolled Students</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {enrollmentData.map(data => (
+                            {filteredEnrollmentData.map(data => (
                                 <TableRow key={data.subject.id}>
                                     <TableCell className="font-medium">{data.subject.name}</TableCell>
                                     <TableCell>{data.className}</TableCell>
@@ -106,16 +132,18 @@ export function EnrollmentList() {
                                             variant="link" 
                                             onClick={() => handleViewStudents(data)}
                                             disabled={data.enrolledStudents.length === 0}
+                                            className="flex items-center justify-center gap-2 mx-auto"
                                         >
+                                            <Users className="h-4 w-4" />
                                             {data.enrolledStudents.length}
                                         </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
-                             {enrollmentData.length === 0 && (
+                             {filteredEnrollmentData.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={3} className="h-24 text-center">
-                                    No subjects found.
+                                        {classFilter === 'all' ? 'No subjects found.' : 'No subjects found for this class.'}
                                     </TableCell>
                                 </TableRow>
                             )}
