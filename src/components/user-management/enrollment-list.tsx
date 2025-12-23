@@ -1,16 +1,18 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { arrayRemove, collection, doc, updateDoc } from "firebase/firestore";
 import type { User, Subject, Class } from "@/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, UserX, X, Users, Filter } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Loader2, UserX, Users, Filter } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
+import { Label } from '../ui/label';
 
 type SubjectEnrollmentInfo = {
     subject: Subject;
@@ -20,6 +22,7 @@ type SubjectEnrollmentInfo = {
 
 export function EnrollmentList() {
     const firestore = useFirestore();
+    const { user: currentUser } = useUser();
     const [selectedSubject, setSelectedSubject] = useState<SubjectEnrollmentInfo | null>(null);
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [classFilter, setClassFilter] = useState<string>('all');
@@ -66,11 +69,14 @@ export function EnrollmentList() {
         setDialogOpen(true);
     };
 
-    const handleBlockUser = async (userId: string) => {
+    const handleStatusToggle = (userId: string, currentStatus: boolean) => {
+        if (userId === currentUser?.uid) {
+            alert("You cannot block yourself.");
+            return;
+        }
         if (!firestore) return;
         const userDocRef = doc(firestore, 'users', userId);
-        await updateDoc(userDocRef, { active: false });
-        // The UI will update automatically due to real-time listeners
+        updateDoc(userDocRef, { active: !currentStatus });
     };
 
     const handleUnenrollUser = async (userId: string, subjectId: string) => {
@@ -174,6 +180,18 @@ export function EnrollmentList() {
                                             <p className="text-sm text-muted-foreground">{student.email}</p>
                                         </div>
                                          {!student.active && <Badge variant="destructive">Blocked</Badge>}
+                                        <div className="flex items-center space-x-2">
+                                            <Label htmlFor={`block-switch-${student.id}`} className="text-xs text-muted-foreground">
+                                                {student.active ?? true ? 'Active' : 'Blocked'}
+                                            </Label>
+                                            <Switch
+                                                id={`block-switch-${student.id}`}
+                                                checked={student.active ?? true}
+                                                onCheckedChange={() => handleStatusToggle(student.id, student.active ?? true)}
+                                                disabled={student.id === currentUser?.uid}
+                                                aria-label="Activate or block user"
+                                            />
+                                        </div>
                                         <Button 
                                             variant="outline" 
                                             size="sm" 
@@ -181,14 +199,6 @@ export function EnrollmentList() {
                                             className="text-destructive border-destructive hover:bg-destructive/10 hover:text-destructive"
                                             >
                                                 <UserX className="mr-2 h-4 w-4" /> Unenroll
-                                        </Button>
-                                         <Button 
-                                            variant="destructive" 
-                                            size="sm" 
-                                            onClick={() => handleBlockUser(student.id)}
-                                            disabled={!student.active}
-                                            >
-                                                <X className="mr-2 h-4 w-4" /> Block
                                         </Button>
                                     </div>
                                 ))}
