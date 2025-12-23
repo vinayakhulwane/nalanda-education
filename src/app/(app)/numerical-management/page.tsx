@@ -5,21 +5,32 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebas
 import { collection } from "firebase/firestore";
 import { Loader2, PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Class } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 function NumericalManagementClassCard({ classItem }: { classItem: Class }) {
     const router = useRouter();
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
+    const description = classItem.description || `Manage questions for ${classItem.name}.`;
+    const shouldTruncate = description.length > 100;
+    const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 100)}...` : description;
+    
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="text-lg font-headline">{classItem.name}</CardTitle>
             </CardHeader>
             <CardContent>
-                <CardDescription>
-                    {classItem.description || `Manage questions for ${classItem.name}.`}
-                </CardDescription>
+                <p className="text-sm text-muted-foreground">
+                    {displayedDescription}
+                    {shouldTruncate && (
+                         <Button variant="link" className="p-0 pl-1 text-sm h-auto" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
+                            {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                        </Button>
+                    )}
+                </p>
             </CardContent>
             <CardFooter>
                  <Button variant="secondary" className="w-full" onClick={() => router.push(`/questions/new`)}>
