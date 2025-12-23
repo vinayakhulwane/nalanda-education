@@ -16,6 +16,52 @@ import type { Class } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 
+function ClassCard({ classItem, onEdit, onDelete }: { classItem: Class, onEdit: (c: Class) => void, onDelete: (c: Class) => void }) {
+    const router = useRouter();
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
+    const description = classItem.description || "";
+    const shouldTruncate = description.length > 100;
+    const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 100)}...` : description;
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-headline">{classItem.name}</CardTitle>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onEdit(classItem)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onDelete(classItem)} className="text-red-600">
+                            <Trash className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </CardHeader>
+            <CardContent>
+                <p className="text-sm text-muted-foreground">
+                    {displayedDescription}
+                    {shouldTruncate && (
+                         <Button variant="link" className="p-0 pl-1 text-sm h-auto" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
+                            {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                        </Button>
+                    )}
+                </p>
+            </CardContent>
+            <CardFooter>
+                <Button variant="secondary" className="w-full" onClick={() => router.push(`/academics/${classItem.id}`)}>Manage Subjects</Button>
+            </CardFooter>
+        </Card>
+    );
+}
+
+
 export default function AcademicsPage() {
     const { userProfile, isUserProfileLoading } = useUser();
     const router = useRouter();
@@ -136,32 +182,12 @@ export default function AcademicsPage() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {classes?.map((c) => (
-                        <Card key={c.id}>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-lg font-headline">{c.name}</CardTitle>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => openEditDialog(c)}>
-                                            <Edit className="mr-2 h-4 w-4" /> Edit
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => openDeleteDialog(c)} className="text-red-600">
-                                            <Trash className="mr-2 h-4 w-4" /> Delete
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-muted-foreground">{c.description}</p>
-                            </CardContent>
-                            <CardFooter>
-                                <Button variant="secondary" className="w-full" onClick={() => router.push(`/academics/${c.id}`)}>Manage Subjects</Button>
-                            </CardFooter>
-                        </Card>
+                        <ClassCard 
+                            key={c.id} 
+                            classItem={c} 
+                            onEdit={openEditDialog}
+                            onDelete={openDeleteDialog}
+                        />
                     ))}
                 </div>
             )}
