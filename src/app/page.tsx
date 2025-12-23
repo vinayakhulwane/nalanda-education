@@ -7,15 +7,18 @@ import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { Logo } from "@/components/logo";
 import { ArrowRight, Mail, Loader2 } from "lucide-react";
 import { useAuth, useUser } from "@/firebase";
-import { GoogleAuthProvider, signInWithRedirect } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const loginImage = PlaceHolderImages.find(p => p.id === 'login');
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -24,11 +27,25 @@ export default function Home() {
   }, [user, router]);
 
   const handleSignIn = async () => {
+    setIsSigningIn(true);
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    try {
+      await signInWithPopup(auth, provider);
+      // The useEffect will handle the redirect once the user state is updated.
+    } catch (error: any) {
+      console.error("Sign-in error", error);
+      toast({
+        variant: "destructive",
+        title: "Sign-in Failed",
+        description: error.message || "An unexpected error occurred during sign-in.",
+      });
+    } finally {
+      setIsSigningIn(false);
+    }
   };
 
-  if (isUserLoading || user) {
+  // Show a loader if Firebase is still checking auth state, or if a sign-in is in progress, or if the user is logged in and we are about to redirect.
+  if (isUserLoading || isSigningIn || user) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -48,7 +65,7 @@ export default function Home() {
             </p>
           </div>
           <div className="grid gap-4">
-            <Button variant="outline" type="button" onClick={handleSignIn}>
+            <Button variant="outline" type="button" onClick={handleSignIn} disabled={isSigningIn}>
               <Mail className="mr-2 h-4 w-4" />
               Sign in with Google
             </Button>
