@@ -19,6 +19,13 @@ export interface Class {
   description: string;
 }
 
+export interface Subject {
+  id: string;
+  name: string;
+  description: string;
+  classId: string;
+}
+
 export interface Course {
   id: string;
   title: string;

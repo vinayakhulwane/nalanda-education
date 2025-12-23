@@ -70,6 +70,30 @@
       "required": [
         "name"
       ]
+    },
+    "Subject": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Subject",
+      "type": "object",
+      "description": "Represents an academic subject within a class.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the subject (e.g., 'Mathematics')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short description of the subject."
+        },
+        "classId": {
+          "type": "string",
+          "description": "The ID of the class this subject belongs to."
+        }
+      },
+      "required": [
+        "name",
+        "classId"
+      ]
     }
   },
   "auth": {
@@ -109,6 +133,16 @@
             "$ref": "#/backend/entities/Class"
           },
           "description": "Stores the academic classes available on the platform."
+        }
+      },
+       {
+        "path": "/subjects/{subjectId}",
+        "definition": {
+          "entityName": "Subject",
+          "schema": {
+            "$ref": "#/backend/entities/Subject"
+          },
+          "description": "Stores the academic subjects for all classes."
         }
       }
     ]

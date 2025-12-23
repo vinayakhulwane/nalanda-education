@@ -103,5 +103,10 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
+
+    match /subjects/{subjectId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }
