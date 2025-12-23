@@ -2,6 +2,7 @@
 
 import { PageHeader } from "@/components/page-header";
 import { EnrollmentList } from "@/components/user-management/enrollment-list";
+import { StudentProgressList } from "@/components/user-management/student-progress-list";
 import { UserList } from "@/components/user-management/user-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/firebase";
@@ -48,9 +49,7 @@ export default function UserManagementPage() {
                     <UserList />
                 </TabsContent>
                 <TabsContent value="progress">
-                    <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm p-8 mt-4">
-                        <p className="text-muted-foreground">Student Progress coming soon.</p>
-                    </div>
+                    <StudentProgressList />
                 </TabsContent>
                 <TabsContent value="enrollment">
                     <EnrollmentList />
