@@ -439,17 +439,40 @@ export default function SubjectWorkspacePage() {
                     <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
                 </TabsContent>
                 <TabsContent value="worksheet">
-                    <Card className="mt-6">
-                        <CardHeader>
-                            <CardTitle>Worksheet Management</CardTitle>
-                            <CardDescription>Create and manage worksheets for this subject.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                             <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-                                <p className="text-muted-foreground">Worksheet features are coming soon.</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <Tabs defaultValue="classroomAssign" className="w-full mt-6">
+                        <TabsList>
+                            <TabsTrigger value="classroomAssign">Classroom Assign</TabsTrigger>
+                            {!userIsEditor && <TabsTrigger value="myPracticeZone">My Practice Zone</TabsTrigger>}
+                        </TabsList>
+                        <TabsContent value="classroomAssign">
+                            <Card className="mt-6">
+                                <CardHeader>
+                                    <CardTitle>Classroom Assignments</CardTitle>
+                                    <CardDescription>Manage and assign worksheets to the classroom.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
+                                        <p className="text-muted-foreground">Classroom assignment features are coming soon.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        {!userIsEditor && (
+                             <TabsContent value="myPracticeZone">
+                                 <Card className="mt-6">
+                                    <CardHeader>
+                                        <CardTitle>My Practice Zone</CardTitle>
+                                        <CardDescription>Review your saved worksheets and practice history.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
+                                            <p className="text-muted-foreground">Practice zone features are coming soon.</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        )}
+                    </Tabs>
                 </TabsContent>
                 <TabsContent value="archivers">
                      <Card className="mt-6">
