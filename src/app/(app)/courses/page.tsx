@@ -18,7 +18,7 @@ export default function CoursesPage() {
     }
     // Firestore 'in' queries are limited to 30 items.
     // For a production app with many enrollments, this would need pagination or a different data model.
-    return query(collection(firestore, 'subjects'), where('id', 'in', userProfile.enrollments));
+    return query(collection(firestore, 'subjects'), where('id', 'in', userProfile.enrollments.slice(0, 30)));
   }, [firestore, userProfile?.enrollments]);
 
   const { data: enrolledSubjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQuery);
