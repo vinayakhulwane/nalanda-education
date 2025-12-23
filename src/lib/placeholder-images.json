@@ -1,3 +1,34 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "login",
+      "description": "Abstract image representing learning and technology",
+      "imageUrl": "https://images.unsplash.com/photo-1758612898312-708f2ffdcd53?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxlZHVjYXRpb24lMjBsZWFybmluZ3xlbnwwfHx8fDE3NjY0MDk4NjJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "education learning"
+    },
+    {
+      "id": "course-algebra",
+      "description": "Placeholder for Algebra course",
+      "imageUrl": "https://images.unsplash.com/photo-1623433302982-7f165ae4f9ef?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8YWJzdHJhY3QlMjBtYXRofGVufDB8fHx8MTc2NjM5NjYwM3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "abstract math"
+    },
+    {
+      "id": "course-geometry",
+      "description": "Placeholder for Geometry course",
+      "imageUrl": "https://images.unsplash.com/photo-1483959651481-dc75b89291f1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxnZW9tZXRyaWMlMjBzaGFwZXN8ZW58MHx8fHwxNzY2NDQ5NjkyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "geometric shapes"
+    },
+    {
+      "id": "course-calculus",
+      "description": "Placeholder for Calculus course",
+      "imageUrl": "https://images.unsplash.com/photo-1588343823210-663b8e34d258?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxncmFwaHMlMjBmdW5jdGlvbnN8ZW58MHx8fHwxNzY2NDUwODUxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "graphs functions"
+    },
+    {
+      "id": "course-statistics",
+      "description": "Placeholder for Statistics course",
+      "imageUrl": "https://images.unsplash.com/photo-1765205361996-66c42e1c3967?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxkYXRhJTIwY2hhcnRzfGVufDB8fHx8MTc2NjQ0ODM5Nnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "data charts"
+    }
+  ]
 }
