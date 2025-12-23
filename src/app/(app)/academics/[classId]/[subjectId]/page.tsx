@@ -39,7 +39,10 @@ export default function SyllabusPage() {
     const unitsQuery = useMemoFirebase(() => firestore && subjectId ? query(collection(firestore, 'units'), where('subjectId', '==', subjectId)) : null, [firestore, subjectId]);
     const { data: units, isLoading: areUnitsLoading } = useCollection<Unit>(unitsQuery);
 
-    const categoriesQuery = useMemoFirebase(() => firestore && units ? query(collection(firestore, 'categories'), where('unitId', 'in', units.map(u => u.id))) : null, [firestore, units]);
+    const categoriesQuery = useMemoFirebase(() => {
+        if (!firestore || !units || units.length === 0) return null;
+        return query(collection(firestore, 'categories'), where('unitId', 'in', units.map(u => u.id)));
+    }, [firestore, units]);
     const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);
 
     useEffect(() => {
