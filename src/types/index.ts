@@ -1,3 +1,4 @@
+'use client';
 export type UserRole = 'student' | 'teacher' | 'admin';
 
 export interface User {
@@ -10,6 +11,12 @@ export interface User {
   gold: number;
   diamonds: number;
   active?: boolean;
+}
+
+export interface Class {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface Course {

@@ -49,6 +49,14 @@ service cloud.firestore {
       return isOwner(userId) && resource != null;
     }
 
+    function isRole(role) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function isAdmin() {
+      return isRole('admin');
+    }
+
     /**
      * Validates critical relational data when a user document is created.
      * In prototyping mode, we only validate fields essential for authorization and
@@ -82,13 +90,18 @@ service cloud.firestore {
      */
     match /users/{userId} {
       // READ Rules: A user can only get their own document. Listing is disabled.
-      allow get: if isOwner(userId);
-      allow list: if false; // CRITICAL: Prevents any user from listing and discovering other user profiles.
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
 
       // WRITE Rules: A user can create, update, and delete their own document.
       allow create: if isOwner(userId) && hasValidAndConsistentUserDataOnCreate(userId);
-      allow update: if isExistingOwner(userId) && hasImmutableUserDataOnUpdate();
+      allow update: if isOwner(userId) || isAdmin();
       allow delete: if isExistingOwner(userId);
+    }
+    
+    match /classes/{classId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

@@ -20,13 +20,17 @@
           "description": "User's full display name."
         },
         "avatar": {
-            "type": "string",
-            "description": "URL to the user's profile picture."
+          "type": "string",
+          "description": "URL to the user's profile picture."
         },
         "role": {
           "type": "string",
           "description": "User's role within the system (e.g., Admin, Teacher, Student).",
-          "enum": ["student", "teacher", "admin"]
+          "enum": [
+            "student",
+            "teacher",
+            "admin"
+          ]
         },
         "coins": {
           "type": "number",
@@ -47,6 +51,25 @@
         "name",
         "role"
       ]
+    },
+    "Class": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Class",
+      "type": "object",
+      "description": "Represents an academic class level in the platform.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the class (e.g., 'Class 10')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short description of the class."
+        }
+      },
+      "required": [
+        "name"
+      ]
     }
   },
   "auth": {
@@ -54,10 +77,10 @@
       "google.com"
     ],
     "authorizedDomains": [
-        "localhost",
-        "firebaseapp.com",
-        "web.app",
-        "cloudworkstations.dev"
+      "localhost",
+      "firebaseapp.com",
+      "web.app",
+      "cloudworkstations.dev"
     ]
   },
   "firestore": {
@@ -76,6 +99,16 @@
               "description": "The unique identifier for the user."
             }
           ]
+        }
+      },
+      {
+        "path": "/classes/{classId}",
+        "definition": {
+          "entityName": "Class",
+          "schema": {
+            "$ref": "#/backend/entities/Class"
+          },
+          "description": "Stores the academic classes available on the platform."
         }
       }
     ]
