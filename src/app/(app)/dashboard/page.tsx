@@ -3,7 +3,6 @@
 import { StudentDashboard } from "@/components/student-dashboard";
 import { TeacherDashboard } from "@/components/teacher-dashboard";
 import { useUser, useDoc, useFirestore } from "@/firebase";
-import { mockCourses } from "@/lib/data";
 import type { User as AppUser } from "@/types";
 import { doc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
@@ -38,7 +37,7 @@ export default function DashboardPage() {
   }
 
   if (userProfile.role === 'student') {
-    return <StudentDashboard user={userProfile} courses={mockCourses} />;
+    return <StudentDashboard user={userProfile} />;
   }
   
   if (userProfile.role === 'teacher' || userProfile.role === 'admin') {

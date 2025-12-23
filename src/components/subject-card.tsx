@@ -20,9 +20,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 type SubjectCardProps = {
   subject: Subject;
   classId: string;
+  isStudentView?: boolean;
 };
 
-export function SubjectCard({ subject, classId }: SubjectCardProps) {
+export function SubjectCard({ subject, classId, isStudentView = false }: SubjectCardProps) {
   const router = useRouter();
   const firestore = useFirestore();
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -56,21 +57,23 @@ export function SubjectCard({ subject, classId }: SubjectCardProps) {
       <Card>
         <CardHeader className="flex flex-row items-start justify-between">
           <CardTitle className="text-lg font-headline">{subject.name}</CardTitle>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
-                <Edit className="mr-2 h-4 w-4" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="text-red-600">
-                <Trash className="mr-2 h-4 w-4" /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {!isStudentView && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 -mt-2">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+                  <Edit className="mr-2 h-4 w-4" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="text-red-600">
+                  <Trash className="mr-2 h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </CardHeader>
         <CardContent>
             <p className="text-sm text-muted-foreground">
@@ -84,7 +87,7 @@ export function SubjectCard({ subject, classId }: SubjectCardProps) {
         </CardContent>
         <CardFooter>
           <Button variant="secondary" className="w-full" onClick={() => router.push(`/academics/${classId}/${subject.id}`)}>
-            Manage Syllabus
+            {isStudentView ? 'View Syllabus' : 'Manage Syllabus'}
           </Button>
         </CardFooter>
       </Card>

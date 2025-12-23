@@ -1,65 +1,19 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { collection, doc } from "firebase/firestore";
-import { Edit, Loader2, MoreVertical, PlusCircle, Trash } from "lucide-react";
+import { Loader2, PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Class } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-
-function ClassCard({ classItem, onEdit, onDelete }: { classItem: Class, onEdit: (c: Class) => void, onDelete: (c: Class) => void }) {
-    const router = useRouter();
-    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-
-    const description = classItem.description || "";
-    const shouldTruncate = description.length > 100;
-    const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 100)}...` : description;
-
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-headline">{classItem.name}</CardTitle>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onEdit(classItem)}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDelete(classItem)} className="text-red-600">
-                            <Trash className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </CardHeader>
-            <CardContent>
-                <p className="text-sm text-muted-foreground">
-                    {displayedDescription}
-                    {shouldTruncate && (
-                         <Button variant="link" className="p-0 pl-1 text-sm h-auto" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
-                            {isDescriptionExpanded ? 'Read less' : 'Read more'}
-                        </Button>
-                    )}
-                </p>
-            </CardContent>
-            <CardFooter>
-                <Button variant="secondary" className="w-full" onClick={() => router.push(`/academics/${classItem.id}`)}>Manage Subjects</Button>
-            </CardFooter>
-        </Card>
-    );
-}
+import { ClassCard } from "@/components/academics/class-card";
 
 
 export default function AcademicsPage() {

@@ -1,19 +1,88 @@
 'use client';
-import type { User, Course } from "@/types";
+import type { User, Course, Class, Subject } from "@/types";
 import { PageHeader } from "./page-header";
 import { StatsCard } from "./stats-card";
-import { BookOpen, Target, CheckCircle } from "lucide-react";
-import { CourseCard } from "./course-card";
-import { Button } from "./ui/button";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { BookOpen, Target, CheckCircle, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import { ClassCard } from "./academics/class-card";
+import { SubjectCard } from "./subject-card";
+import { Card, CardContent } from "./ui/card";
 
 type StudentDashboardProps = {
-    user: User | null; // User can be null
-    courses: Course[];
+    user: User | null;
 }
 
-export function StudentDashboard({ user, courses }: StudentDashboardProps) {
+function StudentAcademics() {
+    const firestore = useFirestore();
+
+    const classesCollectionRef = useMemoFirebase(() => firestore ? collection(firestore, 'classes') : null, [firestore]);
+    const { data: classes, isLoading: areClassesLoading } = useCollection<Class>(classesCollectionRef);
+
+    const subjectsCollectionRef = useMemoFirebase(() => firestore ? collection(firestore, 'subjects') : null, [firestore]);
+    const { data: subjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsCollectionRef);
+
+    const isLoading = areClassesLoading || areSubjectsLoading;
+
+    return (
+        <Tabs defaultValue="classes" className="mt-6">
+            <TabsList>
+                <TabsTrigger value="classes">All Classes</TabsTrigger>
+                <TabsTrigger value="subjects">All Subjects</TabsTrigger>
+            </TabsList>
+            <TabsContent value="classes">
+                {isLoading ? (
+                    <div className="flex justify-center items-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                ) : (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4">
+                        {classes?.map((c) => (
+                            <ClassCard
+                                key={c.id}
+                                classItem={c}
+                                onEdit={() => {}} 
+                                onDelete={() => {}}
+                                isStudentView={true}
+                            />
+                        ))}
+                         {classes?.length === 0 && (
+                            <div className="col-span-full text-center text-muted-foreground py-10">
+                                No classes available yet.
+                            </div>
+                        )}
+                    </div>
+                )}
+            </TabsContent>
+            <TabsContent value="subjects">
+                 {isLoading ? (
+                    <div className="flex justify-center items-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                ) : (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4">
+                        {subjects?.map((s) => (
+                            <SubjectCard 
+                                key={s.id} 
+                                subject={s} 
+                                classId={s.classId} 
+                                isStudentView={true}
+                            />
+                        ))}
+                        {subjects?.length === 0 && (
+                            <div className="col-span-full text-center text-muted-foreground py-10">
+                                No subjects available yet.
+                            </div>
+                        )}
+                    </div>
+                )}
+            </TabsContent>
+        </Tabs>
+    )
+}
+
+export function StudentDashboard({ user }: StudentDashboardProps) {
     if (!user) {
         return null; // or a loading state
     }
@@ -27,36 +96,26 @@ export function StudentDashboard({ user, courses }: StudentDashboardProps) {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
                 <StatsCard
                     title="Courses Enrolled"
-                    value={courses.length.toString()}
+                    value="0"
                     icon={BookOpen}
                     description="The number of courses you are currently taking."
                 />
                 <StatsCard
                     title="Overall Score"
-                    value="82%"
+                    value="N/A"
                     icon={Target}
-                    description="+5% from last month"
+                    description="Your average score will appear here."
                 />
                 <StatsCard
                     title="Worksheets Completed"
-                    value="12"
+                    value="0"
                     icon={CheckCircle}
                     description="Keep up the great work!"
                 />
             </div>
-
-            <div className="flex justify-between items-center mb-4">
-                 <h2 className="font-headline text-2xl font-bold tracking-tight">My Courses</h2>
-                 <Button variant="ghost" asChild>
-                     <Link href="/courses">View all <ArrowRight className="ml-2 h-4 w-4" /></Link>
-                 </Button>
-            </div>
-           
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {courses.map((course) => (
-                    <CourseCard key={course.id} course={course} />
-                ))}
-            </div>
+            
+            <h2 className="font-headline text-2xl font-bold tracking-tight">Explore Academics</h2>
+            <StudentAcademics />
         </div>
     )
 }
