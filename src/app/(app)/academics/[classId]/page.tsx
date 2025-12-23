@@ -82,7 +82,7 @@ export default function SubjectsPage() {
             <div className="flex justify-between items-center">
                 <PageHeader
                     title={`Subjects for ${currentClass?.name || 'Class'}`}
-                    description="Manage subjects like Mathematics or Science for this class."
+                    description={userIsEditor ? "Manage subjects like Mathematics or Science for this class." : "Browse subjects available in this class."}
                 />
                 {userIsEditor && (
                     <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
@@ -132,7 +132,7 @@ export default function SubjectsPage() {
                     ))}
                      {subjects?.length === 0 && (
                         <div className="col-span-full text-center text-muted-foreground py-10">
-                            No subjects found for this class. Click "Add Subject" to create one.
+                            No subjects found for this class. {userIsEditor && 'Click "Add Subject" to create one.'}
                         </div>
                     )}
                 </div>
