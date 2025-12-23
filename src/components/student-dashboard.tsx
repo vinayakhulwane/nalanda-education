@@ -94,7 +94,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
                 <StatsCard
                     title="Courses Enrolled"
-                    value="0"
+                    value={user.enrollments?.length.toString() ?? '0'}
                     icon={BookOpen}
                     description="The number of courses you are currently taking."
                 />
