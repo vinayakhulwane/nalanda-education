@@ -98,7 +98,7 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
     return (
         <div className="mt-6">
             <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold font-headline">Syllabus Builder</h3>
+                <h3 className="text-2xl font-bold font-headline">{userIsEditor ? 'Syllabus Builder' : 'Syllabus'}</h3>
                  {userIsEditor && <Button onClick={() => setDialogType('addUnit')}>
                     <PlusCircle className="mr-2" />
                     Add Unit
