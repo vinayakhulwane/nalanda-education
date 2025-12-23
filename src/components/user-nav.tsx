@@ -12,10 +12,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { type User } from "@/types";
 import { Coins, Diamond, Gem, LogOut, User as UserIcon } from "lucide-react";
 import Link from "next/link";
+import { getAuth, signOut } from "firebase/auth";
 
 export function UserNav({ user }: { user: User }) {
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('');
+  }
+
+  const handleSignOut = () => {
+    const auth = getAuth();
+    signOut(auth);
   }
 
   return (
@@ -62,7 +68,7 @@ export function UserNav({ user }: { user: User }) {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild onClick={handleSignOut}>
           <Link href="/">
             <LogOut className="mr-2" />
             <span>Sign out</span>

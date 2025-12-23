@@ -1,12 +1,40 @@
+'use client';
+
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { Logo } from "@/components/logo";
-import { ArrowRight, Mail } from "lucide-react";
+import { ArrowRight, Mail, Loader2 } from "lucide-react";
+import { useAuth, useUser } from "@/firebase";
+import { GoogleAuthProvider, signInWithRedirect } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Home() {
   const loginImage = PlaceHolderImages.find(p => p.id === 'login');
+  const auth = useAuth();
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
+
+  const handleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    await signInWithRedirect(auth, provider);
+  };
+
+  if (isUserLoading || user) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    )
+  }
 
   return (
     <div className="w-full lg:grid lg:min-h-[100vh] lg:grid-cols-2 xl:min-h-[100vh]">
@@ -20,12 +48,12 @@ export default function Home() {
             </p>
           </div>
           <div className="grid gap-4">
-            <Button variant="outline" type="button">
+            <Button variant="outline" type="button" onClick={handleSignIn}>
               <Mail className="mr-2 h-4 w-4" />
               Sign in with Google
             </Button>
             <Link href="/dashboard" className="w-full">
-              <Button className="w-full">
+              <Button className="w-full" disabled>
                 Continue to Dashboard
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

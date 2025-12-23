@@ -9,11 +9,15 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 type StudentDashboardProps = {
-    user: User;
+    user: User | null; // User can be null
     courses: Course[];
 }
 
 export function StudentDashboard({ user, courses }: StudentDashboardProps) {
+    if (!user) {
+        return null; // or a loading state
+    }
+    
     return (
         <div>
             <PageHeader

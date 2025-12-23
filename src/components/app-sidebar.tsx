@@ -1,3 +1,4 @@
+'use client';
 import {
   SidebarContent,
   SidebarFooter,
@@ -15,12 +16,18 @@ import { mockStudent, mockTeacher } from "@/lib/data";
 import { BookOpen, LayoutDashboard, BarChart3, FilePlus2, BookPlus, Settings, LogOut, ChevronsRightLeft, User, Users } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "./logo";
-
-// In a real app, you'd get the user from a session or context
-const user = mockStudent; // or mockTeacher
+import { useUser } from "@/firebase";
+import { getAuth, signOut } from "firebase/auth";
 
 export function AppSidebar() {
-  const currentUser = user.role === 'student' ? mockStudent : mockTeacher;
+  const { user } = useUser();
+  // For now, we'll default to student. In a real app, you'd fetch the user's role from your database.
+  const role = 'student'; 
+
+  const handleSignOut = () => {
+    const auth = getAuth();
+    signOut(auth);
+  }
 
   const studentMenu = (
     <>
@@ -74,7 +81,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {currentUser.role === 'student' ? studentMenu : teacherMenu}
+          {role === 'student' ? studentMenu : teacherMenu}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
@@ -86,7 +93,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Sign Out">
+            <SidebarMenuButton asChild tooltip="Sign Out" onClick={handleSignOut}>
               <Link href="/"><LogOut /><span>Sign Out</span></Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

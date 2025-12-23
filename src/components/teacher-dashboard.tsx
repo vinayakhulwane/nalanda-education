@@ -19,6 +19,10 @@ const recentGraded = [
 ]
 
 export function TeacherDashboard({ user }: TeacherDashboardProps) {
+    if (!user) {
+        return null;
+    }
+    
     return (
         <div>
             <PageHeader
