@@ -33,7 +33,7 @@ function NumericalManagementClassCard({ classItem }: { classItem: Class }) {
                 </p>
             </CardContent>
             <CardFooter>
-                 <Button variant="secondary" className="w-full" onClick={() => router.push(`/questions/new`)}>
+                 <Button variant="secondary" className="w-full" onClick={() => router.push(`/numerical-management/${classItem.id}`)}>
                     Manage Questions
                 </Button>
             </CardFooter>
