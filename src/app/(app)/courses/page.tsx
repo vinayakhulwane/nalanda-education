@@ -3,7 +3,7 @@
 import { EnrolledSubjectCard } from "@/components/enrolled-subject-card";
 import { PageHeader } from "@/components/page-header";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
+import { collection, query, where, documentId } from "firebase/firestore";
 import type { Subject } from "@/types";
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
@@ -18,7 +18,7 @@ export default function CoursesPage() {
     }
     // Firestore 'in' queries are limited to 30 items.
     // For a production app with many enrollments, this would need pagination or a different data model.
-    return query(collection(firestore, 'subjects'), where('id', 'in', userProfile.enrollments.slice(0, 30)));
+    return query(collection(firestore, 'subjects'), where(documentId(), 'in', userProfile.enrollments.slice(0, 30)));
   }, [firestore, userProfile?.enrollments]);
 
   const { data: enrolledSubjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQuery);
