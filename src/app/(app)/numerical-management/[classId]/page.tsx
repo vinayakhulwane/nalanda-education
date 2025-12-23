@@ -3,41 +3,65 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, BookPlus, Library } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useState } from "react";
 import type { Subject, Class } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 function NumericalManagementSubjectCard({ subject }: { subject: Subject }) {
     const router = useRouter();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [isDialogOpen, setDialogOpen] = useState(false);
 
     const description = subject.description || `Manage questions for ${subject.name}.`;
     const shouldTruncate = description.length > 100;
     const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 100)}...` : description;
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg font-headline">{subject.name}</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p className="text-sm text-muted-foreground">
-                    {displayedDescription}
-                    {shouldTruncate && (
-                        <Button variant="link" className="p-0 pl-1 text-sm h-auto" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
-                            {isDescriptionExpanded ? 'Read less' : 'Read more'}
+        <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg font-headline">{subject.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                        {displayedDescription}
+                        {shouldTruncate && (
+                            <Button variant="link" className="p-0 pl-1 text-sm h-auto" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
+                                {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                            </Button>
+                        )}
+                    </p>
+                </CardContent>
+                <CardFooter>
+                    <DialogTrigger asChild>
+                        <Button variant="secondary" className="w-full">
+                            Manage Questions
                         </Button>
-                    )}
-                </p>
-            </CardContent>
-            <CardFooter>
-                <Button variant="secondary" className="w-full" onClick={() => router.push(`/questions/new`)}>
-                    Manage Questions
-                </Button>
-            </CardFooter>
-        </Card>
+                    </DialogTrigger>
+                </CardFooter>
+            </Card>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Manage Questions for {subject.name}</DialogTitle>
+                </DialogHeader>
+                <div className="py-4 text-center text-muted-foreground">
+                    What would you like to do?
+                </div>
+                <DialogFooter className="sm:justify-center gap-2">
+                    <Button onClick={() => router.push('/questions/new')}>
+                        <BookPlus className="mr-2"/>
+                        Create New Question
+                    </Button>
+                    <Button variant="outline" disabled>
+                        <Library className="mr-2" />
+                        Question Bank
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
