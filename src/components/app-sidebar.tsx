@@ -37,7 +37,6 @@ export function AppSidebar() {
   }
 
   const studentMenu = [
-    { href: "/dashboard", icon: Home, label: "Home" },
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/courses", icon: BookOpen, label: "My Courses" },
     { href: "/progress", icon: BarChart3, label: "My Progress" },
@@ -45,7 +44,6 @@ export function AppSidebar() {
   ];
 
   const adminMenu = [
-    { href: "/dashboard", icon: Home, label: "Home" },
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "#", icon: Users, label: "User Management" },
     { href: "/courses", icon: Briefcase, label: "Academics" },
@@ -83,7 +81,7 @@ export function AppSidebar() {
     }
 
     return menuItems.map((item) => (
-         <SidebarMenuItem key={item.href}>
+         <SidebarMenuItem key={item.href + item.label}>
             <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
                 <Link href={item.href}><item.icon /><span>{item.label}</span></Link>
             </SidebarMenuButton>
