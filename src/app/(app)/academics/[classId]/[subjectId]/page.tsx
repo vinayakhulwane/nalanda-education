@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye } from "lucide-react";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Subject, Unit, Category, CustomTab } from "@/types";
@@ -218,12 +218,17 @@ export default function SubjectWorkspacePage() {
     
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     
+    // Custom Tab Dialog States
     const [isAddTabDialogOpen, setAddTabDialogOpen] = useState(false);
     const [newTabName, setNewTabName] = useState("");
 
     const [isEditTabDialogOpen, setEditTabDialogOpen] = useState(false);
     const [editingTab, setEditingTab] = useState<CustomTab | null>(null);
     const [editedTabName, setEditedTabName] = useState("");
+    
+    const [isEditTabContentDialogOpen, setEditTabContentDialogOpen] = useState(false);
+    const [editedTabContent, setEditedTabContent] = useState("");
+
 
     const [isDeleteTabDialogOpen, setDeleteTabDialogOpen] = useState(false);
     const [deletingTab, setDeletingTab] = useState<CustomTab | null>(null);
@@ -290,6 +295,22 @@ export default function SubjectWorkspacePage() {
         await updateDoc(subjectRef, { customTabs: updatedTabs });
     }
 
+    const openEditTabContentDialog = (tab: CustomTab) => {
+        setEditingTab(tab);
+        setEditedTabContent(tab.content);
+        setEditTabContentDialogOpen(true);
+    }
+
+    const handleEditTabContent = async () => {
+        if (!firestore || !subject || !editingTab) return;
+        const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {...t, content: editedTabContent} : t);
+        const subjectRef = doc(firestore, 'subjects', subjectId);
+        await updateDoc(subjectRef, { customTabs: updatedTabs });
+        setEditTabContentDialogOpen(false);
+        setEditingTab(null);
+    }
+
+
     const description = subject?.description || "Manage the subject curriculum.";
     const shouldTruncate = description.length > 150;
     const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 150)}...` : description;
@@ -338,7 +359,7 @@ export default function SubjectWorkspacePage() {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem onClick={() => openEditTabDialog(tab)}>
-                                                <Edit className="mr-2 h-4 w-4" /> Edit
+                                                <Edit className="mr-2 h-4 w-4" /> Edit Name
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
                                                 {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
@@ -392,8 +413,14 @@ export default function SubjectWorkspacePage() {
                  {visibleCustomTabs?.map(tab => (
                     <TabsContent key={tab.id} value={tab.id}>
                         <Card className="mt-6">
-                            <CardHeader>
+                            <CardHeader className="flex-row items-center justify-between">
                                 <CardTitle>{tab.label}</CardTitle>
+                                {userIsEditor && (
+                                    <Button variant="outline" size="sm" onClick={() => openEditTabContentDialog(tab)}>
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        Edit Content
+                                    </Button>
+                                )}
                             </CardHeader>
                             <CardContent>
                                 <p>{tab.content}</p>
@@ -426,7 +453,7 @@ export default function SubjectWorkspacePage() {
                 </DialogContent>
             </Dialog>
 
-             {/* Edit Tab Dialog */}
+             {/* Edit Tab Name Dialog */}
             <Dialog open={isEditTabDialogOpen} onOpenChange={setEditTabDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -447,6 +474,28 @@ export default function SubjectWorkspacePage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            
+            {/* Edit Tab Content Dialog */}
+             <Dialog open={isEditTabContentDialogOpen} onOpenChange={setEditTabContentDialogOpen}>
+                <DialogContent className="sm:max-w-[625px]">
+                    <DialogHeader>
+                        <DialogTitle>Edit Content</DialogTitle>
+                        <DialogDescription>Edit the content for the tab '{editingTab?.label}'.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <Textarea 
+                            value={editedTabContent} 
+                            onChange={e => setEditedTabContent(e.target.value)}
+                            rows={15}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditTabContentDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleEditTabContent}>Save Content</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
 
              {/* Delete Tab Dialog */}
             <AlertDialog open={isDeleteTabDialogOpen} onOpenChange={setDeleteTabDialogOpen}>
@@ -468,3 +517,5 @@ export default function SubjectWorkspacePage() {
         </div>
     );
 }
+
+    
