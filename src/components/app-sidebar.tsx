@@ -45,9 +45,9 @@ export function AppSidebar() {
 
   const adminMenu = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "#", icon: Users, label: "User Management" },
+    { href: "/user-management", icon: Users, label: "User Management" },
     { href: "/courses", icon: Briefcase, label: "Academics" },
-    { href: "#", icon: BookPlus, label: "Numerical Management" },
+    { href: "/questions/new", icon: BookPlus, label: "Numerical Management" },
     { href: "/worksheets", icon: FilePlus2, label: "Worksheet Generator" },
     { href: "#", icon: Building2, label: "Economy Setting" },
   ];
