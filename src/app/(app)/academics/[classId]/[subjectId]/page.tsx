@@ -361,5 +361,3 @@ export default function SubjectWorkspacePage() {
         </div>
     );
 }
-
-    
