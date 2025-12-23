@@ -1,11 +1,13 @@
 'use client';
 
 import { PageHeader } from "@/components/page-header";
+import { EnrollmentList } from "@/components/user-management/enrollment-list";
 import { UserList } from "@/components/user-management/user-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function UserManagementPage() {
     const { userProfile, isUserProfileLoading } = useUser();
@@ -18,11 +20,15 @@ export default function UserManagementPage() {
     }, [userProfile, isUserProfileLoading, router]);
 
 
-    if (isUserProfileLoading) {
-        return <div>Loading...</div>
+    if (isUserProfileLoading || !userProfile) {
+        return (
+             <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        )
     }
 
-    if (userProfile?.role !== 'admin') {
+    if (userProfile.role !== 'admin') {
         return null;
     }
 
@@ -47,9 +53,7 @@ export default function UserManagementPage() {
                     </div>
                 </TabsContent>
                 <TabsContent value="enrollment">
-                    <div className="flex items-center justify-center rounded-lg border border-dashed shadow-sm p-8 mt-4">
-                        <p className="text-muted-foreground">Enrollment management coming soon.</p>
-                    </div>
+                    <EnrollmentList />
                 </TabsContent>
             </Tabs>
         </div>

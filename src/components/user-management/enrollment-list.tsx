@@ -1,0 +1,179 @@
+'use client';
+import { useState, useMemo } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { arrayRemove, collection, doc, updateDoc } from "firebase/firestore";
+import type { User, Subject, Class } from "@/types";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, UserX, X } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Badge } from '../ui/badge';
+
+type SubjectEnrollmentInfo = {
+    subject: Subject;
+    className: string;
+    enrolledStudents: User[];
+};
+
+export function EnrollmentList() {
+    const firestore = useFirestore();
+    const [selectedSubject, setSelectedSubject] = useState<SubjectEnrollmentInfo | null>(null);
+    const [isDialogOpen, setDialogOpen] = useState(false);
+
+    // Fetch all necessary data
+    const subjectsRef = useMemoFirebase(() => firestore && collection(firestore, 'subjects'), [firestore]);
+    const { data: subjects, isLoading: subjectsLoading } = useCollection<Subject>(subjectsRef);
+
+    const classesRef = useMemoFirebase(() => firestore && collection(firestore, 'classes'), [firestore]);
+    const { data: classes, isLoading: classesLoading } = useCollection<Class>(classesRef);
+
+    const usersRef = useMemoFirebase(() => firestore && collection(firestore, 'users'), [firestore]);
+    const { data: users, isLoading: usersLoading } = useCollection<User>(usersRef);
+
+    const isLoading = subjectsLoading || classesLoading || usersLoading;
+
+    // Memoize the processed data
+    const enrollmentData = useMemo((): SubjectEnrollmentInfo[] => {
+        if (!subjects || !classes || !users) return [];
+
+        const classMap = new Map(classes.map(c => [c.id, c.name]));
+        
+        return subjects.map(subject => {
+            const enrolledStudents = users.filter(user => user.enrollments?.includes(subject.id));
+            return {
+                subject,
+                className: classMap.get(subject.classId) || 'Unknown Class',
+                enrolledStudents,
+            };
+        });
+    }, [subjects, classes, users]);
+
+    const handleViewStudents = (data: SubjectEnrollmentInfo) => {
+        setSelectedSubject(data);
+        setDialogOpen(true);
+    };
+
+    const handleBlockUser = async (userId: string) => {
+        if (!firestore) return;
+        const userDocRef = doc(firestore, 'users', userId);
+        await updateDoc(userDocRef, { active: false });
+        // The UI will update automatically due to real-time listeners
+    };
+
+    const handleUnenrollUser = async (userId: string, subjectId: string) => {
+        if (!firestore) return;
+        const userDocRef = doc(firestore, 'users', userId);
+        await updateDoc(userDocRef, {
+            enrollments: arrayRemove(subjectId)
+        });
+        // Close dialog if last student is removed
+        if (selectedSubject?.enrolledStudents.length === 1) {
+            setDialogOpen(false);
+        }
+    };
+    
+    const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
+
+    return (
+        <Card className="mt-4">
+            <CardHeader>
+                <CardTitle>Subject Enrollments</CardTitle>
+                <CardDescription>View and manage student enrollments across all subjects.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? (
+                    <div className="flex justify-center items-center h-48">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Subject Name</TableHead>
+                                <TableHead>Class</TableHead>
+                                <TableHead className="text-center">Enrolled Students</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {enrollmentData.map(data => (
+                                <TableRow key={data.subject.id}>
+                                    <TableCell className="font-medium">{data.subject.name}</TableCell>
+                                    <TableCell>{data.className}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Button 
+                                            variant="link" 
+                                            onClick={() => handleViewStudents(data)}
+                                            disabled={data.enrolledStudents.length === 0}
+                                        >
+                                            {data.enrolledStudents.length}
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                             {enrollmentData.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="h-24 text-center">
+                                    No subjects found.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
+            </CardContent>
+
+            <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
+                <DialogContent className="sm:max-w-[625px]">
+                    <DialogHeader>
+                        <DialogTitle>Enrolled Students in {selectedSubject?.subject.name}</DialogTitle>
+                        <DialogDescription>
+                           Manage students enrolled in this subject.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        {selectedSubject && selectedSubject.enrolledStudents.length > 0 ? (
+                             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                                {selectedSubject.enrolledStudents.map(student => (
+                                    <div key={student.id} className="flex items-center space-x-4 p-2 rounded-md hover:bg-muted">
+                                        <Avatar>
+                                            <AvatarImage src={student.avatar} alt={student.name} />
+                                            <AvatarFallback>{getInitials(student.name)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-grow">
+                                            <p className="font-medium">{student.name}</p>
+                                            <p className="text-sm text-muted-foreground">{student.email}</p>
+                                        </div>
+                                         {!student.active && <Badge variant="destructive">Blocked</Badge>}
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => handleUnenrollUser(student.id, selectedSubject.subject.id)}
+                                            className="text-destructive border-destructive hover:bg-destructive/10 hover:text-destructive"
+                                            >
+                                                <UserX className="mr-2 h-4 w-4" /> Unenroll
+                                        </Button>
+                                         <Button 
+                                            variant="destructive" 
+                                            size="sm" 
+                                            onClick={() => handleBlockUser(student.id)}
+                                            disabled={!student.active}
+                                            >
+                                                <X className="mr-2 h-4 w-4" /> Block
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-center text-muted-foreground">No students are currently enrolled in this subject.</p>
+                        )}
+                    </div>
+                     <DialogFooter>
+                        <Button variant="outline" onClick={() => setDialogOpen(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    );
+}
