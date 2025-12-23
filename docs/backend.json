@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Nalanda platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "googleId": {
+          "type": "string",
+          "description": "The unique identifier provided by Google OAuth."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "User's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "User's last name."
+        },
+        "role": {
+          "type": "string",
+          "description": "User's role within the system (e.g., Admin, Teacher, Student)."
+        },
+        "coins": {
+          "type": "number",
+          "description": "The number of coins the user has."
+        },
+        "gold": {
+          "type": "number",
+          "description": "The amount of gold the user has."
+        },
+        "diamonds": {
+          "type": "number",
+          "description": "The amount of diamonds the user has."
+        }
+      },
+      "required": [
+        "id",
+        "googleId",
+        "email",
+        "firstName",
+        "lastName",
+        "role"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Includes standard user information like email, name, and role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability, aligning with the core design principles. User data is stored under `/users/{userId}` for private data access, enabling path-based ownership. No custom claims are used; roles are stored within the user document itself. The absence of collaborative entities or complex relationships simplifies the structure and its associated security rules.\n\nQAPs are supported through structural segregation. Each document within the `users` collection shares the same security requirements. Since there are no collaborative entities requiring a membership model, this structure ensures secure list operations based on user authentication."
+  }
+}
