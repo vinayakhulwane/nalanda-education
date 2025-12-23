@@ -209,6 +209,9 @@ export default function SubjectWorkspacePage() {
     const subjectId = params.subjectId as string;
     const firestore = useFirestore();
     
+    // State for description expansion
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
     // Data fetching
     const subjectDocRef = useMemoFirebase(() => firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null, [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
@@ -218,6 +221,10 @@ export default function SubjectWorkspacePage() {
             router.push('/dashboard');
         }
     }, [userProfile, isUserProfileLoading, router]);
+
+    const description = subject?.description || "Manage the subject curriculum.";
+    const shouldTruncate = description.length > 150;
+    const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 150)}...` : description;
 
     if (isUserProfileLoading || isSubjectLoading) {
         return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -231,7 +238,14 @@ export default function SubjectWorkspacePage() {
             </Button>
             <div className="border-b pb-4 mb-6">
                 <h1 className="font-headline text-3xl md:text-4xl font-bold tracking-tight">{subject?.name || "Subject"}</h1>
-                <p className="text-lg text-muted-foreground mt-2">{subject?.description || "Manage the subject curriculum."}</p>
+                <p className="text-lg text-muted-foreground mt-2">
+                    {displayedDescription}
+                    {shouldTruncate && (
+                         <Button variant="link" className="p-0 pl-1 text-lg" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
+                            {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                        </Button>
+                    )}
+                </p>
             </div>
             
             <Tabs defaultValue="syllabus">
