@@ -10,7 +10,7 @@ import {
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { type User } from "@/types";
-import { Coin, Diamond, Gem, LogOut, User as UserIcon } from "lucide-react";
+import { Coins, Diamond, Gem, LogOut, User as UserIcon } from "lucide-react";
 import Link from "next/link";
 
 export function UserNav({ user }: { user: User }) {
@@ -41,7 +41,7 @@ export function UserNav({ user }: { user: User }) {
         <DropdownMenuGroup>
           <DropdownMenuItem disabled className="flex justify-between">
             <div className="flex items-center">
-              <Coin className="mr-2 text-yellow-500" />
+              <Coins className="mr-2 text-yellow-500" />
               <span>Coins</span>
             </div>
             <span>{user.virtualCurrency.coins}</span>
