@@ -5,4 +5,4 @@ dist/
 .git/
 venv/
 __pycache__/
-/images/students/
+images/students/
