@@ -32,8 +32,9 @@ export function SubjectCard({ subject, classId, isStudentView = false }: Subject
   const [editedName, setEditedName] = useState(subject.name);
   const [editedDescription, setEditedDescription] = useState(subject.description);
 
-  const shouldTruncate = subject.description.length > 100;
-  const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${subject.description.substring(0, 100)}...` : subject.description;
+  const description = subject.description || "";
+  const shouldTruncate = description.length > 100;
+  const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 100)}...` : description;
 
   const handleEditSubject = () => {
     if (!firestore) return;
