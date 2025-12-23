@@ -10,7 +10,7 @@ import {
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { type User } from "@/types";
-import { Coins, Diamond, Gem, LogOut, User as UserIcon } from "lucide-react";
+import { Coins, Diamond, Gem, LogOut } from "lucide-react";
 import Link from "next/link";
 import { getAuth, signOut } from "firebase/auth";
 

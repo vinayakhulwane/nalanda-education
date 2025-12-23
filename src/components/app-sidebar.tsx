@@ -6,73 +6,91 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-  SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { mockStudent, mockTeacher } from "@/lib/data";
-import { BookOpen, LayoutDashboard, BarChart3, FilePlus2, BookPlus, Settings, LogOut, ChevronsRightLeft, User, Users } from "lucide-react";
+import { BookOpen, LayoutDashboard, BarChart3, FilePlus2, BookPlus, Settings, LogOut, Users, Wallet, Home, Building2, Briefcase } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "./logo";
-import { useUser } from "@/firebase";
+import { useDoc, useFirestore, useUser } from "@/firebase";
 import { getAuth, signOut } from "firebase/auth";
+import type { User as AppUser } from "@/types";
+import { doc } from "firebase/firestore";
+import { usePathname } from "next/navigation";
+import { useMemo } from "react";
+import { SidebarMenuSkeleton } from "./ui/sidebar";
 
 export function AppSidebar() {
   const { user } = useUser();
-  // For now, we'll default to student. In a real app, you'd fetch the user's role from your database.
-  const role = 'student'; 
+  const firestore = useFirestore();
+  const pathname = usePathname();
+
+  const userDocRef = useMemo(() => {
+    if (!firestore || !user?.uid) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user?.uid]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   const handleSignOut = () => {
     const auth = getAuth();
     signOut(auth);
   }
 
-  const studentMenu = (
-    <>
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip="Dashboard" isActive>
-          <Link href="/dashboard"><LayoutDashboard /><span>Dashboard</span></Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip="Courses">
-          <Link href="/courses"><BookOpen /><span>My Courses</span></Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip="Progress">
-          <Link href="/progress"><BarChart3 /><span>My Progress</span></Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </>
-  );
+  const studentMenu = [
+    { href: "/dashboard", icon: Home, label: "Home" },
+    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/courses", icon: BookOpen, label: "My Courses" },
+    { href: "/progress", icon: BarChart3, label: "My Progress" },
+    { href: "#", icon: Wallet, label: "My Wallet" },
+  ];
 
-  const teacherMenu = (
-    <>
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip="Dashboard" isActive>
-          <Link href="/dashboard"><LayoutDashboard /><span>Dashboard</span></Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip="Worksheets">
-          <Link href="/worksheets"><FilePlus2 /><span>Worksheets</span></Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip="Questions">
-          <Link href="/questions/new"><BookPlus /><span>Question Bank</span></Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-      <SidebarMenuItem>
-        <SidebarMenuButton asChild tooltip="Students">
-          <Link href="#"><Users /><span>Students</span></Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </>
-  );
+  const adminMenu = [
+    { href: "/dashboard", icon: Home, label: "Home" },
+    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "#", icon: Users, label: "User Management" },
+    { href: "/courses", icon: Briefcase, label: "Academics" },
+    { href: "#", icon: BookPlus, label: "Numerical Management" },
+    { href: "/worksheets", icon: FilePlus2, label: "Worksheet Generator" },
+    { href: "#", icon: Building2, label: "Economy Setting" },
+  ];
+  
+  const teacherMenu = [
+    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/worksheets", icon: FilePlus2, label: "Worksheets" },
+    { href: "/questions/new", icon: BookPlus, label: "Question Bank" },
+    { href: "#", icon: Users, label: "Students" },
+  ];
+
+  let menuItems = [];
+  if (userProfile?.role === 'admin') {
+    menuItems = adminMenu;
+  } else if (userProfile?.role === 'student') {
+    menuItems = studentMenu;
+  } else if (userProfile?.role === 'teacher') {
+    menuItems = teacherMenu;
+  }
+  
+  const renderMenuItems = () => {
+    if (isProfileLoading) {
+        return (
+            <>
+                <SidebarMenuSkeleton showIcon />
+                <SidebarMenuSkeleton showIcon />
+                <SidebarMenuSkeleton showIcon />
+                <SidebarMenuSkeleton showIcon />
+            </>
+        )
+    }
+
+    return menuItems.map((item) => (
+         <SidebarMenuItem key={item.href}>
+            <SidebarMenuButton asChild tooltip={item.label} isActive={pathname === item.href}>
+                <Link href={item.href}><item.icon /><span>{item.label}</span></Link>
+            </SidebarMenuButton>
+        </SidebarMenuItem>
+    ));
+  }
+
 
   return (
     <>
@@ -81,11 +99,10 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {role === 'student' ? studentMenu : teacherMenu}
+          {renderMenuItems()}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-        <SidebarSeparator />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Settings">
