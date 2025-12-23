@@ -1,7 +1,7 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
@@ -10,46 +10,35 @@ import { collection, doc, query, where } from "firebase/firestore";
 import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { Subject, Class, Unit, Category } from "@/types";
+import type { Subject, Unit, Category } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export default function SyllabusPage() {
-    const { userProfile, isUserProfileLoading } = useUser();
-    const router = useRouter();
-    const params = useParams();
-    const classId = params.classId as string;
-    const subjectId = params.subjectId as string;
+function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
     const firestore = useFirestore();
-
+    
     // Dialog states
     const [dialogType, setDialogType] = useState<'addUnit' | 'editUnit' | 'deleteUnit' | 'addCategory' | 'editCategory' | 'deleteCategory' | null>(null);
     const [currentUnit, setCurrentUnit] = useState<Unit | null>(null);
     const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
     const [newName, setNewName] = useState('');
     const [newDescription, setNewDescription] = useState('');
-    
-    // Data fetching
-    const subjectDocRef = useMemoFirebase(() => firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null, [firestore, subjectId]);
-    const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
 
+    // Data fetching
     const unitsQuery = useMemoFirebase(() => firestore && subjectId ? query(collection(firestore, 'units'), where('subjectId', '==', subjectId)) : null, [firestore, subjectId]);
     const { data: units, isLoading: areUnitsLoading } = useCollection<Unit>(unitsQuery);
 
     const categoriesQuery = useMemoFirebase(() => {
         if (!firestore || !units || units.length === 0) return null;
-        return query(collection(firestore, 'categories'), where('unitId', 'in', units.map(u => u.id)));
+        const unitIds = units.map(u => u.id);
+        if (unitIds.length === 0) return null;
+        return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds));
     }, [firestore, units]);
     const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);
-
-    useEffect(() => {
-        if (!isUserProfileLoading && userProfile?.role !== 'admin') {
-            router.push('/dashboard');
-        }
-    }, [userProfile, isUserProfileLoading, router]);
 
     // Handlers
     const closeDialog = () => {
@@ -91,37 +80,23 @@ export default function SyllabusPage() {
         if (category) {
             setCurrentCategory(category)
             setNewName(category.name);
-            setNewDescription(category.description);
+            setNewDescription(category.description || '');
         } else if (unit) {
             setNewName(unit.name);
-            setNewDescription(unit.description);
+            setNewDescription(unit.description || '');
         }
     }
 
-
-    if (isUserProfileLoading || isSubjectLoading) {
-        return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-    }
-
     return (
-        <div>
-            <Button variant="ghost" onClick={() => router.push(`/academics/${classId}`)} className="mb-4">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Subjects
-            </Button>
+        <div className="mt-6">
             <div className="flex justify-between items-center mb-6">
-                <PageHeader
-                    title={`Syllabus for ${subject?.name || 'Subject'}`}
-                    description="Manage units and categories for this subject."
-                    className="mb-0"
-                />
-                <Button onClick={() => setDialogType('addUnit')}>
+                <h3 className="text-2xl font-bold font-headline">Syllabus Builder</h3>
+                 <Button onClick={() => setDialogType('addUnit')}>
                     <PlusCircle className="mr-2" />
                     Add Unit
                 </Button>
             </div>
-
-            {areUnitsLoading || areCategoriesLoading ? (
+             {areUnitsLoading || areCategoriesLoading ? (
                  <div className="flex justify-center items-center h-64">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
@@ -130,8 +105,8 @@ export default function SyllabusPage() {
                     {units?.map(unit => (
                         <AccordionItem value={unit.id} key={unit.id} className="bg-card border rounded-lg px-4">
                              <div className="flex items-center">
-                                <GripVertical className="h-5 w-5 text-muted-foreground mr-2" />
-                                <AccordionTrigger className="text-lg font-headline hover:no-underline">
+                                <GripVertical className="h-5 w-5 text-muted-foreground mr-2 cursor-grab" />
+                                <AccordionTrigger className="text-lg font-headline hover:no-underline flex-1">
                                     {unit.name}
                                 </AccordionTrigger>
                                  <DropdownMenu>
@@ -143,7 +118,7 @@ export default function SyllabusPage() {
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={() => openDialog('editUnit', unit)}>Edit Unit</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => openDialog('addCategory', unit)}>Add Category</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => openDialog('deleteUnit', unit)} className="text-red-500">Delete Unit</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => openDialog('deleteUnit', unit)} className="text-destructive focus:text-destructive">Delete Unit</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                              </div>
@@ -185,7 +160,7 @@ export default function SyllabusPage() {
                     <DialogHeader>
                         <DialogTitle>{dialogType?.includes('add') ? 'Add New' : 'Edit'} {dialogType?.includes('Unit') ? 'Unit' : 'Category'}</DialogTitle>
                          <DialogDescription>
-                            {dialogType === 'addUnit' && `Create a new unit for ${subject?.name}.`}
+                            {dialogType === 'addUnit' && `Create a new unit for ${subjectName}.`}
                             {dialogType === 'editUnit' && `Editing the unit: ${currentUnit?.name}.`}
                             {dialogType === 'addCategory' && `Create a new category for the unit: ${currentUnit?.name}.`}
                             {dialogType === 'editCategory' && `Editing the category: ${currentCategory?.name}.`}
@@ -223,5 +198,80 @@ export default function SyllabusPage() {
                 </AlertDialogContent>
             </AlertDialog>
         </div>
+    )
+}
+
+export default function SubjectWorkspacePage() {
+    const { userProfile, isUserProfileLoading } = useUser();
+    const router = useRouter();
+    const params = useParams();
+    const classId = params.classId as string;
+    const subjectId = params.subjectId as string;
+    const firestore = useFirestore();
+    
+    // Data fetching
+    const subjectDocRef = useMemoFirebase(() => firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null, [firestore, subjectId]);
+    const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
+    
+    useEffect(() => {
+        if (!isUserProfileLoading && userProfile?.role !== 'admin') {
+            router.push('/dashboard');
+        }
+    }, [userProfile, isUserProfileLoading, router]);
+
+    if (isUserProfileLoading || isSubjectLoading) {
+        return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
+
+    return (
+        <div>
+             <Button variant="ghost" onClick={() => router.push(`/academics/${classId}`)} className="mb-4">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Subjects
+            </Button>
+            <div className="border-b pb-4 mb-6">
+                <h1 className="font-headline text-3xl md:text-4xl font-bold tracking-tight">{subject?.name || "Subject"}</h1>
+                <p className="text-lg text-muted-foreground mt-2">{subject?.description || "Manage the subject curriculum."}</p>
+            </div>
+            
+            <Tabs defaultValue="syllabus">
+                <TabsList>
+                    <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
+                    <TabsTrigger value="worksheet">Worksheet</TabsTrigger>
+                    <TabsTrigger value="archivers">Archivers</TabsTrigger>
+                </TabsList>
+                <TabsContent value="syllabus">
+                    <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
+                </TabsContent>
+                <TabsContent value="worksheet">
+                    <Card className="mt-6">
+                        <CardHeader>
+                            <CardTitle>Worksheet Management</CardTitle>
+                            <CardDescription>Create and manage worksheets for this subject.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
+                                <p className="text-muted-foreground">Worksheet features are coming soon.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="archivers">
+                     <Card className="mt-6">
+                        <CardHeader>
+                            <CardTitle>Archivers</CardTitle>
+                            <CardDescription>Manage archived content for this subject.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
+                                <p className="text-muted-foreground">Archivers are coming soon.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
     );
 }
+
+    
