@@ -169,9 +169,6 @@ export function EnrollmentList() {
                             <p className="text-center text-muted-foreground">No students are currently enrolled in this subject.</p>
                         )}
                     </div>
-                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDialogOpen(false)}>Close</Button>
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>
