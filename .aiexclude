@@ -3,3 +3,6 @@ node_modules/
 dist/
 .firebase/
 .git/
+venv/
+__pycache__/
+/images/students/
