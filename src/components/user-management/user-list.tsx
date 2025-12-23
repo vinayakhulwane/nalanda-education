@@ -16,31 +16,40 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { Loader2, MoreHorizontal } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card";
-
-// Mock data based on your requirements
-const mockUsers = [
-  { id: 'usr1', name: 'John Doe', email: 'john.d@example.com', mobile: '123-456-7890', role: 'student', active: true },
-  { id: 'usr2', name: 'Jane Smith', email: 'jane.s@example.com', mobile: '987-654-3210', role: 'teacher', active: true },
-  { id: 'usr3', name: 'Admin User', email: 'admin@nalanda.com', mobile: '555-555-5555', role: 'admin', active: true },
-  { id: 'usr4', name: 'Peter Jones', email: 'peter.j@example.com', mobile: '111-222-3333', role: 'student', active: false },
-];
+import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
+import type { User } from "@/types";
+import { collection, doc, updateDoc } from "firebase/firestore";
 
 export function UserList() {
-  const currentAdminId = 'usr3'; // Assume we know the current admin's ID
+  const { user: currentUser } = useUser();
+  const firestore = useFirestore();
+  
+  const usersCollectionRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'users');
+  }, [firestore]);
+
+  const { data: users, isLoading } = useCollection<User>(usersCollectionRef);
 
   const handleRoleChange = (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
-    // In a real app, you'd call a Firestore update here.
+    if (!firestore) return;
+    const userDocRef = doc(firestore, 'users', userId);
+    updateDoc(userDocRef, { role: newRole });
+    // Note: Non-blocking update pattern is preferred here, but for simplicity
+    // in this case, we'll use a direct await. Error handling should be added.
     console.log(`Changing user ${userId} to role ${newRole}`);
   };
 
   const handleStatusToggle = (userId: string, currentStatus: boolean) => {
-    if (userId === currentAdminId) {
+    if (userId === currentUser?.uid) {
         alert("You cannot block yourself.");
         return;
     }
-    // In a real app, you'd update Firestore.
+    if (!firestore) return;
+    const userDocRef = doc(firestore, 'users', userId);
+    updateDoc(userDocRef, { active: !currentStatus });
     console.log(`Toggling status for user ${userId} to ${!currentStatus}`);
   };
 
@@ -51,6 +60,11 @@ export function UserList() {
             <CardDescription>Manage user roles and access permissions.</CardDescription>
         </CardHeader>
         <CardContent>
+            {isLoading ? (
+                <div className="flex justify-center items-center h-48">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            ) : (
             <Table>
                 <TableHeader>
                 <TableRow>
@@ -62,7 +76,7 @@ export function UserList() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {mockUsers.map((user) => (
+                {users?.map((user) => (
                     <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
@@ -73,9 +87,9 @@ export function UserList() {
                     </TableCell>
                     <TableCell>
                          <Switch
-                            checked={user.active}
-                            onCheckedChange={() => handleStatusToggle(user.id, user.active)}
-                            disabled={user.id === currentAdminId}
+                            checked={user.active ?? true} // Default to active if not set
+                            onCheckedChange={() => handleStatusToggle(user.id, user.active ?? true)}
+                            disabled={user.id === currentUser?.uid}
                             aria-label="Activate or block user"
                         />
                     </TableCell>
@@ -98,6 +112,7 @@ export function UserList() {
                 ))}
                 </TableBody>
             </Table>
+            )}
         </CardContent>
     </Card>
   );

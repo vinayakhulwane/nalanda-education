@@ -9,6 +9,7 @@ export interface User {
   coins: number;
   gold: number;
   diamonds: number;
+  active?: boolean;
 }
 
 export interface Course {
