@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus } from "lucide-react";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import type { Subject, Unit, Category, CustomTab } from "@/types";
@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
     const firestore = useFirestore();
@@ -240,6 +241,10 @@ export default function SubjectWorkspacePage() {
     const isEnrolled = useMemo(() => {
         return userProfile?.enrollments?.includes(subjectId) ?? false;
     }, [userProfile, subjectId]);
+    
+    const isUserBlocked = useMemo(() => {
+        return userProfile?.active === false;
+    }, [userProfile]);
 
     useEffect(() => {
         if (!isUserProfileLoading && !userProfile) {
@@ -316,7 +321,7 @@ export default function SubjectWorkspacePage() {
     }
 
     const handleEnrollment = async () => {
-        if (!firestore || !user) return;
+        if (!firestore || !user || isUserBlocked) return;
         const userDocRef = doc(firestore, 'users', user.uid);
         if (isEnrolled) {
             // Unenroll
@@ -359,11 +364,30 @@ export default function SubjectWorkspacePage() {
                     </p>
                 </div>
                  {userProfile?.role === 'student' && (
-                    <div className="mt-4">
-                        <Button onClick={handleEnrollment}>
-                            {isEnrolled ? <UserMinus className="mr-2" /> : <UserPlus className="mr-2" />}
-                            {isEnrolled ? 'Unenroll' : 'Enroll'}
+                    <div className="mt-4 text-center">
+                        <Button onClick={handleEnrollment} disabled={isUserBlocked}>
+                           {isUserBlocked ? (
+                                <>
+                                    <ShieldAlert className="mr-2" /> Blocked
+                                </>
+                           ) : isEnrolled ? (
+                                <>
+                                    <UserMinus className="mr-2" /> Unenroll
+                                </>
+                            ) : (
+                                <>
+                                    <UserPlus className="mr-2" /> Enroll
+                                </>
+                            )}
                         </Button>
+                         {isUserBlocked && (
+                            <Alert variant="destructive" className="mt-4 max-w-md mx-auto">
+                                <AlertTitle>Account Blocked</AlertTitle>
+                                <AlertDescription>
+                                    Your account has been blocked by an administrator. Please contact Nalanda Education to resolve this issue.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                     </div>
                 )}
             </div>

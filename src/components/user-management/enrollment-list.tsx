@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2, UserX, Users, Filter } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
@@ -179,7 +178,6 @@ export function EnrollmentList() {
                                             <p className="font-medium">{student.name}</p>
                                             <p className="text-sm text-muted-foreground">{student.email}</p>
                                         </div>
-                                         {!student.active && <Badge variant="destructive">Blocked</Badge>}
                                         <div className="flex items-center space-x-2">
                                             <Label htmlFor={`block-switch-${student.id}`} className="text-xs text-muted-foreground">
                                                 {student.active ?? true ? 'Active' : 'Blocked'}
