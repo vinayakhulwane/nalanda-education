@@ -347,25 +347,25 @@ export default function SubjectWorkspacePage() {
                 Back to Subjects
             </Button>
             <div className="border-b pb-4 mb-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="font-headline text-3xl md:text-4xl font-bold tracking-tight">{subject?.name || "Subject"}</h1>
-                        <p className="text-lg text-muted-foreground mt-2">
-                            {displayedDescription}
-                            {shouldTruncate && (
-                                 <Button variant="link" className="p-0 pl-1 text-lg" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
-                                    {isDescriptionExpanded ? 'Read less' : 'Read more'}
-                                </Button>
-                            )}
-                        </p>
-                    </div>
-                    {userProfile?.role === 'student' && (
-                        <Button onClick={handleEnrollment} className="mt-4 md:mt-0">
+                <div>
+                    <h1 className="font-headline text-3xl md:text-4xl font-bold tracking-tight">{subject?.name || "Subject"}</h1>
+                    <p className="text-lg text-muted-foreground mt-2">
+                        {displayedDescription}
+                        {shouldTruncate && (
+                             <Button variant="link" className="p-0 pl-1 text-lg" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
+                                {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                            </Button>
+                        )}
+                    </p>
+                </div>
+                 {userProfile?.role === 'student' && (
+                    <div className="mt-4">
+                        <Button onClick={handleEnrollment}>
                             {isEnrolled ? <UserMinus className="mr-2" /> : <UserPlus className="mr-2" />}
                             {isEnrolled ? 'Unenroll' : 'Enroll'}
                         </Button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
             
             <Tabs defaultValue="syllabus">
@@ -543,7 +543,3 @@ export default function SubjectWorkspacePage() {
         </div>
     );
 }
-
-    
-
-    
