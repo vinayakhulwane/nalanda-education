@@ -365,7 +365,7 @@ export default function SubjectWorkspacePage() {
                     </p>
                 </div>
                  {userProfile?.role === 'student' && (
-                    <div className="mt-4 text-center">
+                    <div className="mt-4">
                         <Button onClick={handleEnrollment} disabled={isUserBlocked}>
                            {isUserBlocked ? (
                                 <>
@@ -382,7 +382,7 @@ export default function SubjectWorkspacePage() {
                             )}
                         </Button>
                          {isUserBlocked && (
-                            <Alert variant="destructive" className="mt-4 max-w-md mx-auto">
+                            <Alert variant="destructive" className="mt-4 max-w-md">
                                 <AlertTitle>Account Blocked</AlertTitle>
                                 <AlertDescription>
                                     Your account has been blocked by an administrator. Please contact Nalanda Education to resolve this issue.
