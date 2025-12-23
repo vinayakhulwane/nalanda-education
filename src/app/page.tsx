@@ -11,6 +11,7 @@ import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 export default function Home() {
   const loginImage = PlaceHolderImages.find(p => p.id === 'login');
@@ -30,7 +31,28 @@ export default function Home() {
     setIsSigningIn(true);
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      if (firebaseUser) {
+        const db = getFirestore();
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+          // User doesn't exist, create a new document
+          await setDoc(userDocRef, {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName,
+            email: firebaseUser.email,
+            avatar: firebaseUser.photoURL,
+            role: 'student',
+            coins: 0,
+            gold: 0,
+            diamonds: 0,
+          });
+        }
+      }
       // The useEffect will handle the redirect once the user state is updated.
     } catch (error: any) {
       console.error("Sign-in error", error);
