@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
     const firestore = useFirestore();
@@ -423,7 +424,10 @@ export default function SubjectWorkspacePage() {
                                 )}
                             </CardHeader>
                             <CardContent>
-                                <p>{tab.content}</p>
+                                <div
+                                    className="prose dark:prose-invert max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: tab.content }}
+                                />
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -477,17 +481,13 @@ export default function SubjectWorkspacePage() {
             
             {/* Edit Tab Content Dialog */}
              <Dialog open={isEditTabContentDialogOpen} onOpenChange={setEditTabContentDialogOpen}>
-                <DialogContent className="sm:max-w-[625px]">
+                <DialogContent className="sm:max-w-[800px]">
                     <DialogHeader>
                         <DialogTitle>Edit Content</DialogTitle>
                         <DialogDescription>Edit the content for the tab '{editingTab?.label}'.</DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <Textarea 
-                            value={editedTabContent} 
-                            onChange={e => setEditedTabContent(e.target.value)}
-                            rows={15}
-                        />
+                    <div className="py-4">
+                        <RichTextEditor value={editedTabContent} onChange={setEditedTabContent} />
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setEditTabContentDialogOpen(false)}>Cancel</Button>
