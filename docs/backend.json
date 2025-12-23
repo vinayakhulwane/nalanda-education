@@ -8,28 +8,25 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the user entity."
-        },
-        "googleId": {
-          "type": "string",
-          "description": "The unique identifier provided by Google OAuth."
+          "description": "Unique identifier for the user entity, matches Firebase Auth UID."
         },
         "email": {
           "type": "string",
           "description": "User's email address.",
           "format": "email"
         },
-        "firstName": {
+        "name": {
           "type": "string",
-          "description": "User's first name."
+          "description": "User's full display name."
         },
-        "lastName": {
-          "type": "string",
-          "description": "User's last name."
+        "avatar": {
+            "type": "string",
+            "description": "URL to the user's profile picture."
         },
         "role": {
           "type": "string",
-          "description": "User's role within the system (e.g., Admin, Teacher, Student)."
+          "description": "User's role within the system (e.g., Admin, Teacher, Student).",
+          "enum": ["student", "teacher", "admin"]
         },
         "coins": {
           "type": "number",
@@ -46,19 +43,21 @@
       },
       "required": [
         "id",
-        "googleId",
         "email",
-        "firstName",
-        "lastName",
+        "name",
         "role"
       ]
     }
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous",
       "google.com"
+    ],
+    "authorizedDomains": [
+        "localhost",
+        "firebaseapp.com",
+        "web.app",
+        "cloudworkstations.dev"
     ]
   },
   "firestore": {
@@ -79,7 +78,6 @@
           ]
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability, aligning with the core design principles. User data is stored under `/users/{userId}` for private data access, enabling path-based ownership. No custom claims are used; roles are stored within the user document itself. The absence of collaborative entities or complex relationships simplifies the structure and its associated security rules.\n\nQAPs are supported through structural segregation. Each document within the `users` collection shares the same security requirements. Since there are no collaborative entities requiring a membership model, this structure ensures secure list operations based on user authentication."
+    ]
   }
 }
