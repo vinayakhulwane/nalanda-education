@@ -172,7 +172,7 @@ export default function SubjectsPage() {
                                 <p className="text-sm text-muted-foreground">{s.description}</p>
                             </CardContent>
                             <CardFooter>
-                                <Button variant="secondary" className="w-full">Manage Syllabus</Button>
+                                <Button variant="secondary" className="w-full" onClick={() => router.push(`/academics/${classId}/${s.id}`)}>Manage Syllabus</Button>
                             </CardFooter>
                         </Card>
                     ))}

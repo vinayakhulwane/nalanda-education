@@ -26,6 +26,20 @@ export interface Subject {
   classId: string;
 }
 
+export interface Unit {
+  id: string;
+  name: string;
+  description: string;
+  subjectId: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description: string;
+  unitId: string;
+}
+
 export interface Course {
   id: string;
   title: string;

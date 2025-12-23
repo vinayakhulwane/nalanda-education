@@ -94,6 +94,48 @@
         "name",
         "classId"
       ]
+    },
+    "Unit": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Unit",
+      "type": "object",
+      "description": "Represents a unit of study within a subject.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the unit (e.g., 'Algebra')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short description of the unit."
+        },
+        "subjectId": {
+          "type": "string",
+          "description": "The ID of the subject this unit belongs to."
+        }
+      },
+      "required": ["name", "subjectId"]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Represents a specific category or topic within a unit.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the category (e.g., 'Quadratic Equations')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short description of the category."
+        },
+        "unitId": {
+          "type": "string",
+          "description": "The ID of the unit this category belongs to."
+        }
+      },
+      "required": ["name", "unitId"]
     }
   },
   "auth": {
@@ -143,6 +185,26 @@
             "$ref": "#/backend/entities/Subject"
           },
           "description": "Stores the academic subjects for all classes."
+        }
+      },
+      {
+        "path": "/units/{unitId}",
+        "definition": {
+          "entityName": "Unit",
+          "schema": {
+            "$ref": "#/backend/entities/Unit"
+          },
+          "description": "Stores the units for all subjects."
+        }
+      },
+      {
+        "path": "/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores the categories for all units."
         }
       }
     ]
