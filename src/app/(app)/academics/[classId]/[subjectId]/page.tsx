@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
     const firestore = useFirestore();
+    const { userProfile } = useUser();
     
     // Dialog states
     const [dialogType, setDialogType] = useState<'addUnit' | 'editUnit' | 'deleteUnit' | 'addCategory' | 'editCategory' | 'deleteCategory' | null>(null);
@@ -40,6 +41,8 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
         return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds));
     }, [firestore, units]);
     const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);
+    
+    const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
     // Handlers
     const closeDialog = () => {
@@ -75,7 +78,7 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
         closeDialog();
     }
     
-    const openDialog = (type: typeof dialogType, unit?: Unit, category?: Category) => {
+    const openDialog = (type: NonNullable<typeof dialogType>, unit?: Unit, category?: Category) => {
         setDialogType(type);
         if (unit) setCurrentUnit(unit);
         if (category) {
@@ -95,10 +98,10 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
         <div className="mt-6">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold font-headline">Syllabus Builder</h3>
-                 <Button onClick={() => setDialogType('addUnit')}>
+                 {userIsEditor && <Button onClick={() => setDialogType('addUnit')}>
                     <PlusCircle className="mr-2" />
                     Add Unit
-                </Button>
+                </Button>}
             </div>
              {areUnitsLoading || areCategoriesLoading ? (
                  <div className="flex justify-center items-center h-64">
@@ -113,7 +116,7 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
                                 <AccordionTrigger className="text-lg font-headline hover:no-underline flex-1">
                                     {unit.name}
                                 </AccordionTrigger>
-                                 <DropdownMenu>
+                                 {userIsEditor && <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
                                             <MoreVertical className="h-4 w-4" />
@@ -124,7 +127,7 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
                                         <DropdownMenuItem onClick={() => openDialog('addCategory', unit)}>Add Category</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => openDialog('deleteUnit', unit)} className="text-destructive focus:text-destructive">Delete Unit</DropdownMenuItem>
                                     </DropdownMenuContent>
-                                </DropdownMenu>
+                                </DropdownMenu>}
                              </div>
                             <AccordionContent>
                                 <p className="text-muted-foreground text-sm pb-4">{unit.description}</p>
@@ -135,10 +138,10 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
                                                <p className="font-medium">{category.name}</p>
                                                <p className="text-sm text-muted-foreground">{category.description}</p>
                                            </div>
-                                            <div className="flex items-center">
+                                            {userIsEditor && <div className="flex items-center">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDialog('editCategory', unit, category)}><Edit className="h-4 w-4" /></Button>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDialog('deleteCategory', unit, category)}><Trash className="h-4 w-4 text-destructive" /></Button>
-                                            </div>
+                                            </div>}
                                        </div>
                                    ))}
                                     {categories?.filter(c => c.unitId === unit.id).length === 0 && (
@@ -151,7 +154,7 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
                     {units?.length === 0 && (
                         <Card className="text-center py-12">
                             <CardContent>
-                                <p className="text-muted-foreground">No units found. Start by adding one.</p>
+                                <p className="text-muted-foreground">No units found. {userIsEditor && 'Start by adding one.'}</p>
                             </CardContent>
                         </Card>
                     )}
@@ -221,9 +224,11 @@ export default function SubjectWorkspacePage() {
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
     
     useEffect(() => {
-        // Redirect non-admins away. Students might be allowed in the future in a view-only mode.
-        if (!isUserProfileLoading && userProfile?.role === 'student') {
-            router.push('/dashboard');
+        if (!isUserProfileLoading && userProfile && userProfile.role === 'student') {
+            return; // Students are allowed to view, so do nothing.
+        }
+        if (!isUserProfileLoading && userProfile?.role !== 'admin' && userProfile?.role !== 'teacher') {
+            router.push('/dashboard'); // Redirect other non-privileged users
         }
     }, [userProfile, isUserProfileLoading, router]);
 
@@ -356,3 +361,5 @@ export default function SubjectWorkspacePage() {
         </div>
     );
 }
+
+    

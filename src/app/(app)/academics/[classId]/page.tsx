@@ -42,7 +42,12 @@ export default function SubjectsPage() {
     const { data: subjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQueryRef);
 
     useEffect(() => {
-        if (!isUserProfileLoading && userProfile?.role !== 'admin') {
+        if (!isUserProfileLoading && userProfile && userProfile.role === 'student') {
+            // Students are allowed to view this page, so we do nothing.
+            return;
+        }
+        if (!isUserProfileLoading && userProfile?.role !== 'admin' && userProfile?.role !== 'teacher') {
+            // Redirect non-admins/teachers who aren't students
             router.push('/dashboard');
         }
     }, [userProfile, isUserProfileLoading, router]);
@@ -67,6 +72,8 @@ export default function SubjectsPage() {
         )
     }
 
+    const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
+
     return (
         <div>
             <Button variant="ghost" onClick={() => router.back()} className="mb-4">
@@ -78,35 +85,37 @@ export default function SubjectsPage() {
                     title={`Subjects for ${currentClass?.name || 'Class'}`}
                     description="Manage subjects like Mathematics or Science for this class."
                 />
-                <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <PlusCircle className="mr-2" />
-                            Add Subject
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Add a New Subject</DialogTitle>
-                            <DialogDescription>
-                                Create a new subject for {currentClass?.name}.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">Name</Label>
-                                <Input id="name" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} className="col-span-3" placeholder="e.g., Mathematics" />
+                {userIsEditor && (
+                    <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <PlusCircle className="mr-2" />
+                                Add Subject
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Add a New Subject</DialogTitle>
+                                <DialogDescription>
+                                    Create a new subject for {currentClass?.name}.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">Name</Label>
+                                    <Input id="name" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} className="col-span-3" placeholder="e.g., Mathematics" />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="description" className="text-right">Description</Label>
+                                    <Textarea id="description" value={newSubjectDescription} onChange={(e) => setNewSubjectDescription(e.target.value)} className="col-span-3" placeholder="e.g., Study of numbers, quantity, and space." />
+                                </div>
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="description" className="text-right">Description</Label>
-                                <Textarea id="description" value={newSubjectDescription} onChange={(e) => setNewSubjectDescription(e.target.value)} className="col-span-3" placeholder="e.g., Study of numbers, quantity, and space." />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleAddSubject}>Create Subject</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                            <DialogFooter>
+                                <Button onClick={handleAddSubject}>Create Subject</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </div>
             {areSubjectsLoading ? (
                  <div className="flex justify-center items-center h-48">
@@ -118,7 +127,8 @@ export default function SubjectsPage() {
                         <SubjectCard 
                             key={s.id} 
                             subject={s} 
-                            classId={classId} 
+                            classId={classId}
+                            isStudentView={!userIsEditor}
                         />
                     ))}
                      {subjects?.length === 0 && (
