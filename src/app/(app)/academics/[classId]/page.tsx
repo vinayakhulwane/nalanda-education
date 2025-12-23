@@ -5,13 +5,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { collection, doc, query, where } from "firebase/firestore";
 import { ArrowLeft, Loader2, PlusCircle } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Subject, Class } from "@/types";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { SubjectCard } from "@/components/subject-card";
 
@@ -76,7 +75,7 @@ export default function SubjectsPage() {
 
     return (
         <div>
-            <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+            <Button variant="ghost" onClick={() => router.push('/academics')} className="mb-4">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Classes
             </Button>
