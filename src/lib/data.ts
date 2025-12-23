@@ -11,11 +11,9 @@ export const mockStudent: User = {
   email: 'alex.doe@example.com',
   avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704d',
   role: 'student',
-  virtualCurrency: {
-    coins: 1250,
-    gold: 200,
-    diamonds: 15,
-  },
+  coins: 1250,
+  gold: 200,
+  diamonds: 15,
 };
 
 export const mockTeacher: User = {
@@ -24,11 +22,9 @@ export const mockTeacher: User = {
     email: 'e.reed@example.com',
     avatar: 'https://i.pravatar.cc/150?u=a042581f4e29026704e',
     role: 'teacher',
-    virtualCurrency: {
-      coins: 9999,
-      gold: 999,
-      diamonds: 99,
-    },
+    coins: 9999,
+    gold: 999,
+    diamonds: 99,
 };
 
 

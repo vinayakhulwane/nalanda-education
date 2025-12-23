@@ -6,11 +6,9 @@ export interface User {
   email: string;
   avatar: string;
   role: UserRole;
-  virtualCurrency: {
-    coins: number;
-    gold: number;
-    diamonds: number;
-  };
+  coins: number;
+  gold: number;
+  diamonds: number;
 }
 
 export interface Course {

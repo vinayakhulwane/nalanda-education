@@ -50,21 +50,21 @@ export function UserNav({ user }: { user: User }) {
               <Coins className="mr-2 text-yellow-500" />
               <span>Coins</span>
             </div>
-            <span>{user.virtualCurrency.coins}</span>
+            <span>{user.coins}</span>
           </DropdownMenuItem>
           <DropdownMenuItem disabled className="flex justify-between">
              <div className="flex items-center">
               <Gem className="mr-2 text-red-500" />
               <span>Gold</span>
             </div>
-            <span>{user.virtualCurrency.gold}</span>
+            <span>{user.gold}</span>
           </DropdownMenuItem>
           <DropdownMenuItem disabled className="flex justify-between">
             <div className="flex items-center">
               <Diamond className="mr-2 text-blue-500" />
               <span>Diamonds</span>
             </div>
-            <span>{user.virtualCurrency.diamonds}</span>
+            <span>{user.diamonds}</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
