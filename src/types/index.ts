@@ -19,11 +19,18 @@ export interface Class {
   description: string;
 }
 
+export interface CustomTab {
+    id: string;
+    label: string;
+    content: string;
+}
+
 export interface Subject {
   id: string;
   name: string;
   description: string;
   classId: string;
+  customTabs?: CustomTab[];
 }
 
 export interface Unit {

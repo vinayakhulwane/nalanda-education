@@ -6,17 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, doc, query, where } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical } from "lucide-react";
+import { arrayUnion, collection, doc, query, updateDoc, where } from "firebase/firestore";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { Subject, Unit, Category } from "@/types";
+import type { Subject, Unit, Category, CustomTab } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { v4 as uuidv4 } from 'uuid';
 
 function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
     const firestore = useFirestore();
@@ -34,7 +35,7 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
 
     const categoriesQuery = useMemoFirebase(() => {
         if (!firestore || !units || units.length === 0) return null;
-        const unitIds = units.map(u => u.id);
+        const unitIds = units.map(u => u.id).filter(id => !!id);
         if (unitIds.length === 0) return null;
         return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds));
     }, [firestore, units]);
@@ -84,6 +85,9 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
         } else if (unit) {
             setNewName(unit.name);
             setNewDescription(unit.description || '');
+        } else {
+            setNewName('');
+            setNewDescription('');
         }
     }
 
@@ -209,22 +213,43 @@ export default function SubjectWorkspacePage() {
     const subjectId = params.subjectId as string;
     const firestore = useFirestore();
     
-    // State for description expansion
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [isAddTabDialogOpen, setAddTabDialogOpen] = useState(false);
+    const [newTabName, setNewTabName] = useState("");
 
-    // Data fetching
     const subjectDocRef = useMemoFirebase(() => firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null, [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
     
     useEffect(() => {
-        if (!isUserProfileLoading && userProfile?.role !== 'admin') {
+        // Redirect non-admins away. Students might be allowed in the future in a view-only mode.
+        if (!isUserProfileLoading && userProfile?.role === 'student') {
             router.push('/dashboard');
         }
     }, [userProfile, isUserProfileLoading, router]);
 
+    const handleAddCustomTab = async () => {
+        if (!firestore || !newTabName.trim() || !subjectId) return;
+
+        const newTab: CustomTab = {
+            id: uuidv4(),
+            label: newTabName,
+            content: `Content for ${newTabName} goes here. Edit me!`
+        };
+
+        const subjectRef = doc(firestore, 'subjects', subjectId);
+        await updateDoc(subjectRef, {
+            customTabs: arrayUnion(newTab)
+        });
+
+        setNewTabName('');
+        setAddTabDialogOpen(false);
+    }
+
     const description = subject?.description || "Manage the subject curriculum.";
     const shouldTruncate = description.length > 150;
     const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 150)}...` : description;
+
+    const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
     if (isUserProfileLoading || isSubjectLoading) {
         return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -249,11 +274,21 @@ export default function SubjectWorkspacePage() {
             </div>
             
             <Tabs defaultValue="syllabus">
-                <TabsList>
-                    <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
-                    <TabsTrigger value="worksheet">Worksheet</TabsTrigger>
-                    <TabsTrigger value="archivers">Archivers</TabsTrigger>
-                </TabsList>
+                <div className="flex items-center">
+                    <TabsList>
+                        <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
+                        <TabsTrigger value="worksheet">Worksheet</TabsTrigger>
+                        <TabsTrigger value="archivers">Archivers</TabsTrigger>
+                        {subject?.customTabs?.map(tab => (
+                            <TabsTrigger key={tab.id} value={tab.id}>{tab.label}</TabsTrigger>
+                        ))}
+                    </TabsList>
+                    {userIsEditor && (
+                         <Button variant="ghost" size="icon" className="ml-2" onClick={() => setAddTabDialogOpen(true)}>
+                            <Plus className="h-4 w-4" />
+                        </Button>
+                    )}
+                </div>
                 <TabsContent value="syllabus">
                     <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
                 </TabsContent>
@@ -283,7 +318,41 @@ export default function SubjectWorkspacePage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+                 {subject?.customTabs?.map(tab => (
+                    <TabsContent key={tab.id} value={tab.id}>
+                        <Card className="mt-6">
+                            <CardHeader>
+                                <CardTitle>{tab.label}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p>{tab.content}</p>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                ))}
             </Tabs>
+
+            <Dialog open={isAddTabDialogOpen} onOpenChange={setAddTabDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add New Tab</DialogTitle>
+                        <DialogDescription>Create a new custom tab for this subject.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <Label htmlFor="tab-name">Tab Name</Label>
+                        <Input 
+                            id="tab-name" 
+                            value={newTabName} 
+                            onChange={e => setNewTabName(e.target.value)} 
+                            placeholder="e.g., PDF Notes"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setAddTabDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddCustomTab}>Create Tab</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
