@@ -1,6 +1,6 @@
 'use client';
-import { useState, useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
+import { useState, useMemo, useEffect } from 'react';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { arrayRemove, collection, doc, updateDoc } from "firebase/firestore";
 import type { User, Subject, Class } from "@/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -54,6 +54,19 @@ export function EnrollmentList() {
             };
         });
     }, [subjects, classes, users]);
+    
+     useEffect(() => {
+        if (isDialogOpen && selectedSubject) {
+            // Find the latest version of the selected subject's data from the master list
+            const updatedSubjectData = enrollmentData.find(
+                (data) => data.subject.id === selectedSubject.subject.id
+            );
+            if (updatedSubjectData) {
+                // Update the state that the dialog uses, which triggers a re-render
+                setSelectedSubject(updatedSubjectData);
+            }
+        }
+    }, [enrollmentData, isDialogOpen, selectedSubject]);
 
     const filteredEnrollmentData = useMemo(() => {
         if (classFilter === 'all') {
@@ -84,10 +97,6 @@ export function EnrollmentList() {
         await updateDoc(userDocRef, {
             enrollments: arrayRemove(subjectId)
         });
-        // Close dialog if last student is removed
-        if (selectedSubject?.enrolledStudents.length === 1) {
-            setDialogOpen(false);
-        }
     };
     
     const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -210,3 +219,5 @@ export function EnrollmentList() {
         </Card>
     );
 }
+
+    

@@ -243,6 +243,7 @@ export default function SubjectWorkspacePage() {
     }, [userProfile, subjectId]);
     
     const isUserBlocked = useMemo(() => {
+        // active property is true by default, so we check for explicit false.
         return userProfile?.active === false;
     }, [userProfile]);
 
@@ -392,6 +393,8 @@ export default function SubjectWorkspacePage() {
                 )}
             </div>
             
+            {/* Hide tabs if user is blocked */}
+            {!isUserBlocked && (
             <Tabs defaultValue="syllabus">
                 <div className="flex items-center">
                     <TabsList>
@@ -483,6 +486,7 @@ export default function SubjectWorkspacePage() {
                     </TabsContent>
                 ))}
             </Tabs>
+            )}
 
             {/* Add Tab Dialog */}
             <Dialog open={isAddTabDialogOpen} onOpenChange={setAddTabDialogOpen}>
@@ -567,3 +571,5 @@ export default function SubjectWorkspacePage() {
         </div>
     );
 }
+
+    
