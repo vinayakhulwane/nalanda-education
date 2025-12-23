@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil } from "lucide-react";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Subject, Unit, Category, CustomTab } from "@/types";
@@ -210,7 +210,7 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
 }
 
 export default function SubjectWorkspacePage() {
-    const { userProfile, isUserProfileLoading } = useUser();
+    const { user, userProfile, isUserProfileLoading } = useUser();
     const router = useRouter();
     const params = useParams();
     const classId = params.classId as string;
@@ -237,6 +237,10 @@ export default function SubjectWorkspacePage() {
     const subjectDocRef = useMemoFirebase(() => firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null, [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
     
+    const isEnrolled = useMemo(() => {
+        return userProfile?.enrollments?.includes(subjectId) ?? false;
+    }, [userProfile, subjectId]);
+
     useEffect(() => {
         if (!isUserProfileLoading && !userProfile) {
             router.push('/dashboard');
@@ -311,6 +315,18 @@ export default function SubjectWorkspacePage() {
         setEditingTab(null);
     }
 
+    const handleEnrollment = async () => {
+        if (!firestore || !user) return;
+        const userDocRef = doc(firestore, 'users', user.uid);
+        if (isEnrolled) {
+            // Unenroll
+            await updateDoc(userDocRef, { enrollments: arrayRemove(subjectId) });
+        } else {
+            // Enroll
+            await updateDoc(userDocRef, { enrollments: arrayUnion(subjectId) });
+        }
+    }
+
 
     const description = subject?.description || "Manage the subject curriculum.";
     const shouldTruncate = description.length > 150;
@@ -331,15 +347,25 @@ export default function SubjectWorkspacePage() {
                 Back to Subjects
             </Button>
             <div className="border-b pb-4 mb-6">
-                <h1 className="font-headline text-3xl md:text-4xl font-bold tracking-tight">{subject?.name || "Subject"}</h1>
-                <p className="text-lg text-muted-foreground mt-2">
-                    {displayedDescription}
-                    {shouldTruncate && (
-                         <Button variant="link" className="p-0 pl-1 text-lg" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
-                            {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h1 className="font-headline text-3xl md:text-4xl font-bold tracking-tight">{subject?.name || "Subject"}</h1>
+                        <p className="text-lg text-muted-foreground mt-2">
+                            {displayedDescription}
+                            {shouldTruncate && (
+                                 <Button variant="link" className="p-0 pl-1 text-lg" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
+                                    {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                                </Button>
+                            )}
+                        </p>
+                    </div>
+                    {userProfile?.role === 'student' && (
+                        <Button onClick={handleEnrollment} className="mt-4 md:mt-0">
+                            {isEnrolled ? <UserMinus className="mr-2" /> : <UserPlus className="mr-2" />}
+                            {isEnrolled ? 'Unenroll' : 'Enroll'}
                         </Button>
                     )}
-                </p>
+                </div>
             </div>
             
             <Tabs defaultValue="syllabus">

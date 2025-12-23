@@ -43,6 +43,13 @@
         "diamonds": {
           "type": "number",
           "description": "The amount of diamonds the user has."
+        },
+        "enrollments": {
+          "type": "array",
+          "description": "An array of subject IDs that the user is enrolled in.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [

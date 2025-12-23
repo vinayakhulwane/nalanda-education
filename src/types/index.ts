@@ -11,6 +11,7 @@ export interface User {
   gold: number;
   diamonds: number;
   active?: boolean;
+  enrollments?: string[];
 }
 
 export interface Class {
