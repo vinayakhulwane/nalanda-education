@@ -34,6 +34,20 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
         transition,
     };
 
+    const getPlainText = (html: string) => {
+        if (!html) return '';
+        return html.replace(/<[^>]*>?/gm, '');
+    }
+
+    const previewText = (text: string, maxLength: number = 50) => {
+        if (!text) return 'No question text yet...';
+        const plainText = getPlainText(text);
+        if (plainText.length > maxLength) {
+            return plainText.substring(0, maxLength) + '...';
+        }
+        return plainText;
+    }
+
     const handleMcqChange = (field: string, value: any) => {
         const mcqAnswer = { ...subQuestion.mcqAnswer, [field]: value };
         // When switching from multi to single, keep only the first correct answer
@@ -112,7 +126,7 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                             <Label>Marks</Label>
                             <Input 
                                 type="number" 
-                                value={subQuestion.marks} 
+                                value={subQuestion.marks || ''} 
                                 onChange={e => updateSubQuestion({...subQuestion, marks: parseInt(e.target.value) || 0})}
                             />
                         </div>
@@ -300,11 +314,13 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                 <Card className="bg-muted/30">
                     <CollapsibleTrigger asChild>
                         <CardHeader className="flex flex-row items-center justify-between p-3 bg-muted/50 rounded-t-lg cursor-pointer">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-1 overflow-hidden">
                                 <button {...attributes} {...listeners} className="cursor-grab" onClick={(e) => e.stopPropagation()}>
                                     <GripVertical className="h-5 w-5 text-muted-foreground" />
                                 </button>
-                                <span className="font-semibold text-sm">Sub-Question</span>
+                                <span className="font-semibold text-sm truncate">
+                                    {isOpen ? 'Sub-Question' : previewText(subQuestion.questionText)}
+                                </span>
                             </div>
                             <div className="flex items-center gap-1">
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); duplicateSubQuestion(subQuestion.id);}}>
