@@ -152,13 +152,17 @@ export function QuestionRunner({ question }: { question: Question }) {
     }
   }
 
+  const processedMainQuestionText = useMemo(() => {
+    return question.mainQuestionText.replace(/&nbsp;/g, ' ');
+  }, [question.mainQuestionText]);
+
 
   if (!hasStarted) {
     return (
         <div className="p-4 border rounded-lg bg-card text-card-foreground break-words">
             <div
                 className="prose dark:prose-invert max-w-none mb-6"
-                dangerouslySetInnerHTML={{ __html: question.mainQuestionText }}
+                dangerouslySetInnerHTML={{ __html: processedMainQuestionText }}
             />
              <div className="flex justify-center">
                 <Button onClick={handleStart}>Start Solving</Button>
