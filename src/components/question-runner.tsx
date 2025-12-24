@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
-import type { Question, SubQuestion } from '@/types';
+import type { Question, SolutionStep, SubQuestion } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -18,17 +18,32 @@ type AnswerState = {
   };
 };
 
+type SubQuestionWithStep = SubQuestion & {
+    stepId: string;
+    stepTitle: string;
+    stepObjective: string;
+}
+
 export function QuestionRunner({ question }: { question: Question }) {
   const [hasStarted, setHasStarted] = useState(false);
   const [answers, setAnswers] = useState<AnswerState>({});
   const [currentSubQuestionIndex, setCurrentSubQuestionIndex] = useState(0);
   const [currentAnswer, setCurrentAnswer] = useState<any>(null);
 
-  const allSubQuestions = useMemo(() => {
-    return question.solutionSteps.flatMap(step => step.subQuestions);
+  const allSubQuestions = useMemo((): SubQuestionWithStep[] => {
+    return question.solutionSteps.flatMap(step => 
+        step.subQuestions.map(subQ => ({
+            ...subQ,
+            stepId: step.id,
+            stepTitle: step.title,
+            stepObjective: step.stepQuestion,
+        }))
+    );
   }, [question.solutionSteps]);
 
   const activeSubQuestion = allSubQuestions[currentSubQuestionIndex];
+  const previousSubQuestion = allSubQuestions[currentSubQuestionIndex - 1];
+  const isNewStep = activeSubQuestion && (!previousSubQuestion || previousSubQuestion.stepId !== activeSubQuestion.stepId);
   const isFinished = currentSubQuestionIndex >= allSubQuestions.length;
 
   const handleStart = () => {
@@ -211,31 +226,34 @@ export function QuestionRunner({ question }: { question: Question }) {
             className="prose dark:prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: processedMainQuestionText }}
         />
-
-        <Separator />
         
         {!hasStarted ? (
-             <div className="flex justify-center">
+             <div className="flex justify-center pt-4 border-t">
                 <Button onClick={handleStart}>Start Solving</Button>
             </div>
         ) : (
-            <div className="space-y-8">
-                {allSubQuestions.map((subQ, index) => {
-                    const isVisible = index === currentSubQuestionIndex;
-                    const isSubmitted = !!answers[subQ.id];
-                    
-                    if (!isVisible && !isSubmitted) return null;
-
-                    return (
-                        <div key={subQ.id} className={`p-4 border rounded-lg ${isSubmitted ? 'bg-muted/50' : 'bg-card'}`}>
-                            <div
-                                className="prose dark:prose-invert max-w-none mb-4"
-                                dangerouslySetInnerHTML={{ __html: subQ.questionText }}
-                            />
-                            {renderAnswerInput(subQ)}
-                        </div>
-                    )
-                })}
+            <div className="space-y-6">
+                {activeSubQuestion && (
+                    <Card key={activeSubQuestion.stepId} className="bg-muted/30">
+                        {isNewStep && (
+                            <CardHeader>
+                                <CardTitle className="text-lg font-headline">{activeSubQuestion.stepTitle}</CardTitle>
+                                {activeSubQuestion.stepObjective && (
+                                    <CardDescription>{activeSubQuestion.stepObjective}</CardDescription>
+                                )}
+                            </CardHeader>
+                        )}
+                        <CardContent className={isNewStep ? 'pt-0' : 'pt-6'}>
+                            <div className="p-4 border rounded-lg bg-card">
+                                <div
+                                    className="prose dark:prose-invert max-w-none mb-4"
+                                    dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }}
+                                />
+                                {renderAnswerInput(activeSubQuestion)}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {activeSubQuestion && (
                     <div className="flex justify-end">
