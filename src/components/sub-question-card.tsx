@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { GripVertical, Trash2, Copy, ImagePlus, AlertCircle, Plus, X } from 'lucide-react';
+import { GripVertical, Trash2, Copy, ImagePlus, AlertCircle, Plus, X, ChevronDown } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -15,6 +15,8 @@ import { Switch } from './ui/switch';
 import { v4 as uuidv4 } from 'uuid';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Checkbox } from './ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { useState } from 'react';
 
 interface SubQuestionCardProps {
     subQuestion: SubQuestion;
@@ -25,6 +27,7 @@ interface SubQuestionCardProps {
 
 export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuestion, duplicateSubQuestion }: SubQuestionCardProps) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: subQuestion.id });
+    const [isOpen, setIsOpen] = useState(true);
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -293,65 +296,72 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
 
     return (
         <div ref={setNodeRef} style={style}>
-            <Card className="bg-muted/30">
-                <CardHeader className="flex flex-row items-center justify-between p-3 bg-muted/50 rounded-t-lg">
-                    <div className="flex items-center gap-2">
-                        <button {...attributes} {...listeners} className="cursor-grab">
-                            <GripVertical className="h-5 w-5 text-muted-foreground" />
-                        </button>
-                        <span className="font-semibold text-sm">Sub-Question</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => duplicateSubQuestion(subQuestion.id)}>
-                            <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteSubQuestion(subQuestion.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                    <div>
-                        <Label>Question Text</Label>
-                        <RichTextEditor 
-                            value={subQuestion.questionText} 
-                            onChange={val => updateSubQuestion({...subQuestion, questionText: val})}
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Answer Type</Label>
-                            <Select 
-                                value={subQuestion.answerType} 
-                                onValueChange={(val: SubQuestion['answerType']) => handleAnswerTypeChange(val)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="numerical">Numerical</SelectItem>
-                                    <SelectItem value="text">Text / Short Answer</SelectItem>
-                                    <SelectItem value="mcq">Multiple Choice (MCQ)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2 self-end">
-                            <Button variant="outline" className="w-full">
-                                <ImagePlus className="mr-2 h-4 w-4" />
-                                Add Image
-                            </Button>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <Label>Answer Configuration</Label>
-                        <div className="p-4 border rounded-md bg-background mt-2">
-                            {renderAnswerConfig()}
-                        </div>
-                    </div>
-                    
-                </CardContent>
-            </Card>
+            <Collapsible asChild open={isOpen} onOpenChange={setIsOpen}>
+                <Card className="bg-muted/30">
+                    <CollapsibleTrigger asChild>
+                        <CardHeader className="flex flex-row items-center justify-between p-3 bg-muted/50 rounded-t-lg cursor-pointer">
+                            <div className="flex items-center gap-2">
+                                <button {...attributes} {...listeners} className="cursor-grab" onClick={(e) => e.stopPropagation()}>
+                                    <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                </button>
+                                <span className="font-semibold text-sm">Sub-Question</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); duplicateSubQuestion(subQuestion.id);}}>
+                                    <Copy className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); deleteSubQuestion(subQuestion.id); }}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                                 <ChevronDown className={`h-5 w-5 transition-transform duration-200 ${isOpen ? '' : '-rotate-90'}`} />
+                            </div>
+                        </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <CardContent className="p-4 space-y-4">
+                            <div>
+                                <Label>Question Text</Label>
+                                <RichTextEditor 
+                                    value={subQuestion.questionText} 
+                                    onChange={val => updateSubQuestion({...subQuestion, questionText: val})}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Answer Type</Label>
+                                    <Select 
+                                        value={subQuestion.answerType} 
+                                        onValueChange={(val: SubQuestion['answerType']) => handleAnswerTypeChange(val)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="numerical">Numerical</SelectItem>
+                                            <SelectItem value="text">Text / Short Answer</SelectItem>
+                                            <SelectItem value="mcq">Multiple Choice (MCQ)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2 self-end">
+                                    <Button variant="outline" className="w-full">
+                                        <ImagePlus className="mr-2 h-4 w-4" />
+                                        Add Image
+                                    </Button>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <Label>Answer Configuration</Label>
+                                <div className="p-4 border rounded-md bg-background mt-2">
+                                    {renderAnswerConfig()}
+                                </div>
+                            </div>
+                            
+                        </CardContent>
+                    </CollapsibleContent>
+                </Card>
+            </Collapsible>
         </div>
     )
 }
