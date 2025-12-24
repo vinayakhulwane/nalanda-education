@@ -53,6 +53,20 @@ export function QuestionRunner({ question }: { question: Question }) {
     const stepIds = new Set(question.solutionSteps.map(s => s.id));
     return Array.from(stepIds);
   }, [question.solutionSteps]);
+  
+  const completedQuestionsByStep = useMemo(() => {
+    const completed = allSubQuestions.slice(0, currentSubQuestionIndex);
+    return completed.reduce((acc, subQ) => {
+        if (!acc[subQ.stepId]) {
+            acc[subQ.stepId] = {
+                title: subQ.stepTitle,
+                subQuestions: []
+            };
+        }
+        acc[subQ.stepId].subQuestions.push(subQ);
+        return acc;
+    }, {} as Record<string, { title: string, subQuestions: SubQuestionWithStep[] }>);
+  }, [allSubQuestions, currentSubQuestionIndex]);
 
 
   const isFinished = currentSubQuestionIndex >= allSubQuestions.length;
@@ -277,26 +291,35 @@ export function QuestionRunner({ question }: { question: Question }) {
         ) : (
             <div className="space-y-4">
                 {/* Completed Questions Summaries */}
-                {allSubQuestions.slice(0, currentSubQuestionIndex).map((subQ, index) => (
-                    <Collapsible key={subQ.id}>
-                        <CollapsibleTrigger className="w-full">
-                            <CompletedSubQuestionSummary 
-                                subQuestion={subQ}
-                                answer={answers[subQ.id]?.answer}
-                                index={index}
-                            />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <div className="p-4 border border-t-0 rounded-b-lg -mt-1">
-                                 <div
-                                    className="prose dark:prose-invert max-w-none mb-4 text-muted-foreground"
-                                    dangerouslySetInnerHTML={{ __html: subQ.questionText }}
-                                />
-                                {renderAnswerInput(subQ, true)}
-                            </div>
-                        </CollapsibleContent>
-                    </Collapsible>
+                 {Object.entries(completedQuestionsByStep).map(([stepId, stepData], stepIndex) => (
+                    <div key={stepId} className="space-y-2">
+                        <h4 className="font-semibold text-lg font-headline">Step {uniqueStepIds.indexOf(stepId) + 1}. {stepData.title}</h4>
+                        {stepData.subQuestions.map((subQ, subQIndex) => {
+                             const globalIndex = allSubQuestions.findIndex(q => q.id === subQ.id);
+                             return (
+                                <Collapsible key={subQ.id}>
+                                    <CollapsibleTrigger className="w-full">
+                                        <CompletedSubQuestionSummary 
+                                            subQuestion={subQ}
+                                            answer={answers[subQ.id]?.answer}
+                                            index={globalIndex}
+                                        />
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <div className="p-4 border border-t-0 rounded-b-lg -mt-1">
+                                            <div
+                                                className="prose dark:prose-invert max-w-none mb-4 text-muted-foreground"
+                                                dangerouslySetInnerHTML={{ __html: subQ.questionText }}
+                                            />
+                                            {renderAnswerInput(subQ, true)}
+                                        </div>
+                                    </CollapsibleContent>
+                                </Collapsible>
+                            )
+                        })}
+                    </div>
                 ))}
+
 
                 {/* Active Question Card */}
                 {activeSubQuestion && (

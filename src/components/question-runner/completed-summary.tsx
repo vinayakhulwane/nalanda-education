@@ -1,6 +1,6 @@
 'use client';
 import type { SubQuestion } from '@/types';
-import { ChevronRight, ChevronsUpDown } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 
 interface CompletedSubQuestionSummaryProps {
     subQuestion: SubQuestion & { stepTitle: string };
@@ -51,10 +51,9 @@ export function CompletedSubQuestionSummary({ subQuestion, answer, index }: Comp
         <div className="flex items-center gap-3 p-3 border rounded-lg bg-card text-sm text-muted-foreground runner-summary-card w-full text-left hover:bg-muted/50 cursor-pointer">
             <div className="flex-shrink-0 font-medium">{index + 1}.</div>
             <div className="flex-grow truncate">
-                <span className="font-semibold text-primary/80">{subQuestion.stepTitle}:</span> {questionText}
+                {questionText}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-                <ChevronRight className="h-4 w-4" />
                 <span className="font-semibold text-card-foreground truncate" title={getAnswerText(subQuestion, answer)}>{answerText}</span>
             </div>
              <div className="flex-shrink-0 w-8 text-right">
