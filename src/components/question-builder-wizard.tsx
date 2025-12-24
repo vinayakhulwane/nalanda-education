@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
@@ -385,6 +384,39 @@ export function QuestionBuilderWizard() {
             description: "Could not save the draft. Please try again.",
         });
     }
+  };
+
+  const handlePublish = async () => {
+    await handleSaveDraft(); // Save any pending changes first
+
+    if (!firestore || !question.id) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Cannot publish. Question ID is missing.",
+        });
+        return;
+    }
+
+    try {
+        const questionRef = doc(firestore, 'questions', question.id);
+        await updateDoc(questionRef, {
+            status: 'published',
+            publishedAt: serverTimestamp(),
+        });
+        toast({
+            title: "Question Published",
+            description: `${question.name} is now live.`,
+        });
+        router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`);
+    } catch (error) {
+        console.error("Error publishing question:", error);
+        toast({
+            variant: "destructive",
+            title: "Publish Failed",
+            description: "Could not publish the question. Please try again.",
+        });
+    }
 };
 
   const handleExportJson = () => {
@@ -475,7 +507,7 @@ export function QuestionBuilderWizard() {
             {currentStep < steps.length ? (
                 <Button onClick={handleNext} disabled={!isStepValid}>Next</Button>
             ) : (
-                <Button disabled={!isStepValid}>Publish</Button>
+                <Button onClick={handlePublish} disabled={!isStepValid}>Publish</Button>
             )}
         </div>
       </CardFooter>
