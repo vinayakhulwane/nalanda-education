@@ -41,9 +41,16 @@ export function QuestionRunner({ question }: { question: Question }) {
     );
   }, [question.solutionSteps]);
 
+  const uniqueStepIds = useMemo(() => {
+    const stepIds = new Set(question.solutionSteps.map(s => s.id));
+    return Array.from(stepIds);
+  }, [question.solutionSteps]);
+
   const activeSubQuestion = allSubQuestions[currentSubQuestionIndex];
   const previousSubQuestion = allSubQuestions[currentSubQuestionIndex - 1];
   const isNewStep = activeSubQuestion && (!previousSubQuestion || previousSubQuestion.stepId !== activeSubQuestion.stepId);
+  const currentStepNumber = activeSubQuestion ? uniqueStepIds.indexOf(activeSubQuestion.stepId) + 1 : 0;
+
   const isFinished = currentSubQuestionIndex >= allSubQuestions.length;
 
   const handleStart = () => {
@@ -169,6 +176,7 @@ export function QuestionRunner({ question }: { question: Question }) {
 
   const processedMainQuestionText = useMemo(() => {
     if (!question?.mainQuestionText) return '';
+    // Replace non-breaking spaces with regular spaces
     return question.mainQuestionText.replace(/&nbsp;/g, ' ');
   }, [question.mainQuestionText]);
 
@@ -222,10 +230,12 @@ export function QuestionRunner({ question }: { question: Question }) {
 
   return (
     <div className="p-4 border rounded-lg bg-card text-card-foreground break-words space-y-6">
-        <div
-            className="prose dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: processedMainQuestionText }}
-        />
+       <div className="p-4 rounded-lg bg-muted/50">
+            <div
+                className="prose dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: processedMainQuestionText }}
+            />
+       </div>
         
         {!hasStarted ? (
              <div className="flex justify-center pt-4 border-t">
@@ -237,7 +247,9 @@ export function QuestionRunner({ question }: { question: Question }) {
                     <Card key={activeSubQuestion.stepId} className="bg-muted/30">
                         {isNewStep && (
                             <CardHeader>
-                                <CardTitle className="text-lg font-headline">{activeSubQuestion.stepTitle}</CardTitle>
+                                <CardTitle className="text-lg font-headline">
+                                    Step {currentStepNumber}: {activeSubQuestion.stepTitle}
+                                </CardTitle>
                                 {activeSubQuestion.stepObjective && (
                                     <CardDescription>{activeSubQuestion.stepObjective}</CardDescription>
                                 )}
