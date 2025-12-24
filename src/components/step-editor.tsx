@@ -82,7 +82,7 @@ export function StepEditor({ step, updateStep }: StepEditorProps) {
                 />
             </div>
              <div className="space-y-2">
-                <Label htmlFor="step-question">Step Question</Label>
+                <Label htmlFor="step-question">Step Objective</Label>
                 <Textarea
                     id="step-question"
                     value={step.stepQuestion}
