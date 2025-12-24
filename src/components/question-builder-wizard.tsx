@@ -7,14 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { collection, query, where, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Class, Subject, Unit, Category, Question, SolutionStep } from '@/types';
 import { AlertCircle, FileJson, Loader2, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -38,8 +38,8 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
     const paramClassId = searchParams.get('classId');
     const paramSubjectId = searchParams.get('subjectId');
 
-    const [selectedClass, setSelectedClass] = useState(paramClassId || '');
-    const [selectedSubject, setSelectedSubject] = useState(paramSubjectId || '');
+    const [selectedClass, setSelectedClass] = useState(question.classId || paramClassId || '');
+    const [selectedSubject, setSelectedSubject] = useState(question.subjectId || paramSubjectId || '');
 
     // Data fetching
     const { data: classes, isLoading: classesLoading } = useCollection<Class>(useMemoFirebase(() => firestore && collection(firestore, 'classes'), [firestore]));
@@ -51,28 +51,32 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
     const { data: units, isLoading: unitsLoading } = useCollection<Unit>(unitsQuery);
 
     const categoriesQuery = useMemoFirebase(() => {
-        if (!firestore || !units || units.length === 0) return null;
-        const unitIds = units.map(u => u.id);
-        if (unitIds.length === 0) return null;
-        return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds));
-    }, [firestore, units]);
+        if (!firestore || !question.unitId) return null;
+        return query(collection(firestore, 'categories'), where('unitId', '==', question.unitId));
+    }, [firestore, question.unitId]);
     const { data: categories, isLoading: categoriesLoading } = useCollection<Category>(categoriesQuery);
 
     useEffect(() => {
-        // When component mounts, if we have URL params, update the main question state
-        if (paramClassId) setSelectedClass(paramClassId);
-        if (paramSubjectId) setSelectedSubject(paramSubjectId);
-    }, [paramClassId, paramSubjectId]);
-    
-    useEffect(() => {
-        // Reset subject if class changes, unless it was pre-filled from URL param
-        if (selectedClass !== paramClassId) {
-            setSelectedSubject('');
-            setQuestion({...question, unitId: undefined, categoryId: undefined});
-        }
-    }, [selectedClass, paramClassId]);
+        setQuestion(prev => ({...prev, classId: selectedClass, subjectId: selectedSubject}));
+    }, [selectedClass, selectedSubject, setQuestion]);
 
-    const isFormValid = !!question.name && !!question.mainQuestionText && !!selectedClass && !!selectedSubject && !!question.unitId && !!question.categoryId && !!question.currencyType;
+    useEffect(() => {
+        // Reset subject if class changes
+        if (selectedClass !== question.classId) {
+            setSelectedSubject('');
+            setQuestion(prev => ({...prev, subjectId: undefined, unitId: undefined, categoryId: undefined}));
+        }
+    }, [selectedClass, question.classId, setQuestion]);
+
+    useEffect(() => {
+        // Reset unit/category if subject changes
+        if(selectedSubject !== question.subjectId) {
+            setQuestion(prev => ({...prev, unitId: undefined, categoryId: undefined}));
+        }
+    }, [selectedSubject, question.subjectId, setQuestion]);
+
+
+    const isFormValid = !!question.name && !!question.mainQuestionText && !!question.classId && !!question.subjectId && !!question.unitId && !!question.categoryId && !!question.currencyType;
 
      useEffect(() => {
       onValidityChange(isFormValid);
@@ -91,12 +95,8 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
                     const content = e.target?.result as string;
                     const jsonData = JSON.parse(content);
                     // Here you would have more robust validation and state setting
-                    if (jsonData.mainQuestionText) {
-                         setQuestion({...question, mainQuestionText: jsonData.mainQuestionText});
-                    }
-                    if (jsonData.name) {
-                        setQuestion({...question, name: jsonData.name});
-                    }
+                    setQuestion(prev => ({...prev, ...jsonData}));
+
                     toast({
                         title: 'Success',
                         description: 'JSON data loaded successfully.',
@@ -169,7 +169,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
              <div className="grid md:grid-cols-2 gap-4">
                  <div className="space-y-2">
                     <Label>Unit</Label>
-                    <Select onValueChange={val => setQuestion({...question, unitId: val})} value={question.unitId} disabled={!selectedSubject || unitsLoading}>
+                    <Select onValueChange={val => setQuestion({...question, unitId: val, categoryId: undefined})} value={question.unitId} disabled={!selectedSubject || unitsLoading}>
                         <SelectTrigger>
                             <SelectValue placeholder={unitsLoading ? 'Loading units...' : 'Select a unit'} />
                         </SelectTrigger>
@@ -180,7 +180,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
                 </div>
                  <div className="space-y-2">
                     <Label>Category</Label>
-                     <Select onValueChange={val => setQuestion({...question, categoryId: val})} value={question.categoryId} disabled={!units || units.length === 0 || categoriesLoading}>
+                     <Select onValueChange={val => setQuestion({...question, categoryId: val})} value={question.categoryId} disabled={!question.unitId || categoriesLoading}>
                         <SelectTrigger>
                             <SelectValue placeholder={categoriesLoading ? 'Loading...' : 'Select a category'} />
                         </SelectTrigger>
@@ -387,6 +387,14 @@ function Step3Validation({question}: {question: Partial<Question>}) {
 
 
 export function QuestionBuilderWizard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  
+  const questionId = searchParams.get('questionId');
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isStepValid, setStepValid] = useState(false);
   const [question, setQuestion] = useState<Partial<Question>>({
@@ -394,13 +402,43 @@ export function QuestionBuilderWizard() {
       status: 'draft',
       gradingMode: 'system'
   });
+  const [isLoading, setIsLoading] = useState(!!questionId);
+  
+  const questionDocRef = useMemoFirebase(() => {
+    if (!firestore || !questionId) return null;
+    return doc(firestore, 'questions', questionId);
+  }, [firestore, questionId]);
+
+  const { data: fetchedQuestion, isLoading: isFetching } = useDoc<Question>(questionDocRef);
+
+  useEffect(() => {
+      if (fetchedQuestion) {
+          setQuestion(fetchedQuestion);
+          setIsLoading(false);
+      }
+  }, [fetchedQuestion]);
 
   const progress = ((currentStep - 1) / (steps.length - 1)) * 100;
 
   const handleNext = () => {
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
-      setStepValid(false); // Reset validation for the next step
+      // For subsequent steps, validation depends on the step content itself.
+      // So we don't assume it's invalid right away.
+      if (currentStep + 1 === 2) {
+          setStepValid( (question.solutionSteps?.length || 0) > 0);
+      } else if (currentStep + 1 === 3) {
+          const rules = [
+            { id: 'steps-exist', check: () => (question.solutionSteps?.length || 0) > 0, text: 'At least one step must exist.' },
+            { id: 'steps-not-empty', check: () => question.solutionSteps?.every(s => s.title.trim() !== '' && s.stepQuestion.trim() !== ''), text: 'All steps must have a Title and Step Question.'},
+            { id: 'subquestions-exist', check: () => question.solutionSteps?.every(s => s.subQuestions.length > 0), text: 'Each step must have at least one sub-question.' },
+            { id: 'subquestions-answered', check: () => question.solutionSteps?.every(s => s.subQuestions.every(sq => sq.marks > 0)), text: 'All sub-questions must have marks assigned.' },
+        ];
+        setStepValid(rules.every(rule => rule.check()));
+      }
+      else {
+        setStepValid(false);
+      }
     }
   };
 
@@ -415,7 +453,59 @@ export function QuestionBuilderWizard() {
     setStepValid(isValid);
   }
 
+  const handleSaveDraft = async () => {
+    if (!firestore || !user) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Cannot save. User or database not available.",
+        });
+        return;
+    }
+    
+    const dataToSave = {
+        ...question,
+        authorId: user.uid,
+        status: 'draft',
+        updatedAt: serverTimestamp()
+    };
+
+    try {
+        if (question.id) {
+            // Update existing question
+            const questionRef = doc(firestore, 'questions', question.id);
+            await updateDoc(questionRef, dataToSave);
+            toast({
+                title: "Draft Updated",
+                description: "Your changes have been saved.",
+            });
+        } else {
+            // Create new question
+            const collectionRef = collection(firestore, 'questions');
+            const docRef = await addDoc(collectionRef, { ...dataToSave, createdAt: serverTimestamp() });
+            setQuestion(prev => ({...prev, id: docRef.id})); // Set new ID in state
+            toast({
+                title: "Draft Saved",
+                description: "Question has been saved as a draft.",
+            });
+             // Optionally, update URL without navigation
+            router.replace(`/questions/new?questionId=${docRef.id}`, { scroll: false });
+        }
+
+    } catch (error) {
+        console.error("Error saving draft:", error);
+        toast({
+            variant: "destructive",
+            title: "Save Failed",
+            description: "Could not save the draft. Please try again.",
+        });
+    }
+};
+
   const renderStepContent = () => {
+    if (isLoading) {
+        return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+    }
     switch (currentStep) {
       case 1: return <Step1Metadata onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion}/>;
       case 2: return <Step2SolutionBuilder onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion} />;
@@ -441,7 +531,7 @@ export function QuestionBuilderWizard() {
            {currentStep > 1 && <Button variant="outline" onClick={handleBack}>Back</Button>}
         </div>
         <div className="flex items-center gap-4">
-            <Button variant="ghost">Save as Draft</Button>
+            <Button variant="ghost" onClick={handleSaveDraft}>Save as Draft</Button>
             {currentStep < steps.length ? (
                 <Button onClick={handleNext} disabled={!isStepValid}>Next</Button>
             ) : (
