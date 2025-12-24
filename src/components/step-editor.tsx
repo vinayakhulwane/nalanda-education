@@ -93,12 +93,7 @@ export function StepEditor({ step, updateStep }: StepEditorProps) {
             </div>
             
             <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                    <h4 className="font-medium">Sub-Questions</h4>
-                    <Button size="sm" onClick={handleAddSubQuestion}>
-                        <Plus className="mr-2 h-4 w-4" /> Add Sub-Question
-                    </Button>
-                </div>
+                <h4 className="font-medium">Sub-Questions</h4>
                  <DndContext collisionDetection={closestCenter} onDragEnd={handleSubQuestionDragEnd}>
                     <SortableContext items={step.subQuestions.map(sq => sq.id)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-4">
@@ -114,11 +109,15 @@ export function StepEditor({ step, updateStep }: StepEditorProps) {
                         </div>
                     </SortableContext>
                 </DndContext>
+
                 {step.subQuestions.length === 0 && (
                     <div className="text-center text-sm text-muted-foreground py-8 border-2 border-dashed rounded-lg">
                         No sub-questions added yet.
                     </div>
                 )}
+                 <Button size="sm" onClick={handleAddSubQuestion} variant="outline" className="w-full">
+                    <Plus className="mr-2 h-4 w-4" /> Add Sub-Question
+                </Button>
             </div>
         </div>
     );
