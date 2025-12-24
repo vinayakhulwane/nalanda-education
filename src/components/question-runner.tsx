@@ -197,6 +197,26 @@ export function QuestionRunner({ question }: { question: Question }) {
     }
   };
 
+    const getAnswerText = (subQuestion: SubQuestion, answer: any) => {
+        if (answer === null || answer === undefined) return 'Not Answered';
+        switch (subQuestion.answerType) {
+            case 'numerical':
+            case 'text':
+                return answer.toString();
+            case 'mcq':
+                const optionMap = new Map(subQuestion.mcqAnswer?.options.map(o => [o.id, o.text]));
+                if (subQuestion.mcqAnswer?.isMultiCorrect) {
+                    const answers = (answer as string[] || []);
+                    if (answers.length === 0) return 'Not Answered';
+                    return answers.map(id => optionMap.get(id)).join(', ');
+                }
+                return optionMap.get(answer) || 'N/A';
+            default:
+                return 'N/A';
+        }
+    }
+
+
   const getCorrectAnswerText = (subQ: SubQuestion) => {
     switch (subQ.answerType) {
         case 'numerical': return subQ.numericalAnswer?.correctValue.toString() || 'N/A';
@@ -269,6 +289,7 @@ export function QuestionRunner({ question }: { question: Question }) {
                                 {stepData.subQuestions.map((subQ) => {
                                     const result = results[subQ.id];
                                     const isCorrect = result?.isCorrect;
+                                    const studentAnswer = answers[subQ.id]?.answer;
                                     return (
                                         <div key={subQ.id} className="p-3 border rounded-md">
                                             <div className="flex items-start justify-between">
@@ -283,11 +304,16 @@ export function QuestionRunner({ question }: { question: Question }) {
                                                     {isCorrect ? `${subQ.marks}/${subQ.marks}` : `0/${subQ.marks}`}
                                                 </div>
                                             </div>
-                                            {!isCorrect && (
-                                                <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted rounded">
-                                                    Correct Answer: <span className="font-semibold">{getCorrectAnswerText(subQ)}</span>
+                                            <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted rounded space-y-1">
+                                                <div>
+                                                    Your Answer: <span className="font-semibold">{getAnswerText(subQ, studentAnswer)}</span>
                                                 </div>
-                                            )}
+                                                 {!isCorrect && (
+                                                    <div>
+                                                        Correct Answer: <span className="font-semibold">{getCorrectAnswerText(subQ)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )
                                 })}
