@@ -55,7 +55,7 @@ function NumericalManagementSubjectCard({ subject, classId }: { subject: Subject
                         <BookPlus className="mr-2"/>
                         Create New Question
                     </Button>
-                    <Button variant="outline" disabled>
+                    <Button variant="outline" onClick={() => router.push(`/questions/bank?classId=${classId}&subjectId=${subject.id}`)}>
                         <Library className="mr-2" />
                         Question Bank
                     </Button>

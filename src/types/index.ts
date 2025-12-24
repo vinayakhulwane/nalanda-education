@@ -143,3 +143,5 @@ export interface Question {
   status: 'draft' | 'published';
   authorId: string;
 }
+
+export type QuestionFilter = 'unit' | 'category' | 'status' | 'currency';
