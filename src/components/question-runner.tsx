@@ -279,7 +279,7 @@ export function QuestionRunner({ question }: { question: Question }) {
                 {/* Completed Questions Summaries */}
                 {allSubQuestions.slice(0, currentSubQuestionIndex).map((subQ, index) => (
                     <Collapsible key={subQ.id}>
-                        <CollapsibleTrigger asChild>
+                        <CollapsibleTrigger className="w-full">
                             <CompletedSubQuestionSummary 
                                 subQuestion={subQ}
                                 answer={answers[subQ.id]?.answer}
