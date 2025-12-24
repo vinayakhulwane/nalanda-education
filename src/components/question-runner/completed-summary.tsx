@@ -3,7 +3,7 @@ import type { SubQuestion } from '@/types';
 import { ChevronRight, ChevronsUpDown } from 'lucide-react';
 
 interface CompletedSubQuestionSummaryProps {
-    subQuestion: SubQuestion;
+    subQuestion: SubQuestion & { stepTitle: string };
     answer: any;
     index: number;
 }
@@ -18,7 +18,7 @@ const getPlainText = (html: string) => {
         .trim();
 }
 
-const truncate = (text: string, length = 60) => {
+const truncate = (text: string, length = 40) => {
     if (text.length <= length) return text;
     return text.substring(0, length) + '...';
 }
@@ -50,7 +50,9 @@ export function CompletedSubQuestionSummary({ subQuestion, answer, index }: Comp
     return (
         <div className="flex items-center gap-3 p-3 border rounded-lg bg-card text-sm text-muted-foreground runner-summary-card w-full text-left hover:bg-muted/50 cursor-pointer">
             <div className="flex-shrink-0 font-medium">{index + 1}.</div>
-            <div className="flex-grow truncate" title={getPlainText(subQuestion.questionText)}>{questionText}</div>
+            <div className="flex-grow truncate">
+                <span className="font-semibold text-primary/80">{subQuestion.stepTitle}:</span> {questionText}
+            </div>
             <div className="flex items-center gap-2 flex-shrink-0">
                 <ChevronRight className="h-4 w-4" />
                 <span className="font-semibold text-card-foreground truncate" title={getAnswerText(subQuestion, answer)}>{answerText}</span>
