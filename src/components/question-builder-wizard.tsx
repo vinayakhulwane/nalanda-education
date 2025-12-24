@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Step2SolutionBuilder } from './question-builder/step-2-solution-builder';
 import { Step4Grading } from './question-builder/step-4-grading';
+import { QuestionRunner } from './question-runner';
 
 
 const steps = [
@@ -206,26 +207,20 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
     )
 }
 
-function StepPlaceholder({ stepName }: { stepName: string }) {
-    return (
-        <div className="flex flex-col items-center justify-center text-center h-96 rounded-lg border-2 border-dashed">
-            <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mb-4"/>
-            <h3 className="text-xl font-bold font-headline">Work in Progress</h3>
-            <p className="text-muted-foreground mt-2">The "{stepName}" feature is currently under construction. <br/> Please check back later.</p>
-        </div>
-    )
-}
-
-function Step3Validation({question}: {question: Partial<Question>}) {
-     const validationRules = [
+function Step3Validation({question, onValidityChange}: {question: Partial<Question>, onValidityChange: (isValid: boolean) => void}) {
+     const validationRules = useMemo(() => [
         { id: 'steps-exist', check: () => (question.solutionSteps?.length || 0) > 0, text: 'At least one step must exist.' },
-        { id: 'steps-not-empty', check: () => question.solutionSteps?.every(s => s.title.trim() !== '' && s.stepQuestion.trim() !== ''), text: 'All steps must have a Title and Step Question.'},
+        { id: 'steps-not-empty', check: () => question.solutionSteps?.every(s => s.title.trim() !== '' && s.stepQuestion.trim() !== ''), text: 'All steps must have a Title and Step Objective.'},
         { id: 'subquestions-exist', check: () => question.solutionSteps?.every(s => s.subQuestions.length > 0), text: 'Each step must have at least one sub-question.' },
         { id: 'subquestions-answered', check: () => question.solutionSteps?.every(s => s.subQuestions.every(sq => sq.marks > 0)), text: 'All sub-questions must have marks assigned.' },
         // Add more specific answer checks here later
-    ];
+    ], [question.solutionSteps]);
 
-    const allValid = validationRules.every(rule => rule.check());
+    const allValid = useMemo(() => validationRules.every(rule => rule.check()), [validationRules]);
+    
+    useEffect(() => {
+        onValidityChange(allValid);
+    }, [allValid, onValidityChange]);
 
     return (
         <div className="space-y-4">
@@ -275,57 +270,74 @@ export function QuestionBuilderWizard() {
     return doc(firestore, 'questions', questionId);
   }, [firestore, questionId]);
 
-  const { data: fetchedQuestion, isLoading: isFetching } = useDoc<Question>(questionDocRef);
+  const { data: fetchedQuestion } = useDoc<Question>(questionDocRef);
 
   useEffect(() => {
       if (fetchedQuestion) {
           setQuestion(fetchedQuestion);
           setIsLoading(false);
       }
-  }, [fetchedQuestion]);
+       // If we have a questionId but no fetchedQuestion, it might be loading or not exist.
+      // We set isLoading to false only when we are NOT in edit mode (no questionId).
+      if (!questionId) {
+          setIsLoading(false);
+      }
+  }, [fetchedQuestion, questionId]);
 
   const progress = ((currentStep - 1) / (steps.length - 1)) * 100;
 
   const handleNext = () => {
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
-      // For subsequent steps, validation depends on the step content itself.
-      // So we don't assume it's invalid right away.
-      if (currentStep + 1 === 2) {
-          setStepValid( (question.solutionSteps?.length || 0) > 0);
-      } else if (currentStep + 1 === 3) {
-          const rules = [
-            { id: 'steps-exist', check: () => (question.solutionSteps?.length || 0) > 0, text: 'At least one step must exist.' },
-            { id: 'steps-not-empty', check: () => question.solutionSteps?.every(s => s.title.trim() !== '' && s.stepQuestion.trim() !== ''), text: 'All steps must have a Title and Step Question.'},
-            { id: 'subquestions-exist', check: () => question.solutionSteps?.every(s => s.subQuestions.length > 0), text: 'Each step must have at least one sub-question.' },
-            { id: 'subquestions-answered', check: () => question.solutionSteps?.every(s => s.subQuestions.every(sq => sq.marks > 0)), text: 'All sub-questions must have marks assigned.' },
-        ];
-        setStepValid(rules.every(rule => rule.check()));
-      }
-      else if (currentStep + 1 === 4) {
-        if (question.gradingMode === 'system') {
-            setStepValid(true);
-        } else {
-            const totalWeightage = Object.values(question.aiRubric || {}).reduce((sum, val) => sum + val, 0);
-            setStepValid(totalWeightage === 100);
-        }
-      }
-      else {
-        setStepValid(false);
-      }
     }
   };
 
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
-      setStepValid(true); // Assume previous steps are valid
     }
   };
   
   const handleStepValidityChange = (isValid: boolean) => {
     setStepValid(isValid);
   }
+  
+  useEffect(() => {
+    // This effect re-evaluates validity whenever the current step or the question data changes.
+     switch (currentStep) {
+        case 1:
+            const isMetaValid = !!question.name && !!question.mainQuestionText && !!question.classId && !!question.subjectId && !!question.unitId && !!question.categoryId && !!question.currencyType;
+            setStepValid(isMetaValid);
+            break;
+        case 2:
+            setStepValid((question.solutionSteps?.length || 0) > 0);
+            break;
+        case 3:
+            const rules = [
+                { check: () => (question.solutionSteps?.length || 0) > 0 },
+                { check: () => question.solutionSteps?.every(s => s.title.trim() !== '' && s.stepQuestion.trim() !== '') },
+                { check: () => question.solutionSteps?.every(s => s.subQuestions.length > 0) },
+                { check: () => question.solutionSteps?.every(s => s.subQuestions.every(sq => sq.marks > 0)) },
+            ];
+            setStepValid(rules.every(rule => rule.check()));
+            break;
+        case 4:
+            if (question.gradingMode === 'system') {
+                setStepValid(true);
+            } else {
+                const totalWeightage = Object.values(question.aiRubric || {}).reduce((sum, val) => sum + val, 0);
+                setStepValid(totalWeightage === 100);
+            }
+            break;
+        case 5:
+            // Preview step is always "valid" to proceed to publish, actual validation is on the whole object
+            setStepValid(true);
+            break;
+        default:
+            setStepValid(false);
+            break;
+    }
+  }, [currentStep, question]);
 
   const handleSaveDraft = async () => {
     if (!firestore || !user) {
@@ -378,14 +390,14 @@ export function QuestionBuilderWizard() {
 
   const renderStepContent = () => {
     if (isLoading) {
-        return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+        return <div className="flex h-full min-h-[400px] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
     }
     switch (currentStep) {
       case 1: return <Step1Metadata onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion}/>;
       case 2: return <Step2SolutionBuilder onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion} />;
-      case 3: return <Step3Validation question={question} />;
+      case 3: return <Step3Validation question={question} onValidityChange={handleStepValidityChange}/>;
       case 4: return <Step4Grading onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion} />;
-      case 5: return <StepPlaceholder stepName="Preview & Save" />;
+      case 5: return <QuestionRunner question={question as Question} />;
       default: return null;
     }
   };
