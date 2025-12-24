@@ -153,24 +153,10 @@ export function QuestionRunner({ question }: { question: Question }) {
   }
 
   const processedMainQuestionText = useMemo(() => {
+    if (!question?.mainQuestionText) return '';
     return question.mainQuestionText.replace(/&nbsp;/g, ' ');
   }, [question.mainQuestionText]);
 
-
-  if (!hasStarted) {
-    return (
-        <div className="p-4 border rounded-lg bg-card text-card-foreground break-words">
-            <div
-                className="prose dark:prose-invert max-w-none mb-6"
-                dangerouslySetInnerHTML={{ __html: processedMainQuestionText }}
-            />
-             <div className="flex justify-center">
-                <Button onClick={handleStart}>Start Solving</Button>
-            </div>
-        </div>
-    );
-  }
-  
   if (isFinished) {
     const totalMarks = allSubQuestions.reduce((sum, q) => sum + q.marks, 0);
     const score = allSubQuestions.reduce((sum, q) => answers[q.id]?.isCorrect ? sum + q.marks : sum, 0);
@@ -220,30 +206,44 @@ export function QuestionRunner({ question }: { question: Question }) {
   }
 
   return (
-    <div className="space-y-8">
-        {allSubQuestions.map((subQ, index) => {
-            const isVisible = index === currentSubQuestionIndex;
-            const isSubmitted = !!answers[subQ.id];
-            
-            if (!isVisible && !isSubmitted) return null;
+    <div className="p-4 border rounded-lg bg-card text-card-foreground break-words space-y-6">
+        <div
+            className="prose dark:prose-invert max-w-none"
+            dangerouslySetInnerHTML={{ __html: processedMainQuestionText }}
+        />
 
-            return (
-                <div key={subQ.id} className={`p-4 border rounded-lg ${isSubmitted ? 'bg-muted/50' : 'bg-card'}`}>
-                    <div
-                        className="prose dark:prose-invert max-w-none mb-4"
-                        dangerouslySetInnerHTML={{ __html: subQ.questionText }}
-                    />
-                    {renderAnswerInput(subQ)}
-                </div>
-            )
-        })}
+        <Separator />
+        
+        {!hasStarted ? (
+             <div className="flex justify-center">
+                <Button onClick={handleStart}>Start Solving</Button>
+            </div>
+        ) : (
+            <div className="space-y-8">
+                {allSubQuestions.map((subQ, index) => {
+                    const isVisible = index === currentSubQuestionIndex;
+                    const isSubmitted = !!answers[subQ.id];
+                    
+                    if (!isVisible && !isSubmitted) return null;
 
-        {activeSubQuestion && (
-            <div className="flex justify-end">
-                <Button onClick={handleSubmit}>Submit</Button>
+                    return (
+                        <div key={subQ.id} className={`p-4 border rounded-lg ${isSubmitted ? 'bg-muted/50' : 'bg-card'}`}>
+                            <div
+                                className="prose dark:prose-invert max-w-none mb-4"
+                                dangerouslySetInnerHTML={{ __html: subQ.questionText }}
+                            />
+                            {renderAnswerInput(subQ)}
+                        </div>
+                    )
+                })}
+
+                {activeSubQuestion && (
+                    <div className="flex justify-end">
+                        <Button onClick={handleSubmit}>Submit</Button>
+                    </div>
+                )}
             </div>
         )}
-
     </div>
   );
 }
