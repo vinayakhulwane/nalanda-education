@@ -1,17 +1,20 @@
 'use client';
 
-import type { SubQuestion } from '@/types';
+import type { SubQuestion, McqOption } from '@/types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { GripVertical, Trash2, Copy, ImagePlus, AlertCircle } from 'lucide-react';
+import { GripVertical, Trash2, Copy, ImagePlus, AlertCircle, Plus, X } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Switch } from './ui/switch';
+import { v4 as uuidv4 } from 'uuid';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Checkbox } from './ui/checkbox';
 
 interface SubQuestionCardProps {
     subQuestion: SubQuestion;
@@ -27,6 +30,48 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
         transform: CSS.Transform.toString(transform),
         transition,
     };
+
+    const handleMcqChange = (field: string, value: any) => {
+        const mcqAnswer = { ...subQuestion.mcqAnswer, [field]: value };
+        // When switching from multi to single, keep only the first correct answer
+        if (field === 'isMultiCorrect' && !value && mcqAnswer.correctOptions.length > 1) {
+            mcqAnswer.correctOptions = [mcqAnswer.correctOptions[0]];
+        }
+        updateSubQuestion({ ...subQuestion, mcqAnswer });
+    }
+
+    const handleOptionTextChange = (optionId: string, newText: string) => {
+        const updatedOptions = subQuestion.mcqAnswer?.options.map(opt =>
+            opt.id === optionId ? { ...opt, text: newText } : opt
+        );
+        handleMcqChange('options', updatedOptions);
+    };
+
+    const handleCorrectOptionChange = (optionId: string) => {
+        if (subQuestion.mcqAnswer?.isMultiCorrect) {
+            const currentCorrect = subQuestion.mcqAnswer.correctOptions || [];
+            const newCorrect = currentCorrect.includes(optionId)
+                ? currentCorrect.filter(id => id !== optionId)
+                : [...currentCorrect, optionId];
+            handleMcqChange('correctOptions', newCorrect);
+        } else {
+            handleMcqChange('correctOptions', [optionId]);
+        }
+    };
+    
+    const handleAddOption = () => {
+        const options = subQuestion.mcqAnswer?.options || [];
+        if (options.length >= 6) return;
+        const newOption: McqOption = { id: uuidv4(), text: '' };
+        handleMcqChange('options', [...options, newOption]);
+    };
+
+    const handleDeleteOption = (optionId: string) => {
+        const updatedOptions = subQuestion.mcqAnswer?.options.filter(opt => opt.id !== optionId);
+        const updatedCorrectOptions = subQuestion.mcqAnswer?.correctOptions.filter(id => id !== optionId);
+        updateSubQuestion({ ...subQuestion, mcqAnswer: { ...subQuestion.mcqAnswer!, options: updatedOptions!, correctOptions: updatedCorrectOptions! }});
+    };
+
 
     const renderAnswerConfig = () => {
         switch (subQuestion.answerType) {
@@ -72,7 +117,7 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                                 value={subQuestion.textAnswer?.keywords?.join(', ') || ''}
                                 onChange={e => updateSubQuestion({
                                     ...subQuestion,
-                                    textAnswer: { ...subQuestion.textAnswer, keywords: e.target.value.split(',').map(k => k.trim()) }
+                                    textAnswer: { ...subQuestion.textAnswer!, keywords: e.target.value.split(',').map(k => k.trim()) }
                                 })}
                             />
                         </div>
@@ -83,7 +128,7 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                                     value={subQuestion.textAnswer?.matchLogic || 'any'}
                                     onValueChange={(val: 'any' | 'all' | 'exact') => updateSubQuestion({
                                         ...subQuestion,
-                                        textAnswer: { ...subQuestion.textAnswer, matchLogic: val }
+                                        textAnswer: { ...subQuestion.textAnswer!, matchLogic: val }
                                     })}
                                 >
                                     <SelectTrigger>
@@ -102,7 +147,7 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                                     checked={subQuestion.textAnswer?.caseSensitive || false}
                                     onCheckedChange={checked => updateSubQuestion({
                                         ...subQuestion,
-                                        textAnswer: { ...subQuestion.textAnswer, caseSensitive: checked }
+                                        textAnswer: { ...subQuestion.textAnswer!, caseSensitive: checked }
                                     })}
                                 />
                                 <Label htmlFor={`case-sensitive-${subQuestion.id}`} className="text-sm">
@@ -120,12 +165,114 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                         </div>
                     </div>
                 );
-            case 'mcq':
-                return <p className="text-sm text-muted-foreground text-center p-4 border rounded-md">MCQ answer configuration coming soon.</p>
+             case 'mcq':
+                const mcq = subQuestion.mcqAnswer;
+                return (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                                <Switch
+                                    id={`multi-correct-${subQuestion.id}`}
+                                    checked={mcq?.isMultiCorrect}
+                                    onCheckedChange={checked => handleMcqChange('isMultiCorrect', checked)}
+                                />
+                                <Label htmlFor={`multi-correct-${subQuestion.id}`}>Multiple Correct Answers</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                 <Switch
+                                    id={`shuffle-${subQuestion.id}`}
+                                    checked={mcq?.shuffleOptions ?? true}
+                                    onCheckedChange={checked => handleMcqChange('shuffleOptions', checked)}
+                                />
+                                <Label htmlFor={`shuffle-${subQuestion.id}`}>Shuffle Options</Label>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <Label>Options</Label>
+                            <div className="space-y-2 mt-2">
+                                {mcq?.isMultiCorrect ? (
+                                    // Checkbox Group for Multiple Correct
+                                     mcq.options.map((option, index) => (
+                                        <div key={option.id} className="flex items-center gap-2">
+                                            <Checkbox
+                                                id={`option-check-${option.id}`}
+                                                checked={mcq.correctOptions.includes(option.id)}
+                                                onCheckedChange={() => handleCorrectOptionChange(option.id)}
+                                            />
+                                            <Input value={option.text} onChange={(e) => handleOptionTextChange(option.id, e.target.value)} className="flex-grow" placeholder={`Option ${index + 1}`} />
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteOption(option.id)} disabled={mcq.options.length <= 2}>
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    // Radio Group for Single Correct
+                                    <RadioGroup
+                                        value={mcq.correctOptions?.[0]}
+                                        onValueChange={handleCorrectOptionChange}
+                                    >
+                                        {mcq.options.map((option, index) => (
+                                            <div key={option.id} className="flex items-center gap-2">
+                                                <RadioGroupItem value={option.id} id={`option-radio-${option.id}`} />
+                                                <Input value={option.text} onChange={(e) => handleOptionTextChange(option.id, e.target.value)} className="flex-grow" placeholder={`Option ${index + 1}`}/>
+                                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteOption(option.id)} disabled={mcq.options.length <= 2}>
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </RadioGroup>
+                                )}
+
+                                {(!mcq?.options || mcq.options.length < 6) && (
+                                     <Button variant="outline" size="sm" onClick={handleAddOption} className="mt-2">
+                                        <Plus className="mr-2 h-4 w-4" /> Add Option
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Marks</Label>
+                            <Input 
+                                type="number" 
+                                value={subQuestion.marks} 
+                                onChange={e => updateSubQuestion({...subQuestion, marks: parseInt(e.target.value) || 0})}
+                            />
+                        </div>
+                    </div>
+                )
             default:
                 return null;
         }
     }
+
+    const handleAnswerTypeChange = (value: SubQuestion['answerType']) => {
+        const baseUpdate = { ...subQuestion, answerType: value };
+        // Set default structures when switching to a new type
+        if (value === 'mcq' && !baseUpdate.mcqAnswer) {
+            baseUpdate.mcqAnswer = {
+                options: [{id: uuidv4(), text: ''}, {id: uuidv4(), text: ''}],
+                correctOptions: [],
+                isMultiCorrect: false,
+                shuffleOptions: true,
+            };
+        } else if (value === 'text' && !baseUpdate.textAnswer) {
+            baseUpdate.textAnswer = {
+                keywords: [],
+                matchLogic: 'any',
+                caseSensitive: false,
+            };
+        } else if (value === 'numerical' && !baseUpdate.numericalAnswer) {
+             baseUpdate.numericalAnswer = {
+                baseUnit: '',
+                correctValues: [],
+                allowedUnits: [],
+                defaultUnit: '',
+                tolerance: { type: 'percentage', value: 5 },
+            };
+        }
+        updateSubQuestion(baseUpdate);
+    };
 
 
     return (
@@ -160,7 +307,7 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                             <Label>Answer Type</Label>
                             <Select 
                                 value={subQuestion.answerType} 
-                                onValueChange={(val: SubQuestion['answerType']) => updateSubQuestion({...subQuestion, answerType: val})}
+                                onValueChange={(val: SubQuestion['answerType']) => handleAnswerTypeChange(val)}
                             >
                                 <SelectTrigger>
                                     <SelectValue />

@@ -73,6 +73,11 @@ export type CurrencyType = 'spark' | 'coin' | 'gold' | 'diamond';
 export type SubQuestionType = 'numerical' | 'text' | 'mcq';
 export type GradingMode = 'system' | 'ai';
 
+export interface McqOption {
+  id: string;
+  text: string;
+}
+
 export interface SubQuestion {
   id: string;
   questionText: string;
@@ -98,7 +103,7 @@ export interface SubQuestion {
   };
   // MCQ Answer
   mcqAnswer?: {
-    options: { id: string; text: string }[];
+    options: McqOption[];
     correctOptions: string[]; // array of option ids
     isMultiCorrect: boolean;
     shuffleOptions: boolean;
