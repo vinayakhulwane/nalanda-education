@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, where, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Class, Subject, Unit, Category, Question } from '@/types';
-import { AlertCircle, FileJson, Loader2 } from 'lucide-react';
+import { AlertCircle, FileJson, Loader2, Download } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -388,6 +388,20 @@ export function QuestionBuilderWizard() {
     }
 };
 
+  const handleExportJson = () => {
+    if (!question) return;
+    const jsonString = JSON.stringify(question, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(question.name || 'question').replace(/ /g, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   const renderStepContent = () => {
     if (isLoading) {
         return <div className="flex h-full min-h-[400px] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
@@ -397,7 +411,17 @@ export function QuestionBuilderWizard() {
       case 2: return <Step2SolutionBuilder onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion} />;
       case 3: return <Step3Validation question={question} onValidityChange={handleStepValidityChange}/>;
       case 4: return <Step4Grading onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion} />;
-      case 5: return <QuestionRunner question={question as Question} />;
+      case 5: return (
+        <div>
+            <div className="flex justify-end mb-4">
+                <Button variant="outline" size="sm" onClick={handleExportJson}>
+                    <Download className="mr-2 h-4 w-4"/>
+                    Export JSON
+                </Button>
+            </div>
+            <QuestionRunner question={question as Question} />
+        </div>
+      );
       default: return null;
     }
   };

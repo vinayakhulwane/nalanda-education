@@ -34,19 +34,6 @@ export function QuestionRunner({ question }: { question: Question }) {
   const handleStart = () => {
     setHasStarted(true);
   };
-  
-  const handleExportJson = () => {
-    const jsonString = JSON.stringify(question, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${question.name.replace(/ /g, '_')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
 
   const handleSubmit = () => {
     if (!activeSubQuestion) return;
@@ -169,12 +156,6 @@ export function QuestionRunner({ question }: { question: Question }) {
   if (!hasStarted) {
     return (
         <div className="p-4 border rounded-lg bg-card text-card-foreground">
-             <div className="flex justify-end mb-4">
-                <Button variant="outline" size="sm" onClick={handleExportJson}>
-                    <Download className="mr-2"/>
-                    Export JSON
-                </Button>
-            </div>
             <div
                 className="prose dark:prose-invert max-w-none mb-6"
                 dangerouslySetInnerHTML={{ __html: question.mainQuestionText }}
