@@ -28,8 +28,9 @@ export interface CustomTab {
 }
 
 export interface Subject {
-  id: string;
+  id:string;
   name: string;
+  title?: string;
   description: string;
   classId: string;
   customTabs?: CustomTab[];
@@ -87,13 +88,11 @@ export interface SubQuestion {
   // Numerical Answer
   numericalAnswer?: {
     baseUnit: string;
-    correctValues: number[];
+    correctValue: number;
     allowedUnits: string[];
     defaultUnit: string;
-    tolerance: {
-      type: 'absolute' | 'percentage';
-      value: number;
-    };
+    toleranceType: 'absolute' | 'percentage';
+    toleranceValue: number;
   };
   // Text Answer
   textAnswer?: {

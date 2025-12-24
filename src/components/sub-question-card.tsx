@@ -76,19 +76,34 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
     const renderAnswerConfig = () => {
         switch (subQuestion.answerType) {
             case 'numerical':
+                const numerical = subQuestion.numericalAnswer;
                 return (
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                              <Label>Base Unit</Label>
-                            <Input placeholder="e.g., N" />
+                            <Input 
+                                placeholder="e.g., N" 
+                                value={numerical?.baseUnit || ''}
+                                onChange={e => updateSubQuestion({...subQuestion, numericalAnswer: {...numerical, baseUnit: e.target.value}})}
+                            />
                         </div>
                          <div className="space-y-2">
                              <Label>Correct Value</Label>
-                            <Input type="number" placeholder="e.g., 100" />
+                            <Input 
+                                type="number" 
+                                placeholder="e.g., 100" 
+                                value={numerical?.correctValue || ''}
+                                onChange={e => updateSubQuestion({...subQuestion, numericalAnswer: {...numerical, correctValue: parseFloat(e.target.value) || 0}})}
+                            />
                         </div>
                         <div className="space-y-2">
                              <Label>Tolerance (%)</Label>
-                            <Input type="number" placeholder="e.g., 5" />
+                            <Input 
+                                type="number" 
+                                placeholder="e.g., 5"
+                                value={numerical?.toleranceValue || ''}
+                                onChange={e => updateSubQuestion({...subQuestion, numericalAnswer: {...numerical, toleranceValue: parseFloat(e.target.value) || 0}})}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label>Marks</Label>
@@ -265,10 +280,11 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
         } else if (value === 'numerical' && !baseUpdate.numericalAnswer) {
              baseUpdate.numericalAnswer = {
                 baseUnit: '',
-                correctValues: [],
+                correctValue: 0,
                 allowedUnits: [],
                 defaultUnit: '',
-                tolerance: { type: 'percentage', value: 5 },
+                toleranceType: 'percentage',
+                toleranceValue: 5,
             };
         }
         updateSubQuestion(baseUpdate);
