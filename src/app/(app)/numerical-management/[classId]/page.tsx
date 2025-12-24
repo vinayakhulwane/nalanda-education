@@ -10,7 +10,7 @@ import type { Subject, Class } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-function NumericalManagementSubjectCard({ subject }: { subject: Subject }) {
+function NumericalManagementSubjectCard({ subject, classId }: { subject: Subject, classId: string }) {
     const router = useRouter();
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const [isDialogOpen, setDialogOpen] = useState(false);
@@ -51,7 +51,7 @@ function NumericalManagementSubjectCard({ subject }: { subject: Subject }) {
                     What would you like to do?
                 </div>
                 <DialogFooter className="sm:justify-center gap-2">
-                    <Button onClick={() => router.push('/questions/new')}>
+                    <Button onClick={() => router.push(`/questions/new?classId=${classId}&subjectId=${subject.id}`)}>
                         <BookPlus className="mr-2"/>
                         Create New Question
                     </Button>
@@ -109,6 +109,7 @@ export default function NumericalManagementSubjectsPage() {
                     <NumericalManagementSubjectCard 
                         key={s.id} 
                         subject={s} 
+                        classId={classId}
                     />
                 ))}
                     {subjects?.length === 0 && (

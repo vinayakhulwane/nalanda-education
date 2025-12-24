@@ -14,6 +14,7 @@ import { AlertCircle, FileJson, Loader2 } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchParams } from 'next/navigation';
 
 const steps = [
   { id: 1, name: 'Metadata', description: 'Basic question identity' },
@@ -27,9 +28,13 @@ function Step1Metadata({ onValidityChange }: { onValidityChange: (isValid: boole
     const firestore = useFirestore();
     const { toast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const searchParams = useSearchParams();
 
-    const [selectedClass, setSelectedClass] = useState('');
-    const [selectedSubject, setSelectedSubject] = useState('');
+    const paramClassId = searchParams.get('classId');
+    const paramSubjectId = searchParams.get('subjectId');
+
+    const [selectedClass, setSelectedClass] = useState(paramClassId || '');
+    const [selectedSubject, setSelectedSubject] = useState(paramSubjectId || '');
     const [mainQuestionText, setMainQuestionText] = useState('');
 
     // Data fetching
@@ -48,8 +53,13 @@ function Step1Metadata({ onValidityChange }: { onValidityChange: (isValid: boole
     }, [firestore, units]);
     const { data: categories, isLoading: categoriesLoading } = useCollection<Category>(categoriesQuery);
 
-    // TODO: Connect form inputs to a state management solution (e.g., useForm) and perform validation.
-    // For now, we'll just enable the next step.
+    useEffect(() => {
+        // Reset subject if class changes
+        if (!paramSubjectId) {
+            setSelectedSubject('');
+        }
+    }, [selectedClass, paramSubjectId]);
+    
     useEffect(() => {
       onValidityChange(true); // Placeholder
     }, [onValidityChange]);
@@ -67,8 +77,6 @@ function Step1Metadata({ onValidityChange }: { onValidityChange: (isValid: boole
                     const content = e.target?.result as string;
                     const jsonData = JSON.parse(content);
 
-                    // For now, just populating the main question text.
-                    // This can be expanded to populate other fields.
                     if (jsonData.mainQuestionText) {
                         setMainQuestionText(jsonData.mainQuestionText);
                     }
