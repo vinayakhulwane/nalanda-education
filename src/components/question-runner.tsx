@@ -60,12 +60,13 @@ export function QuestionRunner({ question }: { question: Question }) {
         if (!acc[subQ.stepId]) {
             acc[subQ.stepId] = {
                 title: subQ.stepTitle,
+                objective: subQ.stepObjective,
                 subQuestions: []
             };
         }
         acc[subQ.stepId].subQuestions.push(subQ);
         return acc;
-    }, {} as Record<string, { title: string, subQuestions: SubQuestionWithStep[] }>);
+    }, {} as Record<string, { title: string, objective: string, subQuestions: SubQuestionWithStep[] }>);
   }, [allSubQuestions, currentSubQuestionIndex]);
 
 
@@ -218,12 +219,13 @@ export function QuestionRunner({ question }: { question: Question }) {
         if (!acc[subQ.stepId]) {
             acc[subQ.stepId] = {
                 title: subQ.stepTitle,
+                objective: subQ.stepObjective,
                 subQuestions: []
             };
         }
         acc[subQ.stepId].subQuestions.push(subQ);
         return acc;
-    }, {} as Record<string, { title: string, subQuestions: SubQuestionWithStep[] }>);
+    }, {} as Record<string, { title: string, objective: string, subQuestions: SubQuestionWithStep[] }>);
   }, [allSubQuestions]);
 
 
@@ -261,6 +263,9 @@ export function QuestionRunner({ question }: { question: Question }) {
                         return (
                             <div key={stepId} className="space-y-2">
                                 <h4 className="font-semibold text-lg font-headline">Step {index + 1}. {stepData.title}</h4>
+                                 {stepData.objective && (
+                                    <p className="text-sm text-muted-foreground">{stepData.objective}</p>
+                                )}
                                 {stepData.subQuestions.map((subQ) => {
                                     const result = results[subQ.id];
                                     const isCorrect = result?.isCorrect;
@@ -323,12 +328,14 @@ export function QuestionRunner({ question }: { question: Question }) {
                                 const globalIndex = allSubQuestions.findIndex(q => q.id === subQ.id);
                                 return (
                                     <Collapsible key={subQ.id}>
-                                        <CollapsibleTrigger className="w-full">
-                                            <CompletedSubQuestionSummary 
-                                                subQuestion={subQ}
-                                                answer={answers[subQ.id]?.answer}
-                                                index={globalIndex}
-                                            />
+                                        <CollapsibleTrigger asChild>
+                                             <div>
+                                                <CompletedSubQuestionSummary 
+                                                    subQuestion={subQ}
+                                                    answer={answers[subQ.id]?.answer}
+                                                    index={globalIndex}
+                                                />
+                                             </div>
                                         </CollapsibleTrigger>
                                         <CollapsibleContent>
                                             <div className="p-4 border border-t-0 rounded-b-lg -mt-1">
