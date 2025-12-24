@@ -214,6 +214,13 @@ export function QuestionRunner({ question }: { question: Question }) {
                 <CardDescription>You have completed the question.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                 <div className="p-4 rounded-lg bg-muted/50 break-words">
+                    <div
+                        className="prose dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: processedMainQuestionText }}
+                    />
+                </div>
+                 <Separator />
                 <div className="text-center">
                     <p className="text-muted-foreground">Your Score</p>
                     <p className="text-5xl font-bold">{score} / {totalMarks}</p>
@@ -228,9 +235,8 @@ export function QuestionRunner({ question }: { question: Question }) {
                             <div key={subQ.id} className="p-3 border rounded-md">
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1">
-                                        <p className="font-medium text-sm">Question {index + 1}</p>
                                         <div
-                                            className="text-sm text-muted-foreground prose-sm dark:prose-invert max-w-none"
+                                            className="text-sm prose-sm dark:prose-invert max-w-none mb-2"
                                             dangerouslySetInnerHTML={{ __html: subQ.questionText }}
                                         />
                                     </div>
