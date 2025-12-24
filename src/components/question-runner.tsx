@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
-import type { Question, SubQuestion } from '@/types';
+import type { Question, SubQuestion, SolutionStep } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -11,13 +11,19 @@ import { CheckCircle, XCircle } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { CompletedSubQuestionSummary } from './question-runner/completed-summary';
 import './question-runner/runner.css';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 
 type AnswerState = {
   [subQuestionId: string]: {
     answer: any;
-    isCorrect?: boolean;
   };
 };
+
+type ResultState = {
+  [subQuestionId: string]: {
+    isCorrect: boolean;
+  }
+}
 
 type SubQuestionWithStep = SubQuestion & {
     stepId: string;
@@ -28,6 +34,7 @@ type SubQuestionWithStep = SubQuestion & {
 export function QuestionRunner({ question }: { question: Question }) {
   const [hasStarted, setHasStarted] = useState(false);
   const [answers, setAnswers] = useState<AnswerState>({});
+  const [results, setResults] = useState<ResultState>({});
   const [currentSubQuestionIndex, setCurrentSubQuestionIndex] = useState(0);
   const [currentAnswer, setCurrentAnswer] = useState<any>(null);
 
@@ -53,48 +60,63 @@ export function QuestionRunner({ question }: { question: Question }) {
   const handleStart = () => {
     setHasStarted(true);
   };
+  
+  const calculateResults = (finalAnswers: AnswerState) => {
+    const newResults: ResultState = {};
+    allSubQuestions.forEach(subQ => {
+        const studentAnswer = finalAnswers[subQ.id]?.answer;
+        let isCorrect = false;
+        switch (subQ.answerType) {
+            case 'numerical':
+                const studentValue = parseFloat(studentAnswer);
+                const correctValue = subQ.numericalAnswer?.correctValue ?? NaN;
+                const tolerance = subQ.numericalAnswer?.toleranceValue ?? 0;
+                // Basic tolerance for now, can be expanded
+                isCorrect = !isNaN(studentValue) && Math.abs(studentValue - correctValue) <= (tolerance/100 * correctValue);
+                break;
+            case 'mcq':
+                const correctOptions = subQ.mcqAnswer?.correctOptions || [];
+                if(subQ.mcqAnswer?.isMultiCorrect) {
+                    const studentAnswers = studentAnswer as string[] || [];
+                    isCorrect = studentAnswers.length === correctOptions.length && studentAnswers.every(id => correctOptions.includes(id));
+                } else {
+                    isCorrect = studentAnswer === correctOptions[0];
+                }
+                break;
+            case 'text':
+                 const keywords = subQ.textAnswer?.keywords || [];
+                 const studentText = (studentAnswer as string || '').toLowerCase();
+                 isCorrect = keywords.some(k => studentText.includes(k.toLowerCase()));
+                 break;
+        }
+        newResults[subQ.id] = { isCorrect };
+    });
+    setResults(newResults);
+  }
 
   const handleSubmit = () => {
     const activeSubQuestion = allSubQuestions[currentSubQuestionIndex];
     if (!activeSubQuestion) return;
 
-    let isCorrect = false;
-    switch (activeSubQuestion.answerType) {
-        case 'numerical':
-            const studentValue = parseFloat(currentAnswer);
-            const correctValue = activeSubQuestion.numericalAnswer?.correctValue ?? NaN;
-            isCorrect = !isNaN(studentValue) && studentValue === correctValue;
-            break;
-        case 'mcq':
-            const correctOptions = activeSubQuestion.mcqAnswer?.correctOptions || [];
-            if(activeSubQuestion.mcqAnswer?.isMultiCorrect) {
-                const studentAnswers = currentAnswer as string[] || [];
-                isCorrect = studentAnswers.length === correctOptions.length && studentAnswers.every(id => correctOptions.includes(id));
-            } else {
-                isCorrect = currentAnswer === correctOptions[0];
-            }
-            break;
-        // Basic text validation
-        case 'text':
-             const keywords = activeSubQuestion.textAnswer?.keywords || [];
-             const studentText = (currentAnswer as string || '').toLowerCase();
-             isCorrect = keywords.some(k => studentText.includes(k.toLowerCase()));
-             break;
+    const newAnswers = {
+        ...answers,
+        [activeSubQuestion.id]: { answer: currentAnswer },
     }
-
-
-    setAnswers(prev => ({
-      ...prev,
-      [activeSubQuestion.id]: { answer: currentAnswer, isCorrect },
-    }));
+    setAnswers(newAnswers);
 
     setCurrentAnswer(null); // Reset for next question
-    setCurrentSubQuestionIndex(prev => prev + 1);
+    
+    const nextIndex = currentSubQuestionIndex + 1;
+    setCurrentSubQuestionIndex(nextIndex);
+
+    // If this was the last question, calculate all results
+    if (nextIndex >= allSubQuestions.length) {
+      calculateResults(newAnswers);
+    }
   };
 
   const renderAnswerInput = (subQ: SubQuestion, isSubmitted: boolean) => {
-    const storedAnswer = answers[subQ.id]?.answer;
-    const valueToDisplay = isSubmitted ? storedAnswer : currentAnswer;
+    const valueToDisplay = isSubmitted ? answers[subQ.id]?.answer : currentAnswer;
 
     switch (subQ.answerType) {
       case 'numerical':
@@ -124,7 +146,7 @@ export function QuestionRunner({ question }: { question: Question }) {
                                 }}
                                 disabled={isSubmitted}
                             />
-                            <Label htmlFor={opt.id}>{opt.text}</Label>
+                            <Label htmlFor={opt.id} className={isSubmitted ? 'text-muted-foreground' : ''}>{opt.text}</Label>
                         </div>
                     ))}
                 </div>
@@ -140,7 +162,7 @@ export function QuestionRunner({ question }: { question: Question }) {
             {(subQ.mcqAnswer?.options || []).map(opt => (
               <div key={opt.id} className="flex items-center space-x-2">
                 <RadioGroupItem value={opt.id} id={opt.id} />
-                <Label htmlFor={opt.id}>{opt.text}</Label>
+                <Label htmlFor={opt.id} className={isSubmitted ? 'text-muted-foreground' : ''}>{opt.text}</Label>
               </div>
             ))}
           </RadioGroup>
@@ -184,7 +206,7 @@ export function QuestionRunner({ question }: { question: Question }) {
   
   if (isFinished) {
     const totalMarks = allSubQuestions.reduce((sum, q) => sum + q.marks, 0);
-    const score = allSubQuestions.reduce((sum, q) => answers[q.id]?.isCorrect ? sum + q.marks : sum, 0);
+    const score = allSubQuestions.reduce((sum, q) => results[q.id]?.isCorrect ? sum + q.marks : sum, 0);
     return (
         <Card>
             <CardHeader>
@@ -200,7 +222,8 @@ export function QuestionRunner({ question }: { question: Question }) {
                 <div className="space-y-4">
                     <h3 className="font-semibold">Answer Review</h3>
                     {allSubQuestions.map((subQ, index) => {
-                        const result = answers[subQ.id];
+                        const result = results[subQ.id];
+                        const isCorrect = result?.isCorrect;
                         return (
                             <div key={subQ.id} className="p-3 border rounded-md">
                                 <div className="flex items-start justify-between">
@@ -211,12 +234,12 @@ export function QuestionRunner({ question }: { question: Question }) {
                                             dangerouslySetInnerHTML={{ __html: subQ.questionText }}
                                         />
                                     </div>
-                                    <div className={`flex items-center gap-2 font-semibold text-sm ${result?.isCorrect ? 'text-green-600' : 'text-destructive'}`}>
-                                        {result?.isCorrect ? <CheckCircle className="h-4 w-4"/> : <XCircle className="h-4 w-4"/>}
-                                        {result?.isCorrect ? `${subQ.marks}/${subQ.marks}` : `0/${subQ.marks}`}
+                                    <div className={`flex items-center gap-2 font-semibold text-sm ${isCorrect ? 'text-green-600' : 'text-destructive'}`}>
+                                        {isCorrect ? <CheckCircle className="h-4 w-4"/> : <XCircle className="h-4 w-4"/>}
+                                        {isCorrect ? `${subQ.marks}/${subQ.marks}` : `0/${subQ.marks}`}
                                     </div>
                                 </div>
-                                {!result?.isCorrect && (
+                                {!isCorrect && (
                                      <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted rounded">
                                         Correct Answer: <span className="font-semibold">{getCorrectAnswerText(subQ)}</span>
                                     </div>
@@ -249,13 +272,24 @@ export function QuestionRunner({ question }: { question: Question }) {
             <div className="space-y-4">
                 {/* Completed Questions Summaries */}
                 {allSubQuestions.slice(0, currentSubQuestionIndex).map((subQ, index) => (
-                     <CompletedSubQuestionSummary 
-                        key={subQ.id}
-                        subQuestion={subQ}
-                        answer={answers[subQ.id]?.answer}
-                        isCorrect={answers[subQ.id]?.isCorrect}
-                        index={index}
-                     />
+                    <Collapsible key={subQ.id}>
+                        <CollapsibleTrigger asChild>
+                            <CompletedSubQuestionSummary 
+                                subQuestion={subQ}
+                                answer={answers[subQ.id]?.answer}
+                                index={index}
+                            />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <div className="p-4 border border-t-0 rounded-b-lg -mt-1">
+                                 <div
+                                    className="prose dark:prose-invert max-w-none mb-4 text-muted-foreground"
+                                    dangerouslySetInnerHTML={{ __html: subQ.questionText }}
+                                />
+                                {renderAnswerInput(subQ, true)}
+                            </div>
+                        </CollapsibleContent>
+                    </Collapsible>
                 ))}
 
                 {/* Active Question Card */}
