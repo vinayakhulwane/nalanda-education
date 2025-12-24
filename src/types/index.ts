@@ -118,14 +118,12 @@ export interface SolutionStep {
   subQuestions: SubQuestion[];
 }
 
-export interface AIRubric {
-  problemUnderstanding: number;
-  formulaSelection: number;
-  substitution: number;
-  calculationAccuracy: number;
-  finalAnswer: number;
-  presentationClarity: number;
-}
+export type AIRubricKey = 'problemUnderstanding' | 'formulaSelection' | 'substitution' | 'calculationAccuracy' | 'finalAnswer' | 'presentationClarity';
+
+export type AIRubric = Record<AIRubricKey, number>;
+
+export type AIFeedbackPattern = 'consistency' | 'examReadiness' | 'calculationError' | 'conceptualMisconception' | 'alternativeMethods' | 'commonPitfalls' | 'realWorldConnection' | 'nextSteps';
+
 
 export interface Question {
   id: string;
@@ -143,6 +141,7 @@ export interface Question {
   // Step 4: Grading
   gradingMode: GradingMode;
   aiRubric?: AIRubric;
+  aiFeedbackPatterns?: AIFeedbackPattern[];
   // Status
   status: 'draft' | 'published';
   authorId: string;

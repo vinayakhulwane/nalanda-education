@@ -18,8 +18,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { StepEditor } from './step-editor';
+import { Step4Grading } from './question-builder/step-4-grading';
+
 
 const steps = [
   { id: 1, name: 'Metadata', description: 'Basic question identity' },
@@ -300,28 +301,30 @@ function Step2SolutionBuilder({ onValidityChange, question, setQuestion } : { on
         <div className="grid md:grid-cols-3 gap-6">
             {/* Left Panel: Step List */}
             <div className="md:col-span-1 space-y-2">
-                <DndContext collisionDetection={closestCenter} onDragEnd={handleStepDragEnd}>
-                    <SortableContext items={question.solutionSteps?.map(s => s.id) || []} strategy={verticalListSortingStrategy}>
-                        <div className="space-y-2">
-                            {question.solutionSteps?.map((step, index) => (
-                                <SortableStepItem
-                                    key={step.id}
-                                    step={step}
-                                    index={index}
-                                    selectedStepId={selectedStepId}
-                                    setSelectedStepId={setSelectedStepId}
-                                    deleteStep={deleteStep}
-                                />
-                            ))}
-                        </div>
-                    </SortableContext>
-                </DndContext>
+                 <div className="space-y-2">
+                    <DndContext collisionDetection={closestCenter} onDragEnd={handleStepDragEnd}>
+                        <SortableContext items={question.solutionSteps?.map(s => s.id) || []} strategy={verticalListSortingStrategy}>
+                            <div className="space-y-2">
+                                {question.solutionSteps?.map((step, index) => (
+                                    <SortableStepItem
+                                        key={step.id}
+                                        step={step}
+                                        index={index}
+                                        selectedStepId={selectedStepId}
+                                        setSelectedStepId={setSelectedStepId}
+                                        deleteStep={deleteStep}
+                                    />
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
 
-                 {(!question.solutionSteps || question.solutionSteps.length === 0) && (
-                    <div className="text-center text-sm text-muted-foreground py-10 border-2 border-dashed rounded-lg">
-                        No steps created yet. <br /> Click "Add Step" to begin.
-                    </div>
-                )}
+                    {(!question.solutionSteps || question.solutionSteps.length === 0) && (
+                        <div className="text-center text-sm text-muted-foreground py-10 border-2 border-dashed rounded-lg">
+                            No steps created yet. <br /> Click "Add Step" to begin.
+                        </div>
+                    )}
+                 </div>
                 <Button onClick={handleAddStep} className="w-full" variant="outline">
                     <Plus className="mr-2" /> Add Step
                 </Button>
@@ -437,6 +440,14 @@ export function QuestionBuilderWizard() {
         ];
         setStepValid(rules.every(rule => rule.check()));
       }
+      else if (currentStep + 1 === 4) {
+        if (question.gradingMode === 'system') {
+            setStepValid(true);
+        } else {
+            const totalWeightage = Object.values(question.aiRubric || {}).reduce((sum, val) => sum + val, 0);
+            setStepValid(totalWeightage === 100);
+        }
+      }
       else {
         setStepValid(false);
       }
@@ -511,7 +522,7 @@ export function QuestionBuilderWizard() {
       case 1: return <Step1Metadata onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion}/>;
       case 2: return <Step2SolutionBuilder onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion} />;
       case 3: return <Step3Validation question={question} />;
-      case 4: return <StepPlaceholder stepName="Grading Settings" />;
+      case 4: return <Step4Grading onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion} />;
       case 5: return <StepPlaceholder stepName="Preview & Save" />;
       default: return null;
     }
