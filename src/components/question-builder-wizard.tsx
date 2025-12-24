@@ -300,9 +300,6 @@ function Step2SolutionBuilder({ onValidityChange, question, setQuestion } : { on
         <div className="grid md:grid-cols-3 gap-6">
             {/* Left Panel: Step List */}
             <div className="md:col-span-1 space-y-2">
-                <Button onClick={handleAddStep} className="w-full">
-                    <Plus className="mr-2" /> Add Step
-                </Button>
                 <DndContext collisionDetection={closestCenter} onDragEnd={handleStepDragEnd}>
                     <SortableContext items={question.solutionSteps?.map(s => s.id) || []} strategy={verticalListSortingStrategy}>
                         <div className="space-y-2">
@@ -319,11 +316,15 @@ function Step2SolutionBuilder({ onValidityChange, question, setQuestion } : { on
                         </div>
                     </SortableContext>
                 </DndContext>
+
                  {(!question.solutionSteps || question.solutionSteps.length === 0) && (
                     <div className="text-center text-sm text-muted-foreground py-10 border-2 border-dashed rounded-lg">
                         No steps created yet. <br /> Click "Add Step" to begin.
                     </div>
                 )}
+                <Button onClick={handleAddStep} className="w-full" variant="outline">
+                    <Plus className="mr-2" /> Add Step
+                </Button>
             </div>
 
             {/* Right Panel: Step Editor */}
