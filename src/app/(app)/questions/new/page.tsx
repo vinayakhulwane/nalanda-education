@@ -1,6 +1,6 @@
+'use client';
 import { PageHeader } from "@/components/page-header";
-import { QuestionBuilderForm } from "@/components/question-builder-form";
-import { Card, CardContent } from "@/components/ui/card";
+import { QuestionBuilderWizard } from "@/components/question-builder-wizard";
 
 export default function NewQuestionPage() {
   return (
@@ -9,11 +9,7 @@ export default function NewQuestionPage() {
         title="Question Builder"
         description="Create a new numerical problem with a custom grading rubric."
       />
-      <Card>
-        <CardContent className="pt-6">
-            <QuestionBuilderForm />
-        </CardContent>
-      </Card>
+      <QuestionBuilderWizard />
     </div>
   );
 }

@@ -69,10 +69,53 @@ export interface Teacher extends User {
   classes: string[];
 }
 
-export interface Question {
+export type CurrencyType = 'spark' | 'coin' | 'gold' | 'diamond';
+export type SubQuestionType = 'numerical' | 'text';
+export type GradingMode = 'system' | 'ai';
+
+export interface SubQuestion {
+  id: string;
+  type: SubQuestionType;
+  prompt: string;
+  marks: number;
+  // Numerical answer
+  correctValue?: number;
+  tolerance?: number;
+  // Text answer
+  keywords?: string[];
+}
+
+export interface SolutionStep {
   id: string;
   title: string;
-  content: string;
-  subject: string;
-  topic: string;
+  description: string;
+  stepQuestion: string;
+  subQuestions: SubQuestion[];
+}
+
+export interface AIRubric {
+  problemUnderstanding: number;
+  formulaSelection: number;
+  substitution: number;
+  calculationAccuracy: number;
+  finalAnswer: number;
+  presentationClarity: number;
+}
+
+export interface Question {
+  id: string;
+  // Step 1: Metadata
+  name: string;
+  mainQuestionText: string;
+  unitId: string;
+  categoryId: string;
+  currencyType: CurrencyType;
+  // Step 2: Steps
+  solutionSteps: SolutionStep[];
+  // Step 4: Grading
+  gradingMode: GradingMode;
+  aiRubric?: AIRubric;
+  // Status
+  status: 'draft' | 'published';
+  authorId: string;
 }
