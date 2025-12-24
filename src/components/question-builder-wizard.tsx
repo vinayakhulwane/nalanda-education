@@ -6,19 +6,15 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, where, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import type { Class, Subject, Unit, Category, Question, SolutionStep } from '@/types';
-import { AlertCircle, FileJson, Loader2, GripVertical, Plus, Trash2 } from 'lucide-react';
+import type { Class, Subject, Unit, Category, Question } from '@/types';
+import { AlertCircle, FileJson, Loader2 } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { v4 as uuidv4 } from 'uuid';
-import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { StepEditor } from './step-editor';
+import { Step2SolutionBuilder } from './question-builder/step-2-solution-builder';
 import { Step4Grading } from './question-builder/step-4-grading';
 
 
@@ -208,140 +204,6 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
 
         </div>
     )
-}
-
-function SortableStepItem({ step, index, selectedStepId, setSelectedStepId, deleteStep }: { step: SolutionStep, index: number, selectedStepId: string | null, setSelectedStepId: (id: string) => void, deleteStep: (id: string) => void }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: step.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            onClick={() => setSelectedStepId(step.id)}
-            className={`p-3 border rounded-md cursor-pointer flex items-center gap-2 ${selectedStepId === step.id ? 'bg-muted ring-2 ring-primary' : 'hover:bg-muted/50'}`}
-        >
-            <button {...attributes} {...listeners} className="cursor-grab">
-                <GripVertical className="h-5 w-5 text-muted-foreground" />
-            </button>
-            <span className="font-medium text-sm flex-grow">{index + 1}. {step.title}</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); deleteStep(step.id); }}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-        </div>
-    );
-}
-
-function Step2SolutionBuilder({ onValidityChange, question, setQuestion } : { onValidityChange: (isValid: boolean) => void, question: Partial<Question>, setQuestion: (q: Partial<Question>) => void }) {
-    const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-
-    useEffect(() => {
-        const steps = question.solutionSteps || [];
-        // If there are steps but none is selected, select the first one.
-        if (steps.length > 0 && !selectedStepId) {
-            setSelectedStepId(steps[0].id);
-        }
-        // If the selected step is deleted, select the previous one or null.
-        if (selectedStepId && !steps.find(s => s.id === selectedStepId)) {
-            const lastStep = steps[steps.length - 1];
-            setSelectedStepId(lastStep ? lastStep.id : null);
-        }
-    }, [question.solutionSteps, selectedStepId]);
-
-    const handleAddStep = () => {
-        const newStep: SolutionStep = {
-            id: uuidv4(),
-            title: `New Step ${ (question.solutionSteps?.length || 0) + 1}`,
-            description: '',
-            stepQuestion: '',
-            subQuestions: [],
-        };
-        const newSteps = [...(question.solutionSteps || []), newStep];
-        setQuestion({ ...question, solutionSteps: newSteps });
-        setSelectedStepId(newStep.id);
-    };
-
-    const handleStepDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (over && active.id !== over.id) {
-            const oldIndex = question.solutionSteps?.findIndex(s => s.id === active.id) ?? -1;
-            const newIndex = question.solutionSteps?.findIndex(s => s.id === over.id) ?? -1;
-            if (oldIndex !== -1 && newIndex !== -1) {
-                const newSteps = arrayMove(question.solutionSteps!, oldIndex, newIndex);
-                setQuestion({ ...question, solutionSteps: newSteps });
-            }
-        }
-    };
-
-    const selectedStep = useMemo(() => {
-        return question.solutionSteps?.find(s => s.id === selectedStepId);
-    }, [question.solutionSteps, selectedStepId]);
-    
-    const updateStep = (updatedStep: SolutionStep) => {
-        const newSteps = question.solutionSteps?.map(s => s.id === updatedStep.id ? updatedStep : s);
-        setQuestion({...question, solutionSteps: newSteps});
-    }
-
-    const deleteStep = (stepId: string) => {
-        const newSteps = question.solutionSteps?.filter(s => s.id !== stepId);
-        setQuestion({...question, solutionSteps: newSteps});
-    }
-    
-    const isStepValid = !!question.solutionSteps && question.solutionSteps.length > 0;
-     useEffect(() => {
-        onValidityChange(isStepValid);
-    }, [isStepValid, onValidityChange]);
-
-
-    return (
-        <div className="grid md:grid-cols-3 gap-6">
-            {/* Left Panel: Step List */}
-            <div className="md:col-span-1 space-y-2">
-                 <div className="space-y-2">
-                    <DndContext collisionDetection={closestCenter} onDragEnd={handleStepDragEnd}>
-                        <SortableContext items={question.solutionSteps?.map(s => s.id) || []} strategy={verticalListSortingStrategy}>
-                            <div className="space-y-2">
-                                {question.solutionSteps?.map((step, index) => (
-                                    <SortableStepItem
-                                        key={step.id}
-                                        step={step}
-                                        index={index}
-                                        selectedStepId={selectedStepId}
-                                        setSelectedStepId={setSelectedStepId}
-                                        deleteStep={deleteStep}
-                                    />
-                                ))}
-                            </div>
-                        </SortableContext>
-                    </DndContext>
-
-                    {(!question.solutionSteps || question.solutionSteps.length === 0) && (
-                        <div className="text-center text-sm text-muted-foreground py-10 border-2 border-dashed rounded-lg">
-                            No steps created yet. <br /> Click "Add Step" to begin.
-                        </div>
-                    )}
-                 </div>
-                <Button onClick={handleAddStep} className="w-full" variant="outline">
-                    <Plus className="mr-2" /> Add Step
-                </Button>
-            </div>
-
-            {/* Right Panel: Step Editor */}
-            <div className="md:col-span-2">
-                {selectedStep ? (
-                    <StepEditor key={selectedStep.id} step={selectedStep} updateStep={updateStep} />
-                ) : (
-                    <div className="flex h-full items-center justify-center text-muted-foreground text-center border-2 border-dashed rounded-lg p-8">
-                        Select a step on the left to edit it, or add a new one.
-                    </div>
-                )}
-            </div>
-        </div>
-    );
 }
 
 function StepPlaceholder({ stepName }: { stepName: string }) {
