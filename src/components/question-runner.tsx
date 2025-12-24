@@ -1,15 +1,16 @@
 'use client';
 import { useState, useMemo } from 'react';
-import type { Question, SolutionStep, SubQuestion } from '@/types';
+import type { Question, SubQuestion } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { CheckCircle, Download, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { Separator } from './ui/separator';
+import { CompletedSubQuestionSummary } from './question-runner/completed-summary';
+import './question-runner/runner.css';
 
 type AnswerState = {
   [subQuestionId: string]: {
@@ -173,10 +174,14 @@ export function QuestionRunner({ question }: { question: Question }) {
 
   const processedMainQuestionText = useMemo(() => {
     if (!question?.mainQuestionText) return '';
-    // Replace non-breaking spaces with regular spaces
     return question.mainQuestionText.replace(/&nbsp;/g, ' ');
   }, [question.mainQuestionText]);
 
+  const activeSubQuestion = allSubQuestions[currentSubQuestionIndex];
+  const lastStepId = currentSubQuestionIndex > 0 ? allSubQuestions[currentSubQuestionIndex - 1].stepId : null;
+  const isNewStep = activeSubQuestion && activeSubQuestion.stepId !== lastStepId;
+  const currentStepNumber = activeSubQuestion ? uniqueStepIds.indexOf(activeSubQuestion.stepId) + 1 : 0;
+  
   if (isFinished) {
     const totalMarks = allSubQuestions.reduce((sum, q) => sum + q.marks, 0);
     const score = allSubQuestions.reduce((sum, q) => answers[q.id]?.isCorrect ? sum + q.marks : sum, 0);
@@ -225,8 +230,6 @@ export function QuestionRunner({ question }: { question: Question }) {
     )
   }
 
-  let lastStepId = '';
-
   return (
     <div className="p-4 border rounded-lg bg-card text-card-foreground break-words space-y-6">
        <div className="p-4 rounded-lg bg-muted/50">
@@ -235,46 +238,53 @@ export function QuestionRunner({ question }: { question: Question }) {
                 dangerouslySetInnerHTML={{ __html: processedMainQuestionText }}
             />
        </div>
+
+       <Separator />
         
         {!hasStarted ? (
-             <div className="flex justify-center pt-4 border-t">
+             <div className="flex justify-center pt-4">
                 <Button onClick={handleStart}>Start Solving</Button>
             </div>
         ) : (
-            <div className="space-y-6">
-                {allSubQuestions.slice(0, currentSubQuestionIndex + 1).map((subQ, index) => {
-                    const isNewStep = lastStepId !== subQ.stepId;
-                    lastStepId = subQ.stepId;
-                    const isCurrent = index === currentSubQuestionIndex;
-                    const currentStepNumber = uniqueStepIds.indexOf(subQ.stepId) + 1;
-                    
-                    return (
-                        <Card key={subQ.id} className="bg-muted/30">
-                            {isNewStep && (
-                                <CardHeader>
-                                    <CardTitle className="text-lg font-headline">
-                                        Step {currentStepNumber}: {subQ.stepTitle}
-                                    </CardTitle>
-                                    {subQ.stepObjective && (
-                                        <CardDescription>{subQ.stepObjective}</CardDescription>
-                                    )}
-                                </CardHeader>
-                            )}
-                            <CardContent className={isNewStep ? 'pt-0' : 'pt-6'}>
-                                <div className="p-4 border rounded-lg bg-card">
-                                    <div
-                                        className="prose dark:prose-invert max-w-none mb-4"
-                                        dangerouslySetInnerHTML={{ __html: subQ.questionText }}
-                                    />
-                                    {renderAnswerInput(subQ, !isCurrent)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
+            <div className="space-y-4">
+                {/* Completed Questions Summaries */}
+                {allSubQuestions.slice(0, currentSubQuestionIndex).map((subQ, index) => (
+                     <CompletedSubQuestionSummary 
+                        key={subQ.id}
+                        subQuestion={subQ}
+                        answer={answers[subQ.id]?.answer}
+                        isCorrect={answers[subQ.id]?.isCorrect}
+                        index={index}
+                     />
+                ))}
+
+                {/* Active Question Card */}
+                {activeSubQuestion && (
+                     <Card key={activeSubQuestion.id} className="bg-muted/30 runner-active-card">
+                        {isNewStep && (
+                            <CardHeader>
+                                <CardTitle className="text-lg font-headline">
+                                    Step {currentStepNumber}: {activeSubQuestion.stepTitle}
+                                </CardTitle>
+                                {activeSubQuestion.stepObjective && (
+                                    <CardDescription>{activeSubQuestion.stepObjective}</CardDescription>
+                                )}
+                            </CardHeader>
+                        )}
+                        <CardContent className={isNewStep ? 'pt-0' : 'pt-6'}>
+                            <div className="p-4 border rounded-lg bg-card">
+                                <div
+                                    className="prose dark:prose-invert max-w-none mb-4"
+                                    dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }}
+                                />
+                                {renderAnswerInput(activeSubQuestion, false)}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {!isFinished && (
-                    <div className="flex justify-end">
+                    <div className="flex justify-end mt-4">
                         <Button onClick={handleSubmit}>Submit</Button>
                     </div>
                 )}

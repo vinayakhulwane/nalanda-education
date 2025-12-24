@@ -1,0 +1,30 @@
+
+.runner-summary-card {
+    animation: slide-in-and-fade 0.5s ease-out forwards;
+}
+
+.runner-active-card {
+    animation: slide-up-and-fade 0.5s ease-out forwards;
+}
+
+@keyframes slide-in-and-fade {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slide-up-and-fade {
+     from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
