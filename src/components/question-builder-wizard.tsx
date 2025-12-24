@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, where, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Class, Subject, Unit, Category, Question } from '@/types';
-import { AlertCircle, FileJson, Loader2, Download, Check } from 'lucide-react';
+import { AlertCircle, FileJson, Loader2, Download, Check, FileText, ListChecks, ShieldCheck, Calculator, Eye } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -21,11 +21,11 @@ import { cn } from '@/lib/utils';
 
 
 const steps = [
-  { id: 1, name: 'Metadata', description: 'Basic question identity' },
-  { id: 2, name: 'Steps', description: 'Solution builder engine' },
-  { id: 3, name: 'Validation', description: 'System integrity check' },
-  { id: 4, name: 'Grading', description: 'Evaluation settings' },
-  { id: 5, name: 'Preview & Save', description: 'Final review and publish' },
+  { id: 1, name: 'Metadata', description: 'Basic question identity', icon: FileText },
+  { id: 2, name: 'Steps', description: 'Solution builder engine', icon: ListChecks },
+  { id: 3, name: 'Validation', description: 'System integrity check', icon: ShieldCheck },
+  { id: 4, name: 'Grading', description: 'Evaluation settings', icon: Calculator },
+  { id: 5, name: 'Preview & Save', description: 'Final review and publish', icon: Eye },
 ];
 
 function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidityChange: (isValid: boolean) => void, question: Partial<Question>, setQuestion: (q: Partial<Question>) => void }) {
@@ -419,6 +419,8 @@ export function QuestionBuilderWizard() {
     }
   };
 
+  const CurrentIcon = steps[currentStep - 1].icon;
+
   return (
     <Card>
       <CardHeader>
@@ -447,7 +449,10 @@ export function QuestionBuilderWizard() {
                 </React.Fragment>
             ))}
         </div>
-        <CardTitle>{steps[currentStep - 1].name}</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+            <CurrentIcon className="h-6 w-6 text-primary" />
+            {steps[currentStep - 1].name}
+        </CardTitle>
         <CardDescription>{steps[currentStep - 1].description}</CardDescription>
         {currentStep === 5 && (
           <div className="flex justify-end pt-4">
@@ -477,4 +482,3 @@ export function QuestionBuilderWizard() {
     </Card>
   );
 }
-
