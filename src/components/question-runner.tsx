@@ -46,10 +46,6 @@ export function QuestionRunner({ question }: { question: Question }) {
     return Array.from(stepIds);
   }, [question.solutionSteps]);
 
-  const activeSubQuestion = allSubQuestions[currentSubQuestionIndex];
-  const previousSubQuestion = allSubQuestions[currentSubQuestionIndex - 1];
-  const isNewStep = activeSubQuestion && (!previousSubQuestion || previousSubQuestion.stepId !== activeSubQuestion.stepId);
-  const currentStepNumber = activeSubQuestion ? uniqueStepIds.indexOf(activeSubQuestion.stepId) + 1 : 0;
 
   const isFinished = currentSubQuestionIndex >= allSubQuestions.length;
 
@@ -58,6 +54,7 @@ export function QuestionRunner({ question }: { question: Question }) {
   };
 
   const handleSubmit = () => {
+    const activeSubQuestion = allSubQuestions[currentSubQuestionIndex];
     if (!activeSubQuestion) return;
 
     let isCorrect = false;
@@ -94,17 +91,17 @@ export function QuestionRunner({ question }: { question: Question }) {
     setCurrentSubQuestionIndex(prev => prev + 1);
   };
 
-  const renderAnswerInput = (subQ: SubQuestion) => {
-    const isSubmitted = !!answers[subQ.id];
+  const renderAnswerInput = (subQ: SubQuestion, isSubmitted: boolean) => {
     const storedAnswer = answers[subQ.id]?.answer;
+    const valueToDisplay = isSubmitted ? storedAnswer : currentAnswer;
 
     switch (subQ.answerType) {
       case 'numerical':
         return (
           <Input
             type="number"
-            value={isSubmitted ? storedAnswer : (currentAnswer ?? '')}
-            onChange={(e) => !isSubmitted && setCurrentAnswer(e.target.value)}
+            value={valueToDisplay ?? ''}
+            onChange={(e) => setCurrentAnswer(e.target.value)}
             disabled={isSubmitted}
             className="w-full md:w-1/2"
           />
@@ -117,7 +114,7 @@ export function QuestionRunner({ question }: { question: Question }) {
                         <div key={opt.id} className="flex items-center space-x-2">
                              <Checkbox
                                 id={opt.id}
-                                checked={isSubmitted ? storedAnswer.includes(opt.id) : (currentAnswer as string[] || []).includes(opt.id)}
+                                checked={(valueToDisplay as string[] || []).includes(opt.id)}
                                 onCheckedChange={(checked) => {
                                     if(isSubmitted) return;
                                     const current = (currentAnswer as string[] || []);
@@ -134,8 +131,8 @@ export function QuestionRunner({ question }: { question: Question }) {
         }
         return (
           <RadioGroup
-            value={isSubmitted ? storedAnswer : currentAnswer}
-            onValueChange={(val) => !isSubmitted && setCurrentAnswer(val)}
+            value={valueToDisplay}
+            onValueChange={setCurrentAnswer}
             disabled={isSubmitted}
             className="space-y-2"
           >
@@ -151,8 +148,8 @@ export function QuestionRunner({ question }: { question: Question }) {
          return (
           <Input
             type="text"
-            value={isSubmitted ? storedAnswer : (currentAnswer ?? '')}
-            onChange={(e) => !isSubmitted && setCurrentAnswer(e.target.value)}
+            value={valueToDisplay ?? ''}
+            onChange={(e) => setCurrentAnswer(e.target.value)}
             disabled={isSubmitted}
             className="w-full md:w-1/2"
           />
@@ -228,6 +225,8 @@ export function QuestionRunner({ question }: { question: Question }) {
     )
   }
 
+  let lastStepId = '';
+
   return (
     <div className="p-4 border rounded-lg bg-card text-card-foreground break-words space-y-6">
        <div className="p-4 rounded-lg bg-muted/50">
@@ -243,31 +242,38 @@ export function QuestionRunner({ question }: { question: Question }) {
             </div>
         ) : (
             <div className="space-y-6">
-                {activeSubQuestion && (
-                    <Card key={activeSubQuestion.stepId} className="bg-muted/30">
-                        {isNewStep && (
-                            <CardHeader>
-                                <CardTitle className="text-lg font-headline">
-                                    Step {currentStepNumber}: {activeSubQuestion.stepTitle}
-                                </CardTitle>
-                                {activeSubQuestion.stepObjective && (
-                                    <CardDescription>{activeSubQuestion.stepObjective}</CardDescription>
-                                )}
-                            </CardHeader>
-                        )}
-                        <CardContent className={isNewStep ? 'pt-0' : 'pt-6'}>
-                            <div className="p-4 border rounded-lg bg-card">
-                                <div
-                                    className="prose dark:prose-invert max-w-none mb-4"
-                                    dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }}
-                                />
-                                {renderAnswerInput(activeSubQuestion)}
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                {allSubQuestions.slice(0, currentSubQuestionIndex + 1).map((subQ, index) => {
+                    const isNewStep = lastStepId !== subQ.stepId;
+                    lastStepId = subQ.stepId;
+                    const isCurrent = index === currentSubQuestionIndex;
+                    const currentStepNumber = uniqueStepIds.indexOf(subQ.stepId) + 1;
+                    
+                    return (
+                        <Card key={subQ.id} className="bg-muted/30">
+                            {isNewStep && (
+                                <CardHeader>
+                                    <CardTitle className="text-lg font-headline">
+                                        Step {currentStepNumber}: {subQ.stepTitle}
+                                    </CardTitle>
+                                    {subQ.stepObjective && (
+                                        <CardDescription>{subQ.stepObjective}</CardDescription>
+                                    )}
+                                </CardHeader>
+                            )}
+                            <CardContent className={isNewStep ? 'pt-0' : 'pt-6'}>
+                                <div className="p-4 border rounded-lg bg-card">
+                                    <div
+                                        className="prose dark:prose-invert max-w-none mb-4"
+                                        dangerouslySetInnerHTML={{ __html: subQ.questionText }}
+                                    />
+                                    {renderAnswerInput(subQ, !isCurrent)}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
 
-                {activeSubQuestion && (
+                {!isFinished && (
                     <div className="flex justify-end">
                         <Button onClick={handleSubmit}>Submit</Button>
                     </div>
