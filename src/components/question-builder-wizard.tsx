@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import type { Class, Subject, Unit, Category } from '@/types';
 import { AlertCircle, FileJson, Loader2 } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 const steps = [
   { id: 1, name: 'Metadata', description: 'Basic question identity' },
@@ -24,6 +25,8 @@ const steps = [
 
 function Step1Metadata({ onValidityChange }: { onValidityChange: (isValid: boolean) => void }) {
     const firestore = useFirestore();
+    const { toast } = useToast();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [selectedClass, setSelectedClass] = useState('');
     const [selectedSubject, setSelectedSubject] = useState('');
@@ -51,14 +54,58 @@ function Step1Metadata({ onValidityChange }: { onValidityChange: (isValid: boole
       onValidityChange(true); // Placeholder
     }, [onValidityChange]);
 
+    const handleBulkUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target?.result as string;
+                    const jsonData = JSON.parse(content);
+
+                    // For now, just populating the main question text.
+                    // This can be expanded to populate other fields.
+                    if (jsonData.mainQuestionText) {
+                        setMainQuestionText(jsonData.mainQuestionText);
+                    }
+                    
+                    toast({
+                        title: 'Success',
+                        description: 'JSON data loaded successfully.',
+                    });
+
+                } catch (error) {
+                    console.error("Failed to parse JSON:", error);
+                    toast({
+                        variant: "destructive",
+                        title: 'Upload Failed',
+                        description: 'The selected file is not valid JSON.',
+                    });
+                }
+            };
+            reader.readAsText(file);
+        }
+    };
+
 
     return (
         <div className="space-y-6">
             <div className="flex justify-end">
-                 <Button variant="outline">
+                 <Button variant="outline" onClick={handleBulkUploadClick}>
                     <FileJson className="mr-2 h-4 w-4" />
                     Bulk Upload JSON
                 </Button>
+                 <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="application/json"
+                />
             </div>
             <div className="space-y-2">
                 <Label htmlFor="q-name">Question Name</Label>

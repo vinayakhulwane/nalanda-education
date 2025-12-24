@@ -1,8 +1,13 @@
 'use client';
-import 'react-quill/dist/quill.snow.css';
-import dynamic from 'next/dynamic';
 
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
+import dynamic from 'next/dynamic';
+import 'react-quill-new/dist/quill.snow.css';
+
+// Dynamically import react-quill-new to ensure it only runs in the browser
+const ReactQuill = dynamic(() => import('react-quill-new'), { 
+    ssr: false,
+    loading: () => <div className="h-[340px] w-full animate-pulse bg-muted rounded-md" />
+});
 
 interface RichTextEditorProps {
     value: string;
@@ -27,7 +32,8 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
                 value={value} 
                 onChange={onChange}
                 modules={modules}
-                style={{ height: '300px', marginBottom: '40px' }}
+                // Using a container class or CSS is preferred over inline styles for Quill
+                className="h-[300px] mb-12"
             />
         </div>
     );
