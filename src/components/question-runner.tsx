@@ -155,7 +155,7 @@ export function QuestionRunner({ question }: { question: Question }) {
 
   if (!hasStarted) {
     return (
-        <div className="p-4 border rounded-lg bg-card text-card-foreground">
+        <div className="p-4 border rounded-lg bg-card text-card-foreground break-words">
             <div
                 className="prose dark:prose-invert max-w-none mb-6"
                 dangerouslySetInnerHTML={{ __html: question.mainQuestionText }}
