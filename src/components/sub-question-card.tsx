@@ -133,7 +133,7 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                             <Input 
                                 type="number" 
                                 value={subQuestion.marks || ''} 
-                                onChange={e => updateSubQuestion({...subQuestion, marks: parseInt(e.target.value) || 0})}
+                                onChange={e => updateSubQuestion({...subQuestion, marks: parseFloat(e.target.value) || 0})}
                             />
                         </div>
                     </div>
