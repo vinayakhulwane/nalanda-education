@@ -36,7 +36,13 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
 
     const getPlainText = (html: string) => {
         if (!html) return '';
-        return html.replace(/<[^>]*>?/gm, '');
+        // First, replace common block tags with spaces, then strip all tags, then decode &nbsp;
+        return html
+            .replace(/<\/p>/gi, ' ')
+            .replace(/<br\s*\/?>/gi, ' ')
+            .replace(/<[^>]*>?/gm, '')
+            .replace(/&nbsp;/g, ' ')
+            .trim();
     }
 
     const previewText = (text: string, maxLength: number = 50) => {
@@ -139,7 +145,7 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>Heads up!</AlertTitle>
                             <AlertDescription>
-                                Text answers are evaluated by keyword matching. For complex conceptual questions, using the MCQ type is recommended.
+                                Text answers are evaluated by keyword matching. Use MCQ where possible.
                             </AlertDescription>
                         </Alert>
                         <div className="space-y-2">
@@ -167,8 +173,8 @@ export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuest
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="any">ANY keyword match (OR)</SelectItem>
-                                        <SelectItem value="all">ALL keywords match (AND)</SelectItem>
+                                        <SelectItem value="any">ANY keyword must match (OR)</SelectItem>
+                                        <SelectItem value="all">ALL keywords must match (AND)</SelectItem>
                                         <SelectItem value="exact">Exact match only</SelectItem>
                                     </SelectContent>
                                 </Select>
