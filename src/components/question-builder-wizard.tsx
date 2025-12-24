@@ -1,7 +1,7 @@
+
 'use client';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, where, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Class, Subject, Unit, Category, Question } from '@/types';
-import { AlertCircle, FileJson, Loader2, Download } from 'lucide-react';
+import { AlertCircle, FileJson, Loader2, Download, Check } from 'lucide-react';
 import { RichTextEditor } from './rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Step2SolutionBuilder } from './question-builder/step-2-solution-builder';
 import { Step4Grading } from './question-builder/step-4-grading';
 import { QuestionRunner } from './question-runner';
+import { cn } from '@/lib/utils';
 
 
 const steps = [
@@ -284,8 +285,6 @@ export function QuestionBuilderWizard() {
       }
   }, [fetchedQuestion, questionId]);
 
-  const progress = ((currentStep - 1) / (steps.length - 1)) * 100;
-
   const handleNext = () => {
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
@@ -413,12 +412,6 @@ export function QuestionBuilderWizard() {
       case 4: return <Step4Grading onValidityChange={handleStepValidityChange} question={question} setQuestion={setQuestion} />;
       case 5: return (
         <div>
-            <div className="flex justify-end mb-4">
-                <Button variant="outline" size="sm" onClick={handleExportJson}>
-                    <Download className="mr-2 h-4 w-4"/>
-                    Export JSON
-                </Button>
-            </div>
             <QuestionRunner question={question as Question} />
         </div>
       );
@@ -429,9 +422,41 @@ export function QuestionBuilderWizard() {
   return (
     <Card>
       <CardHeader>
-        <Progress value={progress} className="h-2 mb-4" />
+        <div className="flex w-full items-center justify-between p-4">
+            {steps.map((step, index) => (
+                <React.Fragment key={step.id}>
+                    <div className="flex flex-col items-center">
+                        <div
+                            className={cn(
+                                'flex h-8 w-8 items-center justify-center rounded-full border-2',
+                                currentStep > step.id ? 'border-primary bg-primary text-primary-foreground' : '',
+                                currentStep === step.id ? 'border-primary' : '',
+                                currentStep < step.id ? 'border-border' : ''
+                            )}
+                        >
+                            {currentStep > step.id ? <Check className="h-5 w-5" /> : step.id}
+                        </div>
+                        <p className={cn('mt-2 text-xs text-center', currentStep === step.id ? 'font-semibold text-primary' : 'text-muted-foreground')}>{step.name}</p>
+                    </div>
+                    {index < steps.length - 1 && (
+                        <div className={cn(
+                            'flex-1 h-px bg-border -mx-4',
+                            currentStep > step.id ? 'bg-primary' : ''
+                        )} />
+                    )}
+                </React.Fragment>
+            ))}
+        </div>
         <CardTitle>{steps[currentStep - 1].name}</CardTitle>
         <CardDescription>{steps[currentStep - 1].description}</CardDescription>
+        {currentStep === 5 && (
+          <div className="flex justify-end pt-4">
+            <Button variant="outline" size="sm" onClick={handleExportJson}>
+              <Download className="mr-2 h-4 w-4" />
+              Export JSON
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="min-h-[400px]">
         {renderStepContent()}
@@ -452,3 +477,5 @@ export function QuestionBuilderWizard() {
     </Card>
   );
 }
+
+    
