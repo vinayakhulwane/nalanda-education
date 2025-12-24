@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -47,7 +47,7 @@ function Step1Metadata({ onValidityChange }: { onValidityChange: (isValid: boole
 
     // TODO: Connect form inputs to a state management solution (e.g., useForm) and perform validation.
     // For now, we'll just enable the next step.
-    useState(() => {
+    useEffect(() => {
       onValidityChange(true); // Placeholder
     }, [onValidityChange]);
 
