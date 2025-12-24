@@ -75,10 +75,6 @@ export default function NumericalManagementPage() {
                     title="Numerical Management"
                     description="Manage numerical questions by class."
                 />
-                <Button onClick={() => router.push('/questions/new')}>
-                    <PlusCircle className="mr-2" />
-                    Add New Question
-                </Button>
             </div>
             {areClassesLoading ? (
                  <div className="flex justify-center items-center h-48">
