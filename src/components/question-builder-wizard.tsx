@@ -33,11 +33,21 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
     const fileInputRef = useRef<HTMLInputElement>(null);
     const searchParams = useSearchParams();
 
-    const paramClassId = searchParams.get('classId');
-    const paramSubjectId = searchParams.get('subjectId');
+    // Set initial values from URL params if available and not already in question state
+    useEffect(() => {
+        const paramClassId = searchParams.get('classId');
+        const paramSubjectId = searchParams.get('subjectId');
+        if (paramClassId && !question.classId) {
+            setQuestion(prev => ({...prev, classId: paramClassId}));
+        }
+        if (paramSubjectId && !question.subjectId) {
+             setQuestion(prev => ({...prev, subjectId: paramSubjectId}));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Run only on mount
 
-    const [selectedClass, setSelectedClass] = useState(question.classId || paramClassId || '');
-    const [selectedSubject, setSelectedSubject] = useState(question.subjectId || paramSubjectId || '');
+    const selectedClass = question.classId || '';
+    const selectedSubject = question.subjectId || '';
 
     // Data fetching
     const { data: classes, isLoading: classesLoading } = useCollection<Class>(useMemoFirebase(() => firestore && collection(firestore, 'classes'), [firestore]));
@@ -54,25 +64,13 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
     }, [firestore, question.unitId]);
     const { data: categories, isLoading: categoriesLoading } = useCollection<Category>(categoriesQuery);
 
-    useEffect(() => {
-        setQuestion(prev => ({...prev, classId: selectedClass, subjectId: selectedSubject}));
-    }, [selectedClass, selectedSubject, setQuestion]);
+    const handleClassChange = (newClassId: string) => {
+        setQuestion(prev => ({...prev, classId: newClassId, subjectId: '', unitId: '', categoryId: ''}));
+    }
 
-    useEffect(() => {
-        // Reset subject if class changes
-        if (selectedClass !== question.classId) {
-            setSelectedSubject('');
-            setQuestion(prev => ({...prev, subjectId: undefined, unitId: undefined, categoryId: undefined}));
-        }
-    }, [selectedClass, question.classId, setQuestion]);
-
-    useEffect(() => {
-        // Reset unit/category if subject changes
-        if(selectedSubject !== question.subjectId) {
-            setQuestion(prev => ({...prev, unitId: undefined, categoryId: undefined}));
-        }
-    }, [selectedSubject, question.subjectId, setQuestion]);
-
+    const handleSubjectChange = (newSubjectId: string) => {
+        setQuestion(prev => ({...prev, subjectId: newSubjectId, unitId: '', categoryId: ''}));
+    }
 
     const isFormValid = !!question.name && !!question.mainQuestionText && !!question.classId && !!question.subjectId && !!question.unitId && !!question.categoryId && !!question.currencyType;
 
@@ -92,8 +90,8 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
                 try {
                     const content = e.target?.result as string;
                     const jsonData = JSON.parse(content);
-                    // Here you would have more robust validation and state setting
-                    setQuestion(prev => ({...prev, ...jsonData}));
+                    // Overwrite the existing question state with the uploaded JSON data
+                    setQuestion(jsonData);
 
                     toast({
                         title: 'Success',
@@ -142,7 +140,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
             <div className="grid md:grid-cols-2 gap-4">
                  <div className="space-y-2">
                     <Label>Class</Label>
-                    <Select onValueChange={setSelectedClass} value={selectedClass}>
+                    <Select onValueChange={handleClassChange} value={selectedClass}>
                         <SelectTrigger disabled={classesLoading}>
                             <SelectValue placeholder={classesLoading ? 'Loading classes...' : 'Select a class'} />
                         </SelectTrigger>
@@ -153,7 +151,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
                 </div>
                  <div className="space-y-2">
                     <Label>Subject</Label>
-                    <Select onValueChange={setSelectedSubject} value={selectedSubject} disabled={!selectedClass || subjectsLoading}>
+                    <Select onValueChange={handleSubjectChange} value={selectedSubject} disabled={!selectedClass || subjectsLoading}>
                         <SelectTrigger>
                             <SelectValue placeholder={subjectsLoading ? 'Loading subjects...' : 'Select a subject'} />
                         </SelectTrigger>
@@ -167,7 +165,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
              <div className="grid md:grid-cols-2 gap-4">
                  <div className="space-y-2">
                     <Label>Unit</Label>
-                    <Select onValueChange={val => setQuestion({...question, unitId: val, categoryId: undefined})} value={question.unitId} disabled={!selectedSubject || unitsLoading}>
+                    <Select onValueChange={val => setQuestion({...question, unitId: val, categoryId: ''})} value={question.unitId || ''} disabled={!selectedSubject || unitsLoading}>
                         <SelectTrigger>
                             <SelectValue placeholder={unitsLoading ? 'Loading units...' : 'Select a unit'} />
                         </SelectTrigger>
@@ -178,7 +176,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
                 </div>
                  <div className="space-y-2">
                     <Label>Category</Label>
-                     <Select onValueChange={val => setQuestion({...question, categoryId: val})} value={question.categoryId} disabled={!question.unitId || categoriesLoading}>
+                     <Select onValueChange={val => setQuestion({...question, categoryId: val})} value={question.categoryId || ''} disabled={!question.unitId || categoriesLoading}>
                         <SelectTrigger>
                             <SelectValue placeholder={categoriesLoading ? 'Loading...' : 'Select a category'} />
                         </SelectTrigger>
