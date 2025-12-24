@@ -70,25 +70,46 @@ export interface Teacher extends User {
 }
 
 export type CurrencyType = 'spark' | 'coin' | 'gold' | 'diamond';
-export type SubQuestionType = 'numerical' | 'text';
+export type SubQuestionType = 'numerical' | 'text' | 'mcq';
 export type GradingMode = 'system' | 'ai';
 
 export interface SubQuestion {
   id: string;
-  type: SubQuestionType;
-  prompt: string;
+  questionText: string;
+  image?: string;
+  answerType: SubQuestionType;
   marks: number;
-  // Numerical answer
-  correctValue?: number;
-  tolerance?: number;
-  // Text answer
-  keywords?: string[];
+  // Numerical Answer
+  numericalAnswer?: {
+    baseUnit: string;
+    correctValues: number[];
+    allowedUnits: string[];
+    defaultUnit: string;
+    tolerance: {
+      type: 'absolute' | 'percentage';
+      value: number;
+    };
+  };
+  // Text Answer
+  textAnswer?: {
+    keywords: string[];
+    matchLogic: 'any' | 'all' | 'exact';
+    caseSensitive: boolean;
+  };
+  // MCQ Answer
+  mcqAnswer?: {
+    options: { id: string; text: string }[];
+    correctOptions: string[]; // array of option ids
+    isMultiCorrect: boolean;
+    shuffleOptions: boolean;
+  };
 }
 
 export interface SolutionStep {
   id: string;
   title: string;
   description: string;
+  stepImage?: string;
   stepQuestion: string;
   subQuestions: SubQuestion[];
 }
@@ -107,6 +128,9 @@ export interface Question {
   // Step 1: Metadata
   name: string;
   mainQuestionText: string;
+  mainImage?: string;
+  classId: string;
+  subjectId: string;
   unitId: string;
   categoryId: string;
   currencyType: CurrencyType;
