@@ -212,6 +212,20 @@ export function QuestionRunner({ question }: { question: Question }) {
     if (!question?.mainQuestionText) return '';
     return question.mainQuestionText.replace(/&nbsp;/g, ' ');
   }, [question.mainQuestionText]);
+  
+  const allQuestionsByStep = useMemo(() => {
+    return allSubQuestions.reduce((acc, subQ) => {
+        if (!acc[subQ.stepId]) {
+            acc[subQ.stepId] = {
+                title: subQ.stepTitle,
+                subQuestions: []
+            };
+        }
+        acc[subQ.stepId].subQuestions.push(subQ);
+        return acc;
+    }, {} as Record<string, { title: string, subQuestions: SubQuestionWithStep[] }>);
+  }, [allSubQuestions]);
+
 
   const activeSubQuestion = allSubQuestions[currentSubQuestionIndex];
   const lastStepId = currentSubQuestionIndex > 0 ? allSubQuestions[currentSubQuestionIndex - 1].stepId : null;
@@ -228,6 +242,10 @@ export function QuestionRunner({ question }: { question: Question }) {
                 <CardDescription>You have completed the question.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                <div className="text-center">
+                    <p className="text-muted-foreground">Your Score</p>
+                    <p className="text-5xl font-bold">{score} / {totalMarks}</p>
+                </div>
                  <div className="p-4 rounded-lg bg-muted/50 break-words">
                     <div
                         className="prose dark:prose-invert max-w-none"
@@ -235,35 +253,39 @@ export function QuestionRunner({ question }: { question: Question }) {
                     />
                 </div>
                  <Separator />
-                <div className="text-center">
-                    <p className="text-muted-foreground">Your Score</p>
-                    <p className="text-5xl font-bold">{score} / {totalMarks}</p>
-                </div>
-                 <Separator />
                 <div className="space-y-4">
                     <h3 className="font-semibold">Answer Review</h3>
-                    {allSubQuestions.map((subQ, index) => {
-                        const result = results[subQ.id];
-                        const isCorrect = result?.isCorrect;
+                     {uniqueStepIds.map((stepId, index) => {
+                        const stepData = allQuestionsByStep[stepId];
+                        if (!stepData) return null;
                         return (
-                            <div key={subQ.id} className="p-3 border rounded-md">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <div
-                                            className="text-sm prose-sm dark:prose-invert max-w-none mb-2"
-                                            dangerouslySetInnerHTML={{ __html: subQ.questionText }}
-                                        />
-                                    </div>
-                                    <div className={`flex items-center gap-2 font-semibold text-sm ${isCorrect ? 'text-green-600' : 'text-destructive'}`}>
-                                        {isCorrect ? <CheckCircle className="h-4 w-4"/> : <XCircle className="h-4 w-4"/>}
-                                        {isCorrect ? `${subQ.marks}/${subQ.marks}` : `0/${subQ.marks}`}
-                                    </div>
-                                </div>
-                                {!isCorrect && (
-                                     <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted rounded">
-                                        Correct Answer: <span className="font-semibold">{getCorrectAnswerText(subQ)}</span>
-                                    </div>
-                                )}
+                            <div key={stepId} className="space-y-2">
+                                <h4 className="font-semibold text-lg font-headline">Step {index + 1}. {stepData.title}</h4>
+                                {stepData.subQuestions.map((subQ) => {
+                                    const result = results[subQ.id];
+                                    const isCorrect = result?.isCorrect;
+                                    return (
+                                        <div key={subQ.id} className="p-3 border rounded-md">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1">
+                                                    <div
+                                                        className="text-sm prose-sm dark:prose-invert max-w-none mb-2"
+                                                        dangerouslySetInnerHTML={{ __html: subQ.questionText }}
+                                                    />
+                                                </div>
+                                                <div className={`flex items-center gap-2 font-semibold text-sm ${isCorrect ? 'text-green-600' : 'text-destructive'}`}>
+                                                    {isCorrect ? <CheckCircle className="h-4 w-4"/> : <XCircle className="h-4 w-4"/>}
+                                                    {isCorrect ? `${subQ.marks}/${subQ.marks}` : `0/${subQ.marks}`}
+                                                </div>
+                                            </div>
+                                            {!isCorrect && (
+                                                <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted rounded">
+                                                    Correct Answer: <span className="font-semibold">{getCorrectAnswerText(subQ)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
                             </div>
                         )
                     })}
@@ -291,34 +313,38 @@ export function QuestionRunner({ question }: { question: Question }) {
         ) : (
             <div className="space-y-4">
                 {/* Completed Questions Summaries */}
-                 {Object.entries(completedQuestionsByStep).map(([stepId, stepData], stepIndex) => (
-                    <div key={stepId} className="space-y-2">
-                        <h4 className="font-semibold text-lg font-headline">Step {uniqueStepIds.indexOf(stepId) + 1}. {stepData.title}</h4>
-                        {stepData.subQuestions.map((subQ, subQIndex) => {
-                             const globalIndex = allSubQuestions.findIndex(q => q.id === subQ.id);
-                             return (
-                                <Collapsible key={subQ.id}>
-                                    <CollapsibleTrigger className="w-full">
-                                        <CompletedSubQuestionSummary 
-                                            subQuestion={subQ}
-                                            answer={answers[subQ.id]?.answer}
-                                            index={globalIndex}
-                                        />
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                        <div className="p-4 border border-t-0 rounded-b-lg -mt-1">
-                                            <div
-                                                className="prose dark:prose-invert max-w-none mb-4 text-muted-foreground"
-                                                dangerouslySetInnerHTML={{ __html: subQ.questionText }}
+                 {uniqueStepIds.map((stepId, index) => {
+                     const stepData = completedQuestionsByStep[stepId];
+                     if (!stepData) return null;
+                     return (
+                         <div key={stepId} className="space-y-2">
+                            <h4 className="font-semibold text-lg font-headline">Step {index + 1}. {stepData.title}</h4>
+                            {stepData.subQuestions.map((subQ) => {
+                                const globalIndex = allSubQuestions.findIndex(q => q.id === subQ.id);
+                                return (
+                                    <Collapsible key={subQ.id}>
+                                        <CollapsibleTrigger className="w-full">
+                                            <CompletedSubQuestionSummary 
+                                                subQuestion={subQ}
+                                                answer={answers[subQ.id]?.answer}
+                                                index={globalIndex}
                                             />
-                                            {renderAnswerInput(subQ, true)}
-                                        </div>
-                                    </CollapsibleContent>
-                                </Collapsible>
-                            )
-                        })}
-                    </div>
-                ))}
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent>
+                                            <div className="p-4 border border-t-0 rounded-b-lg -mt-1">
+                                                <div
+                                                    className="prose dark:prose-invert max-w-none mb-4 text-muted-foreground"
+                                                    dangerouslySetInnerHTML={{ __html: subQ.questionText }}
+                                                />
+                                                {renderAnswerInput(subQ, true)}
+                                            </div>
+                                        </CollapsibleContent>
+                                    </Collapsible>
+                                )
+                            })}
+                        </div>
+                     )
+                 })}
 
 
                 {/* Active Question Card */}
