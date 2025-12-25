@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo, Suspense, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -37,13 +37,15 @@ function QuestionBankPageContent() {
 
   const categoriesQuery = useMemoFirebase(() => {
       if (!firestore || !units || units.length === 0) return null;
-      const unitIds = units.map(u => u.id);
+      // If a specific unit is selected, only fetch its categories
       if(unitFilter !== 'all') {
-        if (!unitIds.includes(unitFilter)) return null; // A single unit is selected that has no categories.
+        if (!units.map(u=>u.id).includes(unitFilter)) return null; // A single unit is selected that has no categories.
         return query(collection(firestore, 'categories'), where('unitId', '==', unitFilter));
       }
+      // Otherwise, fetch categories for all units of the subject
+      const unitIds = units.map(u => u.id);
       if (unitIds.length === 0) return null;
-      return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds));
+      return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
   }, [firestore, units, unitFilter]);
   const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);
 
@@ -60,12 +62,19 @@ function QuestionBankPageContent() {
     });
   }, [questions, searchFilter, unitFilter, categoryFilter, statusFilter, currencyFilter]);
   
+  // When unit filter changes, reset category filter
+  useEffect(() => {
+    setCategoryFilter('all');
+  }, [unitFilter]);
+
+
   const resetFilters = (filterToReset: string) => {
     switch (filterToReset) {
       case 'unit': setUnitFilter('all'); setCategoryFilter('all'); break;
       case 'category': setCategoryFilter('all'); break;
       case 'status': setStatusFilter('all'); break;
       case 'currency': setCurrencyFilter('all'); break;
+      case 'search': setSearchFilter(''); break;
       default:
         setUnitFilter('all');
         setCategoryFilter('all');
