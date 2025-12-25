@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Suspense, useMemo } from "react";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, where, orderBy, doc } from "firebase/firestore";
+import { collection, query, where, doc } from "firebase/firestore";
 import type { Worksheet } from "@/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -31,17 +31,21 @@ function SavedWorksheetsPageContent() {
     // This query now matches the security rule by filtering on authorId.
     return query(
       collection(firestore, 'worksheets'),
-      where('authorId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('authorId', '==', user.uid)
     );
   }, [firestore, user?.uid]);
 
   const { data: allUserWorksheets, isLoading } = useCollection<Worksheet>(worksheetsQuery);
 
   const subjectWorksheets = useMemo(() => {
-    if (!allUserWorksheets || !subjectId) return [];
-    // Client-side filtering for the subject
-    return allUserWorksheets.filter(ws => ws.subjectId === subjectId);
+    if (!allUserWorksheets) return [];
+    // Client-side filtering and sorting
+    const filtered = allUserWorksheets.filter(ws => ws.subjectId === subjectId);
+    return filtered.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+        return dateB - dateA; // Sort descending
+    });
   }, [allUserWorksheets, subjectId]);
 
 
