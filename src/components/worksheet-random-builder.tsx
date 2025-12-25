@@ -6,6 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { FilePlus2, ShoppingCart, PlusCircle, Filter, X } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
 
 type WorksheetRandomBuilderProps = {
   availableQuestions: Question[];
@@ -28,6 +31,7 @@ export function WorksheetRandomBuilder({
   }, [availableQuestions, filters]);
 
   const questionsByUnit = useMemo(() => {
+    // In a real app, you'd want to map unitId to unitName
     return filteredQuestions.reduce((acc, q) => {
       acc[q.unitId] = (acc[q.unitId] || 0) + 1;
       return acc;
@@ -35,6 +39,7 @@ export function WorksheetRandomBuilder({
   }, [filteredQuestions]);
 
   const questionsByCategory = useMemo(() => {
+    // In a real app, you'd want to map categoryId to categoryName
     return filteredQuestions.reduce((acc, q) => {
       acc[q.categoryId] = (acc[q.categoryId] || 0) + 1;
       return acc;
@@ -62,8 +67,8 @@ export function WorksheetRandomBuilder({
   const { totalMarks, estimatedTime } = useMemo(() => {
     return selectedQuestions.reduce(
       (acc, q) => {
-        const marks = q.solutionSteps.reduce((stepSum, step) => 
-            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0);
+        const marks = q.solutionSteps?.reduce((stepSum, step) => 
+            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
         acc.totalMarks += marks;
         // Simple estimation: 2 minutes per mark
         acc.estimatedTime += marks * 2;
@@ -73,10 +78,20 @@ export function WorksheetRandomBuilder({
     );
   }, [selectedQuestions]);
 
+  const handleFilterChange = (currency: CurrencyType, isChecked: boolean) => {
+    if (isChecked) {
+      setFilters(prev => [...prev, currency]);
+    } else {
+      setFilters(prev => prev.filter(c => c !== currency));
+    }
+  }
+
+  const allCurrencyTypes: CurrencyType[] = ['spark', 'coin', 'gold', 'diamond'];
+
   return (
     <div className="space-y-6 mt-4">
       <div className="flex justify-between items-start">
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
             {filters.length > 0 && <span className="text-sm font-semibold">Active Filters:</span>}
             {filters.map(f => (
                 <Badge key={f} variant="outline" className="pl-2 capitalize">
@@ -85,10 +100,32 @@ export function WorksheetRandomBuilder({
                 </Badge>
             ))}
         </div>
-        <Button variant="outline" disabled>
-          <Filter className="mr-2 h-4 w-4" />
-          Filter (2)
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline">
+              <Filter className="mr-2 h-4 w-4" />
+              Filter
+              {filters.length > 0 && <Badge variant="secondary" className="ml-2 rounded-full h-5 w-5 p-0 justify-center">{filters.length}</Badge>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56" align="end">
+            <div className="space-y-4">
+                <h4 className="font-medium leading-none">Filter by Currency</h4>
+                <div className="space-y-2">
+                  {allCurrencyTypes.map(currency => (
+                    <div key={currency} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`filter-${currency}`}
+                        checked={filters.includes(currency)}
+                        onCheckedChange={(checked) => handleFilterChange(currency, !!checked)}
+                      />
+                      <Label htmlFor={`filter-${currency}`} className="capitalize">{currency}</Label>
+                    </div>
+                  ))}
+                </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <Card>
@@ -113,6 +150,7 @@ export function WorksheetRandomBuilder({
                     <Badge variant="secondary">{count}</Badge>
                   </div>
                 ))}
+                 {Object.keys(questionsByUnit).length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No questions for current filters.</p>}
               </div>
             </ScrollArea>
           </CardContent>
@@ -132,6 +170,7 @@ export function WorksheetRandomBuilder({
                     <Badge variant="secondary">{count}</Badge>
                   </div>
                 ))}
+                 {Object.keys(questionsByCategory).length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No questions for current filters.</p>}
               </div>
             </ScrollArea>
           </CardContent>
@@ -143,7 +182,7 @@ export function WorksheetRandomBuilder({
             <CardTitle>Add Random by Type</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(['spark', 'coin', 'gold', 'diamond'] as CurrencyType[]).map(currency => (
+            {allCurrencyTypes.map(currency => (
               <div key={currency} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
                 <span className="capitalize">{currency}</span>
                 <div className="flex items-center gap-2">
@@ -161,7 +200,7 @@ export function WorksheetRandomBuilder({
       </div>
       
       {/* Footer Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg flex items-center justify-between">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg flex items-center justify-between ml-[var(--sidebar-width-icon)]">
             <div className="flex items-center gap-6 text-sm">
                 <div><span className="font-semibold">Questions:</span> {selectedQuestions.length}</div>
                 <div><span className="font-semibold">Total Marks:</span> {totalMarks}</div>
