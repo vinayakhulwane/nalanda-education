@@ -5,7 +5,7 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
-import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -38,14 +38,26 @@ export function WorksheetRandomBuilder({
   setSelectedQuestions,
   onCreateWorksheet,
 }: WorksheetRandomBuilderProps) {
-  const [filters, setFilters] = useState<CurrencyType[]>([]);
+  const [filters, setFilters] = useState<{
+    units: string[];
+    categories: string[];
+    currencies: CurrencyType[];
+  }>({
+    units: [],
+    categories: [],
+    currencies: [],
+  });
 
   const unitMap = useMemo(() => new Map(units.map(u => [u.id, u.name])), [units]);
   const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
 
   const filteredQuestions = useMemo(() => {
-    if (filters.length === 0) return availableQuestions;
-    return availableQuestions.filter(q => filters.includes(q.currencyType));
+    return availableQuestions.filter(q => {
+      const unitMatch = filters.units.length === 0 || filters.units.includes(q.unitId);
+      const categoryMatch = filters.categories.length === 0 || filters.categories.includes(q.categoryId);
+      const currencyMatch = filters.currencies.length === 0 || filters.currencies.includes(q.currencyType);
+      return unitMatch && categoryMatch && currencyMatch;
+    });
   }, [availableQuestions, filters]);
 
   const questionsByUnit = useMemo(() => {
@@ -129,12 +141,14 @@ export function WorksheetRandomBuilder({
   };
 
 
-  const handleFilterChange = (currency: CurrencyType, isChecked: boolean) => {
-    if (isChecked) {
-      setFilters(prev => [...prev, currency]);
-    } else {
-      setFilters(prev => prev.filter(c => c !== currency));
-    }
+  const handleFilterChange = (filterType: 'units' | 'categories' | 'currencies', value: string, isChecked: boolean) => {
+    setFilters(prev => {
+        const currentValues = prev[filterType] as string[];
+        const newValues = isChecked
+            ? [...currentValues, value]
+            : currentValues.filter(v => v !== value);
+        return { ...prev, [filterType]: newValues };
+    });
   }
 
   const allCurrencyTypes: CurrencyType[] = ['spark', 'coin', 'gold', 'diamond'];
@@ -143,17 +157,33 @@ export function WorksheetRandomBuilder({
       return question.solutionSteps?.reduce((stepSum, step) => 
             stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
   }
+  
+  const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
+  const isFilterActive = activeFilterCount > 0;
+
 
   return (
     <div className="space-y-6 mt-4">
       <div className="flex justify-between items-start">
         <div className="flex gap-2 items-center flex-wrap">
-            {filters.length > 0 && <span className="text-sm font-semibold">Active Filters:</span>}
-            {filters.map(f => (
-                <Badge key={f} variant="outline" className="pl-2 capitalize">
-                    {f}
-                    <button onClick={() => setFilters(filters.filter(item => item !== f))} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-                </Badge>
+            {isFilterActive && <span className="text-sm font-semibold">Active Filters:</span>}
+            {filters.units.map(id => (
+              <Badge key={id} variant="outline" className="pl-2 capitalize">
+                Unit: {unitMap.get(id) || id}
+                <button onClick={() => handleFilterChange('units', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
+            ))}
+            {filters.categories.map(id => (
+              <Badge key={id} variant="outline" className="pl-2 capitalize">
+                Category: {categoryMap.get(id) || id}
+                <button onClick={() => handleFilterChange('categories', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
+            ))}
+            {filters.currencies.map(c => (
+              <Badge key={c} variant="outline" className="pl-2 capitalize">
+                {c}
+                <button onClick={() => handleFilterChange('currencies', c, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
             ))}
         </div>
         <Popover>
@@ -161,25 +191,60 @@ export function WorksheetRandomBuilder({
             <Button variant="outline">
               <Filter className="mr-2 h-4 w-4" />
               Filter
-              {filters.length > 0 && <Badge variant="secondary" className="ml-2 rounded-full h-5 w-5 p-0 justify-center">{filters.length}</Badge>}
+              {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2 rounded-full h-5 w-5 p-0 justify-center">{activeFilterCount}</Badge>}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-56" align="end">
-            <div className="space-y-4">
-                <h4 className="font-medium leading-none">Filter by Currency</h4>
-                <div className="space-y-2">
-                  {allCurrencyTypes.map(currency => (
-                    <div key={currency} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`filter-${currency}`}
-                        checked={filters.includes(currency)}
-                        onCheckedChange={(checked) => handleFilterChange(currency, !!checked)}
-                      />
-                      <Label htmlFor={`filter-${currency}`} className="capitalize">{currency}</Label>
-                    </div>
-                  ))}
-                </div>
-            </div>
+          <PopoverContent className="w-80" align="end">
+             <Tabs defaultValue="unit" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="unit">Unit</TabsTrigger>
+                    <TabsTrigger value="category">Category</TabsTrigger>
+                    <TabsTrigger value="currency">Currency</TabsTrigger>
+                </TabsList>
+                <TabsContent value="unit" className="mt-2">
+                  <div className="space-y-2">
+                    {units.map(unit => (
+                      <div key={unit.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`filter-unit-${unit.id}`}
+                          checked={filters.units.includes(unit.id)}
+                          onCheckedChange={(checked) => handleFilterChange('units', unit.id, !!checked)}
+                        />
+                        <Label htmlFor={`filter-unit-${unit.id}`} className="capitalize">{unit.name}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+                 <TabsContent value="category" className="mt-2">
+                  <div className="space-y-2">
+                    {categories.map(cat => (
+                      <div key={cat.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`filter-cat-${cat.id}`}
+                          checked={filters.categories.includes(cat.id)}
+                          onCheckedChange={(checked) => handleFilterChange('categories', cat.id, !!checked)}
+                        />
+                        <Label htmlFor={`filter-cat-${cat.id}`} className="capitalize">{cat.name}</Label>
+                      </div>
+                    ))}
+                     {categories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories found for the selected subject/unit.</p>}
+                  </div>
+                </TabsContent>
+                <TabsContent value="currency" className="mt-2">
+                  <div className="space-y-2">
+                    {allCurrencyTypes.map(currency => (
+                      <div key={currency} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`filter-currency-${currency}`}
+                          checked={filters.currencies.includes(currency)}
+                          onCheckedChange={(checked) => handleFilterChange('currencies', currency, !!checked)}
+                        />
+                        <Label htmlFor={`filter-currency-${currency}`} className="capitalize">{currency}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+             </Tabs>
           </PopoverContent>
         </Popover>
       </div>
@@ -395,5 +460,3 @@ export function WorksheetRandomBuilder({
     </div>
   );
 }
-
-    
