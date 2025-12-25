@@ -40,7 +40,7 @@ const unitPrefixes: Record<string, number> = {
 function parseUnitAndValue(input: string): { value: number, unit: string } | null {
     if (!input || typeof input !== 'string') return null;
     
-    // Normalize input: trim whitespace
+    // Normalize input: trim whitespace, make lowercase for prefix matching
     const trimmedInput = input.trim();
     
     // Regex to separate the initial number from the rest of the string (the unit)
@@ -138,14 +138,13 @@ export function QuestionRunner({ question }: { question: Question }) {
                 const { baseUnit, correctValue, toleranceValue } = subQ.numericalAnswer || {};
 
                 if (parsedAnswer && correctValue !== undefined) {
+                    const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
                     // If baseUnit is not specified, treat as unitless
                     if (!baseUnit) {
-                        const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
-                         // Correct if student also provides no unit
+                        // Correct if student also provides no unit
                         isCorrect = parsedAnswer.unit === '' && Math.abs(parsedAnswer.value - correctValue) <= tolerance;
                     } else {
                         const studentValueInBase = convertToBase(parsedAnswer.value, parsedAnswer.unit, baseUnit);
-                        const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
                         if (!isNaN(studentValueInBase)) {
                            isCorrect = Math.abs(studentValueInBase - correctValue) <= tolerance;
                         }
@@ -200,7 +199,7 @@ export function QuestionRunner({ question }: { question: Question }) {
       case 'numerical':
         return (
           <Input
-            type="text" // Changed to text to allow units
+            type="text"
             value={valueToDisplay ?? ''}
             onChange={(e) => setCurrentAnswer(e.target.value)}
             disabled={isSubmitted}
@@ -329,7 +328,7 @@ export function QuestionRunner({ question }: { question: Question }) {
                 <CardDescription>You have completed the question.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="text-center">
+                 <div className="text-center">
                     <p className="text-muted-foreground">Your Score</p>
                     <p className="text-5xl font-bold">{score} / {totalMarks}</p>
                 </div>
