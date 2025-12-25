@@ -79,7 +79,6 @@ function AddQuestionsPageContent() {
             title,
             classId,
             subjectId,
-            unitId: unitId || undefined,
             mode,
             worksheetType,
             questions: selectedQuestions.map(q => q.id),
@@ -88,6 +87,10 @@ function AddQuestionsPageContent() {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
+
+        if (unitId) {
+            newWorksheet.unitId = unitId;
+        }
 
         if (mode === 'exam' && examDate) {
             const date = new Date(examDate);
