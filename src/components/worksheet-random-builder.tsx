@@ -5,7 +5,7 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Droplet, Star, Coins, Gem, Crown, Sparkles } from 'lucide-react';
+import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
@@ -23,7 +23,7 @@ type WorksheetRandomBuilderProps = {
   onCreateWorksheet: () => void;
 };
 
-const currencyIcons = {
+const currencyIcons: Record<CurrencyType, React.ElementType> = {
     spark: Sparkles,
     coin: Coins,
     gold: Crown,
@@ -106,7 +106,7 @@ export function WorksheetRandomBuilder({
 
     return { 
         totalMarks, 
-        estimatedTime: totalMarks * 2, // Simple estimation: 2 minutes per mark
+        estimatedTime: Math.ceil((totalMarks * 20) / 60), // 20 seconds per mark, converted to minutes
         breakdownByUnit,
         breakdownByCategory,
         totalCost: costMap,
@@ -258,10 +258,10 @@ export function WorksheetRandomBuilder({
         </Card>
       </div>
 
-      <Card>
+       <Card>
           <CardHeader>
-            <CardTitle>Summary</CardTitle>
-            <CardDescription>Review your worksheet before generating it.</CardDescription>
+            <CardTitle>Summary & Finalize</CardTitle>
+            <CardDescription>Review your worksheet details below, then click generate.</CardDescription>
           </CardHeader>
           <CardContent className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-6">
@@ -286,7 +286,7 @@ export function WorksheetRandomBuilder({
             </SheetTrigger>
              <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
                 <SheetHeader className="p-6 pb-0">
-                    <SheetTitle>Review &amp; Blueprint</SheetTitle>
+                    <SheetTitle>Review & Blueprint</SheetTitle>
                     <SheetDescription>
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
@@ -356,7 +356,7 @@ export function WorksheetRandomBuilder({
                             <TabsContent value="review" className="mt-4 px-6 pb-6">
                             <div className="space-y-3">
                                     {selectedQuestions.map(q => {
-                                        const CurrencyIcon = currencyIcons[q.currencyType] || Star;
+                                        const CurrencyIcon = currencyIcons[q.currencyType] || Sparkles;
                                         return (
                                         <Card key={q.id} className="p-3">
                                             <div className="flex items-start justify-between gap-2">
@@ -394,7 +394,7 @@ export function WorksheetRandomBuilder({
                             <p className="font-semibold">Est. Time: {estimatedTime} mins</p>
                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 {Object.entries(totalCost).filter(([,count]) => count > 0).map(([currency, count]) => {
-                                    const Icon = currencyIcons[currency as CurrencyType] || Star;
+                                    const Icon = currencyIcons[currency as CurrencyType] || Sparkles;
                                     return (
                                         <span key={currency} className="flex items-center gap-1 capitalize">
                                             <Icon className="h-3 w-3" /> {count} {currency}
