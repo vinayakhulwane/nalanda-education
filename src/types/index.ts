@@ -159,6 +159,7 @@ export interface Worksheet {
     subjectId: string;
     unitId?: string;
     mode: 'practice' | 'exam';
+    worksheetType: 'classroom' | 'sample';
     startTime?: Date; // For exam mode
     questions: string[]; // Array of question IDs
     authorId: string;

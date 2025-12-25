@@ -12,6 +12,8 @@ import { Checkbox } from './ui/checkbox';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger } from './ui/sheet';
 import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Switch } from './ui/switch';
+import { cn } from '@/lib/utils';
 
 type WorksheetRandomBuilderProps = {
   availableQuestions: Question[];
@@ -19,7 +21,8 @@ type WorksheetRandomBuilderProps = {
   categories: Category[];
   selectedQuestions: Question[];
   setSelectedQuestions: (questions: Question[]) => void;
-  onCreateWorksheet: () => void;
+  onCreateWorksheet: (worksheetType: 'classroom' | 'sample') => void;
+  removeQuestion: (questionId: string) => void;
 };
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
@@ -37,6 +40,7 @@ export function WorksheetRandomBuilder({
   selectedQuestions,
   setSelectedQuestions,
   onCreateWorksheet,
+  removeQuestion,
 }: WorksheetRandomBuilderProps) {
   const [filters, setFilters] = useState<{
     units: string[];
@@ -47,6 +51,7 @@ export function WorksheetRandomBuilder({
     categories: [],
     currencies: [],
   });
+  const [worksheetType, setWorksheetType] = useState<'classroom' | 'sample'>('classroom');
 
   const unitMap = useMemo(() => new Map(units.map(u => [u.id, u.name])), [units]);
   const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
@@ -156,10 +161,6 @@ export function WorksheetRandomBuilder({
     }
   };
   
-  const removeQuestion = (questionId: string) => {
-    setSelectedQuestions(selectedQuestions.filter(q => q.id !== questionId));
-  };
-
 
   const handleFilterChange = (filterType: 'units' | 'categories' | 'currencies', value: string, isChecked: boolean) => {
     setFilters(prev => {
@@ -218,7 +219,7 @@ export function WorksheetRandomBuilder({
              <Tabs defaultValue="unit" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="unit">Unit</TabsTrigger>
-                    <TabsTrigger value="category" disabled={filters.units.length === 0}>Category</TabsTrigger>
+                    <TabsTrigger value="category" disabled={filters.units.length > 0 && availableCategories.length === 0}>Category</TabsTrigger>
                     <TabsTrigger value="currency">Currency</TabsTrigger>
                 </TabsList>
                 <TabsContent value="unit" className="mt-2">
@@ -353,11 +354,20 @@ export function WorksheetRandomBuilder({
                 </div>
             </SheetTrigger>
              <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
-                <SheetHeader className="p-6 pb-0">
+                <SheetHeader className="p-6 pb-2">
                     <SheetTitle>Review & Blueprint</SheetTitle>
                     <SheetDescription>
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
+                    <div className="flex items-center space-x-2 pt-4">
+                        <Label htmlFor="worksheet-type" className={cn("text-muted-foreground", worksheetType === 'sample' && 'font-semibold text-foreground')}>
+                            Sample Worksheet
+                        </Label>
+                        <Switch id="worksheet-type" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
+                         <Label htmlFor="worksheet-type" className={cn("text-muted-foreground", worksheetType === 'classroom' && 'font-semibold text-foreground')}>
+                           Classroom Assignment
+                        </Label>
+                    </div>
                 </SheetHeader>
                 <div className="flex-grow overflow-y-auto">
                     <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
@@ -429,7 +439,6 @@ export function WorksheetRandomBuilder({
                                         <Card key={q.id} className="p-3">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-grow">
-                                                    
                                                     <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
                                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                                         {q.gradingMode === 'ai' && (
@@ -471,7 +480,7 @@ export function WorksheetRandomBuilder({
                                 })}
                             </div>
                         </div>
-                        <Button onClick={onCreateWorksheet}>
+                        <Button onClick={() => onCreateWorksheet(worksheetType)}>
                             Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
                         </Button>
                     </div>

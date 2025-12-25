@@ -62,7 +62,7 @@ function AddQuestionsPageContent() {
     const backUrl = subjectId && classId ? `/worksheets/new?classId=${classId}&subjectId=${subjectId}` : '/worksheets';
     const isLoading = isSubjectLoading || areQuestionsLoading || areUnitsLoading || areCategoriesLoading;
 
-    const handleCreateWorksheet = async () => {
+    const handleCreateWorksheet = async (worksheetType: 'classroom' | 'sample') => {
         if (!user || !firestore || !classId || !subjectId || !title) {
             toast({
                 variant: 'destructive',
@@ -78,6 +78,7 @@ function AddQuestionsPageContent() {
             subjectId,
             unitId: unitId || undefined,
             mode,
+            worksheetType,
             questions: selectedQuestions.map(q => q.id),
             authorId: user.uid,
             status: 'draft', // Or 'published' depending on desired flow
@@ -117,6 +118,10 @@ function AddQuestionsPageContent() {
         }
     };
 
+    const removeQuestion = (questionId: string) => {
+        setSelectedQuestions(selectedQuestions.filter(q => q.id !== questionId));
+    };
+
 
     if (isLoading) {
         return (
@@ -149,6 +154,7 @@ function AddQuestionsPageContent() {
                         selectedQuestions={selectedQuestions}
                         setSelectedQuestions={setSelectedQuestions}
                         onCreateWorksheet={handleCreateWorksheet}
+                        removeQuestion={removeQuestion}
                     />
                 </TabsContent>
                  <TabsContent value="manual">
@@ -158,6 +164,8 @@ function AddQuestionsPageContent() {
                         addQuestion={addQuestion}
                         units={allUnits || []}
                         categories={allCategories || []}
+                        removeQuestion={removeQuestion}
+                        onCreateWorksheet={handleCreateWorksheet}
                     />
                 </TabsContent>
             </Tabs>
