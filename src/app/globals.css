@@ -84,4 +84,14 @@
   body {
     @apply bg-background text-foreground;
   }
+  @keyframes blast {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(3);
+      opacity: 0;
+    }
+  }
 }

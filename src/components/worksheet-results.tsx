@@ -88,6 +88,7 @@ export function WorksheetResults({
   
   const [isClaiming, setIsClaiming] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(false);
+  const [isBlasting, setIsBlasting] = useState(false);
 
 
   const { totalMarks, score, rewards } = useMemo(() => {
@@ -107,12 +108,13 @@ export function WorksheetResults({
             })
         });
 
+        // This logic is now aligned with the detailed business rules
         if (q.currencyType === 'spark') {
             const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5);
-            rewards.coin += rewardValue;
+            rewards.coin += rewardValue; // Spark rewards are always paid in Coins
         } else {
             const rewardValue = obtainedMarksForQuestion;
-            rewards[q.currencyType] += rewardValue;
+            rewards[q.currencyType] = (rewards[q.currencyType] || 0) + rewardValue;
         }
     })
 
@@ -120,7 +122,7 @@ export function WorksheetResults({
   }, [questions, results]);
   
   const handleClaimRewards = async () => {
-    if (!user || !firestore || hasClaimed) return;
+    if (!user || !firestore || hasClaimed || isClaiming) return;
     setIsClaiming(true);
 
     const userRef = doc(firestore, 'users', user.uid);
@@ -134,6 +136,9 @@ export function WorksheetResults({
         if (Object.keys(updatePayload).length > 0) {
             await updateDoc(userRef, updatePayload);
         }
+        
+        setIsBlasting(true);
+        setTimeout(() => setIsBlasting(false), 600); // Duration of the animation
 
         toast({
             title: "Rewards Claimed!",
@@ -152,6 +157,11 @@ export function WorksheetResults({
         setIsClaiming(false);
     }
   }
+  
+    const processedMainQuestionText = (questionText: string) => {
+        if (!questionText) return '';
+        return questionText.replace(/&nbsp;/g, ' ');
+    }
 
 
   return (
@@ -193,7 +203,17 @@ export function WorksheetResults({
                 </div>
             </div>
             
-            <div className="mt-8 mb-6">
+            <div className="mt-8 mb-6 relative flex justify-center">
+                {isBlasting && Array.from({ length: 12 }).map((_, i) => (
+                    <div
+                        key={i}
+                        className="absolute w-2 h-2 bg-yellow-400 rounded-full animate-blast pointer-events-none"
+                        style={{
+                            transform: `rotate(${(i / 12) * 360}deg) translateX(60px)`,
+                            animationDelay: `${Math.random() * 0.1}s`,
+                        }}
+                    />
+                ))}
                 <Button 
                     className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200"
                     onClick={handleClaimRewards}
@@ -214,13 +234,12 @@ export function WorksheetResults({
             <div className="space-y-6">
                 <h3 className="text-xl font-semibold text-center">Question Review</h3>
                  {questions.map((question, qIndex) => {
-                    const processedMainQuestionText = question.mainQuestionText.replace(/&nbsp;/g, ' ');
                     return (
                     <div key={question.id}>
                        <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words">
                            <div className="flex gap-2">
                              <span className="font-bold">Q{qIndex + 1}.</span>
-                             <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText }} />
+                             <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(question.mainQuestionText) }} />
                            </div>
                         </div>
                         <div className="border border-t-0 rounded-b-lg p-4 space-y-3">
