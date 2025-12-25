@@ -190,7 +190,6 @@ export function QuestionRunner({ question }: { question: Question }) {
             onChange={(e) => setCurrentAnswer(e.target.value)}
             disabled={isSubmitted}
             className="w-full md:w-1/2"
-            placeholder="e.g., 7 kN"
           />
         );
       case 'mcq':
