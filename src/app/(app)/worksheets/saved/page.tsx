@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Suspense, useMemo } from "react";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, where, doc } from "firebase/firestore";
+import { collection, query, where, orderBy, doc } from "firebase/firestore";
 import type { Worksheet } from "@/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -26,28 +26,17 @@ function SavedWorksheetsPageContent() {
   const { toast } = useToast();
 
   const worksheetsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
+    if (!firestore || !user?.uid || !subjectId) return null;
+    
     return query(
       collection(firestore, 'worksheets'),
-      where('authorId', '==', user.uid)
+      where('authorId', '==', user.uid),
+      where('subjectId', '==', subjectId),
+      orderBy('createdAt', 'desc')
     );
-  }, [firestore, user?.uid]);
+  }, [firestore, user?.uid, subjectId]);
 
-  const { data: allUserWorksheets, isLoading } = useCollection<Worksheet>(worksheetsQuery);
-
-  const worksheets = useMemo(() => {
-    if (!allUserWorksheets) return [];
-    
-    // 1. Filter by subjectId on the client
-    const subjectWorksheets = allUserWorksheets.filter(ws => ws.subjectId === subjectId);
-    
-    // 2. Sort by createdAt on the client
-    return subjectWorksheets.sort((a, b) => {
-      const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-      const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-      return dateB - dateA; // Descending order
-    });
-  }, [allUserWorksheets, subjectId]);
+  const { data: worksheets, isLoading } = useCollection<Worksheet>(worksheetsQuery);
 
   const backUrl = subjectId && classId ? `/worksheets/${classId}/${subjectId}` : '/worksheets';
 
