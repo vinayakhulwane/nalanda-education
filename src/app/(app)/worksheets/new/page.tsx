@@ -1,6 +1,6 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
-import { useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
+import { useDoc, useFirestore, useMemoFirebase, useCollection, useUser } from "@/firebase";
 import type { Subject, Unit } from "@/types";
 import { collection, query, where, doc } from "firebase/firestore";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -17,6 +17,7 @@ function NewWorksheetPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const firestore = useFirestore();
+    const { userProfile } = useUser();
 
     const classId = searchParams.get('classId');
     const subjectId = searchParams.get('subjectId');
@@ -49,6 +50,8 @@ function NewWorksheetPageContent() {
             setExamDate(undefined);
         }
     }, [day, month, year]);
+    
+    const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
     const isFormValid = useMemo(() => {
         if (!title) return false;
@@ -166,13 +169,15 @@ function NewWorksheetPageContent() {
                                 <RadioGroupItem value="practice" id="practice" />
                                 <span>Practice Mode</span>
                             </Label>
-                            <Label htmlFor="exam" className="flex items-center space-x-2 border rounded-md p-3 flex-1 cursor-pointer hover:bg-muted/50 data-[state=checked]:border-primary">
-                                <RadioGroupItem value="exam" id="exam" />
-                                <span>Exam Mode</span>
-                            </Label>
+                            {userIsEditor && (
+                                <Label htmlFor="exam" className="flex items-center space-x-2 border rounded-md p-3 flex-1 cursor-pointer hover:bg-muted/50 data-[state=checked]:border-primary">
+                                    <RadioGroupItem value="exam" id="exam" />
+                                    <span>Exam Mode</span>
+                                </Label>
+                            )}
                         </RadioGroup>
                     </div>
-                    {mode === 'exam' && (
+                    {mode === 'exam' && userIsEditor && (
                         <div className="pt-2 animate-in fade-in space-y-4">
                             <Label>Start Date & Time</Label>
                             <div className="flex flex-wrap gap-4">
