@@ -95,58 +95,58 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
               </TabsList>
               <ScrollArea className="h-64">
                 <div className="p-4 space-y-2">
-                    <TabsContent value="unit" className="mt-0">
+                    <TabsContent value="unit" className="mt-0 space-y-3">
                         {units.map(u => (
-                            <div key={u.id} className="flex items-center space-x-2">
+                            <div key={u.id} className="flex items-center space-x-3">
                                 <Checkbox 
                                     id={`unit-${u.id}`} 
                                     checked={filters.unit.includes(u.id)}
                                     onCheckedChange={(checked) => handleMultiSelectChange(setFilters.setUnit, filters.unit, u.id, !!checked)}
                                 />
-                                <Label htmlFor={`unit-${u.id}`} className="flex-grow">
-                                    {u.name} ({questionCounts.units[u.id] || 0})
+                                <Label htmlFor={`unit-${u.id}`} className="flex-grow font-normal cursor-pointer">
+                                    {u.name} <span className="text-muted-foreground">({questionCounts.units[u.id] || 0})</span>
                                 </Label>
                             </div>
                         ))}
                     </TabsContent>
-                    <TabsContent value="category" className="mt-0">
+                    <TabsContent value="category" className="mt-0 space-y-3">
                          {categories.map(c => (
-                            <div key={c.id} className="flex items-center space-x-2">
+                            <div key={c.id} className="flex items-center space-x-3">
                                 <Checkbox 
                                     id={`cat-${c.id}`} 
                                     checked={filters.category.includes(c.id)}
                                     onCheckedChange={(checked) => handleMultiSelectChange(setFilters.setCategory, filters.category, c.id, !!checked)}
                                 />
-                                <Label htmlFor={`cat-${c.id}`} className="flex-grow">
-                                    {c.name} ({questionCounts.categories[c.id] || 0})
+                                <Label htmlFor={`cat-${c.id}`} className="flex-grow font-normal cursor-pointer">
+                                    {c.name} <span className="text-muted-foreground">({questionCounts.categories[c.id] || 0})</span>
                                 </Label>
                             </div>
                         ))}
                     </TabsContent>
-                    <TabsContent value="status" className="mt-0">
+                    <TabsContent value="status" className="mt-0 space-y-3">
                         {(['published', 'draft'] as const).map(status => (
-                            <div key={status} className="flex items-center space-x-2">
+                            <div key={status} className="flex items-center space-x-3">
                                 <Checkbox 
                                     id={`status-${status}`} 
                                     checked={filters.status.includes(status)}
                                     onCheckedChange={(checked) => handleMultiSelectChange(setFilters.setStatus, filters.status, status, !!checked)}
                                 />
-                                <Label htmlFor={`status-${status}`} className="flex-grow capitalize">
-                                    {status} ({questionCounts.statuses[status] || 0})
+                                <Label htmlFor={`status-${status}`} className="flex-grow font-normal capitalize cursor-pointer">
+                                    {status} <span className="text-muted-foreground">({questionCounts.statuses[status] || 0})</span>
                                 </Label>
                             </div>
                         ))}
                     </TabsContent>
-                     <TabsContent value="currency" className="mt-0">
+                     <TabsContent value="currency" className="mt-0 space-y-3">
                         {(['spark', 'coin', 'gold', 'diamond'] as const).map(currency => (
-                            <div key={currency} className="flex items-center space-x-2">
+                            <div key={currency} className="flex items-center space-x-3">
                                 <Checkbox 
                                     id={`curr-${currency}`} 
                                     checked={filters.currency.includes(currency)}
                                     onCheckedChange={(checked) => handleMultiSelectChange(setFilters.setCurrency, filters.currency, currency, !!checked)}
                                 />
-                                <Label htmlFor={`curr-${currency}`} className="flex-grow capitalize">
-                                    {currency} ({questionCounts.currencies[currency] || 0})
+                                <Label htmlFor={`curr-${currency}`} className="flex-grow font-normal capitalize cursor-pointer">
+                                    {currency} <span className="text-muted-foreground">({questionCounts.currencies[currency] || 0})</span>
                                 </Label>
                             </div>
                         ))}
@@ -167,7 +167,7 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
             {isFilterActive && <span>|</span>}
             <div className="flex flex-wrap items-center gap-1">
                 {activeFilters.map((f, i) => (
-                    <span key={`${f.key}-${i}`} className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded-md">
+                    <span key={`${f.key}-${i}`} className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded-md text-xs">
                         {f.label}
                     </span>
                 ))}
