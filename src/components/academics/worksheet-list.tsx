@@ -5,6 +5,7 @@ import { collection, query, where } from "firebase/firestore";
 import type { Worksheet } from "@/types";
 import { Loader2 } from "lucide-react";
 import { WorksheetDisplayCard } from "./worksheet-display-card";
+import { EnrollmentPromptCard } from "./enrollment-prompt-card";
 
 interface WorksheetListProps {
   subjectId: string;
@@ -49,14 +50,17 @@ export function WorksheetList({ subjectId, isEnrolled, userIsEditor }: Worksheet
       </div>
     );
   }
+  
+  const showEnrollmentPrompt = !userIsEditor && !isEnrolled;
 
   return (
     <div className="mt-6">
-        {visibleWorksheets && visibleWorksheets.length > 0 ? (
+        {(visibleWorksheets && visibleWorksheets.length > 0) || showEnrollmentPrompt ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {visibleWorksheets.map(ws => (
                     <WorksheetDisplayCard key={ws.id} worksheet={ws} />
                 ))}
+                 {showEnrollmentPrompt && <EnrollmentPromptCard />}
             </div>
         ) : (
             <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
