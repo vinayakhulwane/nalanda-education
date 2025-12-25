@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
 import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -106,7 +106,7 @@ export function WorksheetRandomBuilder({
 
     return { 
         totalMarks, 
-        estimatedTime: Math.ceil((totalMarks * 20) / 60), // 20 seconds per mark, converted to minutes
+        estimatedTime: Math.ceil((totalMarks * 20) / 60),
         breakdownByUnit,
         breakdownByCategory,
         totalCost: costMap,
@@ -124,6 +124,12 @@ export function WorksheetRandomBuilder({
       setSelectedQuestions([...selectedQuestions, candidates[randomIndex]]);
     }
   };
+  
+    const addQuestion = (question: Question) => {
+        if (!selectedQuestions.find(q => q.id === question.id)) {
+        setSelectedQuestions([...selectedQuestions, question]);
+        }
+    };
   
   const removeQuestion = (questionId: string) => {
     setSelectedQuestions(selectedQuestions.filter(q => q.id !== questionId));
@@ -258,22 +264,38 @@ export function WorksheetRandomBuilder({
         </Card>
       </div>
 
-       <Card>
-          <CardHeader>
-            <CardTitle>Summary & Finalize</CardTitle>
-            <CardDescription>Review your worksheet details below, then click generate.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-6">
-                <div><span className="font-semibold">Questions:</span> {selectedQuestions.length}</div>
-                <div><span className="font-semibold">Total Marks:</span> {totalMarks}</div>
-                <div><span className="font-semibold">Est. Time:</span> {estimatedTime} mins</div>
+        <div className="lg:col-span-2">
+            <h2 className="font-headline text-xl font-bold mb-4">Available Questions</h2>
+            <ScrollArea className="h-[600px] pr-4">
+            <div className="grid md:grid-cols-2 gap-4">
+            {filteredQuestions.map((q) => (
+                <Card key={q.id}>
+                <CardHeader>
+                    <CardTitle className="text-base">{q.name}</CardTitle>
+                    <CardDescription className="line-clamp-2" dangerouslySetInnerHTML={{ __html: q.mainQuestionText}} />
+                </CardHeader>
+                <CardContent>
+                    <div className="flex gap-2">
+                        <Badge variant="secondary">{unitMap.get(q.unitId) || q.unitId}</Badge>
+                        <Badge variant="outline">{categoryMap.get(q.categoryId) || q.categoryId}</Badge>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button size="sm" variant="outline" className="w-full" onClick={() => addQuestion(q)} disabled={!!selectedQuestions.find(sq => sq.id === q.id)}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> 
+                    {selectedQuestions.find(sq => sq.id === q.id) ? 'Added' : 'Add to Worksheet'}
+                    </Button>
+                </CardFooter>
+                </Card>
+            ))}
+                {filteredQuestions.length === 0 && (
+                    <div className="col-span-full text-center text-muted-foreground py-10">
+                        No questions available for the selected filters.
+                    </div>
+                )}
             </div>
-             <Button disabled={selectedQuestions.length === 0} onClick={onCreateWorksheet}>
-                <FilePlus2 className="mr-2 h-4 w-4" /> Generate Worksheet
-            </Button>
-          </CardContent>
-      </Card>
+            </ScrollArea>
+        </div>
       
         <Sheet>
             <SheetTrigger asChild>
