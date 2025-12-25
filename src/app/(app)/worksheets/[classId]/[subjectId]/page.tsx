@@ -1,4 +1,5 @@
 
+
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -40,8 +40,9 @@ function CreateWorksheetModal({ subject, units, children }: { subject: Subject; 
         params.set('mode', mode);
         if (mode === 'exam' && startDate) {
             const [hours, minutes] = startTime.split(':').map(Number);
-            startDate.setHours(hours, minutes);
-            params.set('startTime', startDate.toISOString());
+            const combinedDateTime = new Date(startDate);
+            combinedDateTime.setHours(hours, minutes);
+            params.set('startTime', combinedDateTime.toISOString());
         }
         router.push(`/worksheets/new?${params.toString()}`);
     }
@@ -84,45 +85,33 @@ function CreateWorksheetModal({ subject, units, children }: { subject: Subject; 
                         </RadioGroup>
                     </div>
                     {mode === 'exam' && (
-                        <div className="grid grid-cols-2 gap-4 pt-2 animate-in fade-in">
-                            <div className="space-y-2">
-                                <Label>Start Date</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "w-full justify-start text-left font-normal rounded-xl border-muted-foreground/20 h-11",
-                                                !startDate && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
-                                            {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0 rounded-2xl border-none shadow-2xl animate-in zoom-in-95 duration-200" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={startDate}
-                                            onSelect={setStartDate}
-                                            initialFocus
-                                            className="p-3"
-                                            classNames={{
-                                                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-full",
-                                                day_today: "bg-accent text-accent-foreground rounded-full",
-                                            }}
-                                        />
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                             <div className="space-y-2">
-                                <Label htmlFor="start-time">Start Time</Label>
-                                <Input
-                                    id="start-time"
-                                    type="time"
-                                    value={startTime}
-                                    onChange={(e) => setStartTime(e.target.value)}
+                        <div className="pt-2 animate-in fade-in space-y-4">
+                            <div className="p-4 border rounded-md">
+                                <Calendar
+                                    mode="single"
+                                    selected={startDate}
+                                    onSelect={setStartDate}
+                                    initialFocus
                                 />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Start Date</Label>
+                                    <Input
+                                        readOnly
+                                        value={startDate ? format(startDate, "PPP") : "Select a date above"}
+                                        className="bg-muted"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="start-time">Start Time</Label>
+                                    <Input
+                                        id="start-time"
+                                        type="time"
+                                        value={startTime}
+                                        onChange={(e) => setStartTime(e.target.value)}
+                                    />
+                                </div>
                             </div>
                         </div>
                     )}
