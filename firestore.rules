@@ -8,12 +8,12 @@
  * The data is organized in a single top-level collection: `/users`. Each user's profile and related data are stored in a document where the document ID matches the user's Authentication UID (e.g., `/users/{userId}`).
  *
  * ## Key Security Decisions
- * - **No User Listing:** To protect user privacy, it is impossible for any client to list the documents in the `/users` collection. This prevents malicious actors from discovering the identities of other users.
- * - **Strict Ownership:** A user can only read, create, update, or delete their own document within the `/users` collection.
+ * - **No User Listing:** To protect user privacy, it is impossible for any client to list all documents in the `/users` collection, unless they are an admin.
+ * - **Strict Ownership:** A user can only read, create, update, or delete their own document within the `/users` collection. Admins have broader access.
  * - **Path-Based Security:** Authorization is primarily determined by matching the `request.auth.uid` with the `{userId}` wildcard in the document path.
  *
  * ## Denormalization for Authorization
- * This security model is simple and does not require complex denormalization. The user's role is stored directly on their user document. While not used for authorization in this version, it's correctly placed for future expansion without needing costly lookups.
+ * This security model is simple and does not require complex denormalization. The user's role is stored directly on their user document.
  *
  * ## Structural Segregation
  * Not applicable in this model, as all user data is considered private. There is no mix of public and private data within the same collection.
@@ -53,6 +53,10 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
+    function isTeacher() {
+      return isRole('teacher');
+    }
+
     function isAdmin() {
       return isRole('admin');
     }
@@ -76,24 +80,19 @@ service cloud.firestore {
     function hasImmutableUserDataOnUpdate() {
       let incomingData = request.resource.data;
       let existingData = resource.data;
-      return incomingData.id == existingData.id && incomingData.googleId == existingData.googleId;
+      return incomingData.id == existingData.id;
     }
 
     /**
      * @description Rules for a user's own profile document.
      * @path /users/{userId}
-     * @allow (get) An authenticated user requests their own document: `/users/USER_123`.
-     * @allow (create) A new user creates their own profile document: `/users/USER_123`.
-     * @deny (list) Any user, authenticated or not, attempts to list all documents in `/users`.
-     * @deny (update) An authenticated user (`USER_ABC`) tries to modify another user's document (`/users/USER_XYZ`).
-     * @principle Restricts access to a user's own data tree, enforcing strict privacy and ownership.
      */
     match /users/{userId} {
-      // READ Rules: A user can only get their own document. Listing is disabled.
+      // READ Rules: A user can only get their own document. Listing is disabled for non-admins.
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
 
-      // WRITE Rules: A user can create, update, and delete their own document.
+      // WRITE Rules: A user can create, update, and delete their own document. Admins can update any.
       allow create: if isOwner(userId) && hasValidAndConsistentUserDataOnCreate(userId);
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isExistingOwner(userId);
@@ -123,7 +122,10 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
+
+    match /worksheets/{worksheetId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isAdmin();
+    }
   }
 }
-
-    

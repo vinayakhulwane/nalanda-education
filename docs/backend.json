@@ -191,6 +191,25 @@
         "status",
         "authorId"
       ]
+    },
+     "Worksheet": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Worksheet",
+      "type": "object",
+      "description": "Represents a worksheet created by a teacher or admin.",
+      "properties": {
+        "title": { "type": "string" },
+        "classId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "unitId": { "type": "string" },
+        "mode": { "type": "string", "enum": ["practice", "exam"] },
+        "worksheetType": { "type": "string", "enum": ["classroom", "sample"] },
+        "startTime": { "type": "string", "format": "date-time" },
+        "questions": { "type": "array", "items": { "type": "string" } },
+        "authorId": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "published"] }
+      },
+      "required": ["title", "classId", "subjectId", "mode", "worksheetType", "questions", "authorId", "status"]
     }
   },
   "auth": {
@@ -271,9 +290,17 @@
           },
           "description": "Stores all numerical questions created by teachers/admins."
         }
+      },
+      {
+        "path": "/worksheets/{worksheetId}",
+        "definition": {
+          "entityName": "Worksheet",
+          "schema": {
+            "$ref": "#/backend/entities/Worksheet"
+          },
+          "description": "Stores worksheets created by teachers and admins."
+        }
       }
     ]
   }
 }
-
-    
