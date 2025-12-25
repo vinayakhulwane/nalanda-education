@@ -34,13 +34,13 @@ export function WorksheetBuilder({ availableQuestions }: WorksheetBuilderProps) 
           {availableQuestions.map((q) => (
             <Card key={q.id}>
               <CardHeader>
-                <CardTitle className="text-base">{q.title}</CardTitle>
-                <CardDescription>{q.content}</CardDescription>
+                <CardTitle className="text-base">{q.name}</CardTitle>
+                <CardDescription className="line-clamp-2" dangerouslySetInnerHTML={{ __html: q.mainQuestionText}} />
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2">
-                    <Badge variant="secondary">{q.subject}</Badge>
-                    <Badge variant="outline">{q.topic}</Badge>
+                    <Badge variant="secondary">{q.classId}</Badge>
+                    <Badge variant="outline">{q.subjectId}</Badge>
                 </div>
               </CardContent>
               <CardFooter>
@@ -50,6 +50,11 @@ export function WorksheetBuilder({ availableQuestions }: WorksheetBuilderProps) 
               </CardFooter>
             </Card>
           ))}
+            {availableQuestions.length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-10">
+                    No questions available. Create some in the Numerical Management section.
+                </div>
+            )}
         </div>
         </ScrollArea>
       </div>
@@ -71,7 +76,7 @@ export function WorksheetBuilder({ availableQuestions }: WorksheetBuilderProps) 
                         {worksheetQuestions.map((q, index) => (
                             <div key={q.id} className="flex items-center justify-between">
                                 <span className="text-sm flex-grow pr-2">
-                                    {index + 1}. {q.title}
+                                    {index + 1}. {q.name}
                                 </span>
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeQuestion(q.id)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
