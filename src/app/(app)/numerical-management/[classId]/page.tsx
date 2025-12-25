@@ -5,7 +5,7 @@ import { useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase
 import { collection, doc, query, where } from "firebase/firestore";
 import { ArrowLeft, Loader2, BookPlus, Library } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, use } from "react";
 import type { Subject, Class } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -121,6 +121,7 @@ function NumericalManagementSubjectsPageContent({ classId }: { classId: string }
 }
 
 
-export default function NumericalManagementSubjectsPage({ params }: { params: { classId: string } }) {
-    return <NumericalManagementSubjectsPageContent classId={params.classId} />;
+export default function NumericalManagementSubjectsPage({ params }: { params: Promise<{ classId: string }> }) {
+    const { classId } = use(params);
+    return <NumericalManagementSubjectsPageContent classId={classId} />;
 }
