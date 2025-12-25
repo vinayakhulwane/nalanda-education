@@ -2,7 +2,7 @@
 import type { Question, Unit, Category, CurrencyType, Worksheet } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
-import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X, WalletWarning } from 'lucide-react';
+import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X, AlertCircle } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
@@ -461,7 +461,7 @@ export function WorksheetManualBuilder({
                                         <span>{createButton}</span>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p className="flex items-center gap-2"><WalletWarning className="h-4 w-4" /> Not enough balance</p>
+                                        <p className="flex items-center gap-2"><AlertCircle className="h-4 w-4" /> Not enough balance</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>

@@ -4,7 +4,7 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
-import { ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles, WalletWarning } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles, AlertCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -510,7 +510,7 @@ export function WorksheetRandomBuilder({
                                         <span>{createButton}</span>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p className="flex items-center gap-2"><WalletWarning className="h-4 w-4" /> Not enough balance</p>
+                                        <p className="flex items-center gap-2"><AlertCircle className="h-4 w-4" /> Not enough balance</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
