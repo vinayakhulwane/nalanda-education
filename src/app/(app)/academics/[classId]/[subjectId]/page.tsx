@@ -287,6 +287,7 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                                         worksheet={ws} 
                                         isPractice={true}
                                         completedAttempts={userProfile?.completedWorksheets || []}
+                                        view="card"
                                     />
                                 ))
                             )}
@@ -298,7 +299,7 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                         )}
                     </TabsContent>
                     <TabsContent value="history">
-                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+                         <div className="space-y-4 mt-4">
                             {isLoading ? (
                                 <div className="flex justify-center items-center h-48 col-span-full">
                                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -310,6 +311,7 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                                         worksheet={ws} 
                                         isPractice={true}
                                         completedAttempts={userProfile?.completedWorksheets || []}
+                                        view="list"
                                     />
                                 ))
                             )}
