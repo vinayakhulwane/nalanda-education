@@ -110,7 +110,7 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
                     <Search className="absolute left-4 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input placeholder="Search units..." className="pl-9 h-9 bg-muted/50 border-none" value={searchTerms.unit} onChange={e => setSearchTerms({...searchTerms, unit: e.target.value})} />
                   </div>
-                   <ScrollArea className="h-64">
+                   <ScrollArea className="max-h-72">
                     <div className="space-y-1 px-1">
                         {filteredUnits.map(u => (
                              <label
@@ -141,7 +141,7 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
                     <Search className="absolute left-4 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input placeholder="Search categories..." className="pl-9 h-9 bg-muted/50 border-none" value={searchTerms.category} onChange={e => setSearchTerms({...searchTerms, category: e.target.value})} />
                   </div>
-                  <ScrollArea className="h-64">
+                  <ScrollArea className="max-h-72">
                     <div className="space-y-1 px-1">
                         {filteredCategories.map(c => (
                              <label
@@ -169,7 +169,7 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
                 </TabsContent>
                 
                  <TabsContent value="status" className="mt-2 space-y-3 outline-none">
-                    <ScrollArea className="h-64">
+                    <ScrollArea className="max-h-72">
                       <div className="space-y-1 px-1">
                           {(['published', 'draft'] as const).map(status => (
                               <label
@@ -196,7 +196,7 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
                 </TabsContent>
 
                  <TabsContent value="currency" className="mt-2 space-y-3 outline-none">
-                    <ScrollArea className="h-64">
+                    <ScrollArea className="max-h-72">
                       <div className="space-y-1 px-1">
                           {(['spark', 'coin', 'gold', 'diamond'] as const).map(currency => (
                              <label
