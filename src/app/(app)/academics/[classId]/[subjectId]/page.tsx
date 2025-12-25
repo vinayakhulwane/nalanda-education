@@ -9,7 +9,7 @@ import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlo
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch } from "firebase/firestore";
 import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, use } from "react";
 import type { Subject, Unit, Category, CustomTab, Worksheet } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -649,7 +649,12 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     );
 }
 
-export default function SubjectWorkspacePage({ params }: { params: { classId: string, subjectId: string } }) {
-    const { classId, subjectId } = params;
+export default function SubjectWorkspacePage({ 
+  params 
+}: { 
+  params: Promise<{ classId: string; subjectId: string }> 
+}) {
+    const { classId, subjectId } = use(params);
+
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
