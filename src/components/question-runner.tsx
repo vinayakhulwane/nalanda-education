@@ -33,40 +33,49 @@ type SubQuestionWithStep = SubQuestion & {
 
 // --- Unit Conversion Utilities ---
 const unitPrefixes: Record<string, number> = {
-    'G': 1e9, 'M': 1e6, 'k': 1e3,
-    'd': 1e-1, 'c': 1e-2, 'm': 1e-3, 'µ': 1e-6, 'n': 1e-9,
+    'g': 1e9, 'm': 1e6, 'k': 1e3,
+    'd': 1e-1, 'c': 1e-2, 'm': 1e-3, 'µ': 1e-6, 'u': 1e-6, 'n': 1e-9,
 };
 
 function parseUnitAndValue(input: string): { value: number, unit: string } | null {
     if (!input || typeof input !== 'string') return null;
     
-    // Regex to find the first letter, which we assume is the start of the unit.
-    const match = input.trim().match(/^(-?[\d.]+)\s*([a-zA-Zµ]+.*)?$/);
+    // Normalize input: trim whitespace
+    const trimmedInput = input.trim();
+    
+    // Regex to separate the initial number from the rest of the string (the unit)
+    const match = trimmedInput.match(/^(-?[\d.eE+-]+)\s*(.*)$/);
     if (!match) return null;
 
     const value = parseFloat(match[1]);
-    const unit = match[2] || '';
+    const unit = match[2]?.trim() || '';
 
     if(isNaN(value)) return null;
 
     return { value, unit };
 }
 
-function convertTo_Base(value: number, unit: string, baseUnit: string): number {
-    if (unit === baseUnit) return value;
 
-    // Handle prefixed units (e.g., 'kN' to 'N')
-    const unitPrefix = unit.replace(baseUnit, '');
-    if (unitPrefix && unitPrefixes[unitPrefix]) {
-        return value * unitPrefixes[unitPrefix];
-    }
+function convertToBase(value: number, unit: string, baseUnit: string): number {
+    // Normalize units for comparison (lowercase)
+    const normalizedUnit = unit.toLowerCase();
+    const normalizedBaseUnit = baseUnit.toLowerCase();
+
+    if (normalizedUnit === normalizedBaseUnit) return value;
     
-    // Handle base unit with prefix to non-prefixed (e.g. 'N' to 'kN')
-    const basePrefix = baseUnit.replace(unit, '');
-    if (basePrefix && unitPrefixes[basePrefix]) {
-        return value / unitPrefixes[basePrefix];
+    // Handle cases where one unit is a prefixed version of the other (e.g. kN vs N)
+    if (normalizedUnit.endsWith(normalizedBaseUnit)) { // e.g. unit 'kn', base 'n'
+      const prefix = normalizedUnit.replace(normalizedBaseUnit, '');
+      if (prefix && unitPrefixes[prefix]) {
+        return value * unitPrefixes[prefix];
+      }
+    } else if (normalizedBaseUnit.endsWith(normalizedUnit)) { // e.g. unit 'n', base 'kn'
+      const prefix = normalizedBaseUnit.replace(normalizedUnit, '');
+      if (prefix && unitPrefixes[prefix]) {
+        return value / unitPrefixes[prefix];
+      }
     }
-    
+
     // Basic conversion logic for now, can be expanded.
     // For now, if no prefix logic matches, return NaN to indicate failure
     return NaN;
@@ -126,10 +135,16 @@ export function QuestionRunner({ question }: { question: Question }) {
         switch (subQ.answerType) {
             case 'numerical':
                 const parsedAnswer = parseUnitAndValue(studentAnswer);
-                if (parsedAnswer) {
-                    const { baseUnit, correctValue, toleranceValue } = subQ.numericalAnswer || {};
-                    if(baseUnit && correctValue !== undefined) {
-                        const studentValueInBase = convertTo_Base(parsedAnswer.value, parsedAnswer.unit, baseUnit);
+                const { baseUnit, correctValue, toleranceValue } = subQ.numericalAnswer || {};
+
+                if (parsedAnswer && correctValue !== undefined) {
+                    // If baseUnit is not specified, treat as unitless
+                    if (!baseUnit) {
+                        const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
+                         // Correct if student also provides no unit
+                        isCorrect = parsedAnswer.unit === '' && Math.abs(parsedAnswer.value - correctValue) <= tolerance;
+                    } else {
+                        const studentValueInBase = convertToBase(parsedAnswer.value, parsedAnswer.unit, baseUnit);
                         const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
                         if (!isNaN(studentValueInBase)) {
                            isCorrect = Math.abs(studentValueInBase - correctValue) <= tolerance;
