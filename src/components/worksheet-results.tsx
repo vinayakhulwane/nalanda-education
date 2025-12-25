@@ -138,8 +138,10 @@ export function WorksheetResults({
                  {questions.map((question, qIndex) => (
                     <div key={question.id}>
                         <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg">
-                             <h4>Q{qIndex + 1}: {question.name}</h4>
-                            <div dangerouslySetInnerHTML={{ __html: question.mainQuestionText }} />
+                           <div className="flex gap-2">
+                             <span className="font-bold">Q{qIndex + 1}.</span>
+                             <div dangerouslySetInnerHTML={{ __html: question.mainQuestionText }} />
+                           </div>
                         </div>
                         <div className="border border-t-0 rounded-b-lg p-4 space-y-3">
                         {question.solutionSteps.flatMap(step => step.subQuestions).map(subQ => {
