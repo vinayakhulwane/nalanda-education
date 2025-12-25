@@ -420,7 +420,7 @@ export function WorksheetRandomBuilder({
                                         <Card key={q.id} className="p-3">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-grow">
-                                                    <p className="text-sm font-semibold">{q.name}</p>
+                                                    
                                                     <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
                                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                                         {q.gradingMode === 'ai' && (
