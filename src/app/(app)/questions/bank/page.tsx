@@ -18,11 +18,11 @@ function QuestionBankPageContent() {
   const classId = searchParams.get('classId');
   const subjectId = searchParams.get('subjectId');
 
-  // Filter States
-  const [unitFilter, setUnitFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [currencyFilter, setCurrencyFilter] = useState<string>('all');
+  // Filter States - now arrays for multi-select
+  const [unitFilter, setUnitFilter] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [currencyFilter, setCurrencyFilter] = useState<string[]>([]);
   const [searchFilter, setSearchFilter] = useState<string>('');
 
   // Data Fetching
@@ -37,15 +37,11 @@ function QuestionBankPageContent() {
 
   const categoriesQuery = useMemoFirebase(() => {
       if (!firestore || !units || units.length === 0) return null;
-      // If a specific unit is selected, only fetch its categories
-      if(unitFilter !== 'all') {
-        if (!units.map(u=>u.id).includes(unitFilter)) return null; // A single unit is selected that has no categories.
-        return query(collection(firestore, 'categories'), where('unitId', '==', unitFilter));
-      }
-      // Otherwise, fetch categories for all units of the subject
-      const unitIds = units.map(u => u.id);
-      if (unitIds.length === 0) return null;
-      return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
+      // Fetch categories for all selected units, or all units if none are selected.
+      const relevantUnitIds = unitFilter.length > 0 ? unitFilter : units.map(u => u.id);
+      if (relevantUnitIds.length === 0) return null;
+      // Firestore 'in' query is limited to 30 items. Slice to prevent errors.
+      return query(collection(firestore, 'categories'), where('unitId', 'in', relevantUnitIds.slice(0, 30)));
   }, [firestore, units, unitFilter]);
   const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);
 
@@ -54,32 +50,32 @@ function QuestionBankPageContent() {
     if (!questions) return [];
     return questions.filter(q => {
       const searchMatch = searchFilter === '' || q.name.toLowerCase().includes(searchFilter.toLowerCase());
-      const unitMatch = unitFilter === 'all' || q.unitId === unitFilter;
-      const categoryMatch = categoryFilter === 'all' || q.categoryId === categoryFilter;
-      const statusMatch = statusFilter === 'all' || q.status === statusFilter;
-      const currencyMatch = currencyFilter === 'all' || q.currencyType === currencyFilter;
+      const unitMatch = unitFilter.length === 0 || unitFilter.includes(q.unitId);
+      const categoryMatch = categoryFilter.length === 0 || categoryFilter.includes(q.categoryId);
+      const statusMatch = statusFilter.length === 0 || statusFilter.includes(q.status);
+      const currencyMatch = currencyFilter.length === 0 || currencyFilter.includes(q.currencyType);
       return searchMatch && unitMatch && categoryMatch && statusMatch && currencyMatch;
     });
   }, [questions, searchFilter, unitFilter, categoryFilter, statusFilter, currencyFilter]);
   
   // When unit filter changes, reset category filter
   useEffect(() => {
-    setCategoryFilter('all');
+    setCategoryFilter([]);
   }, [unitFilter]);
 
 
-  const resetFilters = (filterToReset: string) => {
+  const resetFilters = (filterToReset?: string) => {
     switch (filterToReset) {
-      case 'unit': setUnitFilter('all'); setCategoryFilter('all'); break;
-      case 'category': setCategoryFilter('all'); break;
-      case 'status': setStatusFilter('all'); break;
-      case 'currency': setCurrencyFilter('all'); break;
+      case 'unit': setUnitFilter([]); setCategoryFilter([]); break;
+      case 'category': setCategoryFilter([]); break;
+      case 'status': setStatusFilter([]); break;
+      case 'currency': setCurrencyFilter([]); break;
       case 'search': setSearchFilter(''); break;
       default:
-        setUnitFilter('all');
-        setCategoryFilter('all');
-        setStatusFilter('all');
-        setCurrencyFilter('all');
+        setUnitFilter([]);
+        setCategoryFilter([]);
+        setStatusFilter([]);
+        setCurrencyFilter([]);
         setSearchFilter('');
     }
   }
@@ -120,6 +116,7 @@ function QuestionBankPageContent() {
       <QuestionBankFilters
         units={units || []}
         categories={categories || []}
+        questions={questions || []}
         filters={{ unit: unitFilter, category: categoryFilter, status: statusFilter, currency: currencyFilter, search: searchFilter }}
         setFilters={{ setUnit: setUnitFilter, setCategory: setCategoryFilter, setStatus: setStatusFilter, setCurrency: setCurrencyFilter, setSearch: setSearchFilter }}
         resetFilters={resetFilters}
