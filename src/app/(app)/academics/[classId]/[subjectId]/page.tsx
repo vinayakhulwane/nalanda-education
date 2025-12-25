@@ -230,18 +230,15 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     const firestore = useFirestore();
     const { user, userProfile } = useUser();
 
-    // Query for practice worksheets created by the user or sample worksheets
+    // Query for practice worksheets created by the user
     const worksheetsQuery = useMemoFirebase(() => {
-        if (!firestore || !user || !subjectId) return null;
+        if (!firestore || !user?.uid || !subjectId) return null;
         
-        // This is a placeholder. For a real app, you would have a more robust way
-        // to distinguish student-created practice worksheets.
-        // For now, we'll show 'sample' worksheets as a stand-in for user-created ones.
         return query(
             collection(firestore, 'worksheets'),
             where('subjectId', '==', subjectId),
-            where('worksheetType', '==', 'sample') // Example: Student-created worksheets are of type 'sample'
-            // In a real scenario, you might query where authorId === user.uid and worksheetType === 'practice'
+            where('worksheetType', '==', 'practice'),
+            where('authorId', '==', user.uid)
         );
     }, [firestore, user, subjectId]);
     
@@ -290,7 +287,6 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
             </CardContent>
         </Card>
     )
-
 }
 
 export default function SubjectWorkspacePage() {
@@ -655,3 +651,5 @@ export default function SubjectWorkspacePage() {
         </div>
     );
 }
+
+    
