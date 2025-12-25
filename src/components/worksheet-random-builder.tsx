@@ -106,12 +106,16 @@ export function WorksheetRandomBuilder({
     const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
     const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
     
-    const costMap: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
+    const marksByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
+    const countByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
 
     selectedQuestions.forEach(q => {
         const marks = q.solutionSteps?.reduce((stepSum, step) => 
             stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
         totalMarks += marks;
+        
+        marksByCurrency[q.currencyType] += marks;
+        countByCurrency[q.currencyType]++;
 
         const unitName = unitMap.get(q.unitId) || 'Uncategorized';
         if (!breakdownByUnit[unitName]) breakdownByUnit[unitName] = { count: 0, marks: 0 };
@@ -122,16 +126,21 @@ export function WorksheetRandomBuilder({
         if (!breakdownByCategory[categoryName]) breakdownByCategory[categoryName] = { count: 0, marks: 0 };
         breakdownByCategory[categoryName].count++;
         breakdownByCategory[categoryName].marks += marks;
-
-        costMap[q.currencyType]++;
     });
+    
+    const calculatedCost: Record<CurrencyType, number> = {
+        spark: countByCurrency.spark,
+        coin: Math.ceil(marksByCurrency.coin * 0.5),
+        gold: Math.ceil(marksByCurrency.gold * 0.5),
+        diamond: Math.ceil(marksByCurrency.diamond * 0.5),
+    };
 
     return { 
         totalMarks, 
         estimatedTime: Math.ceil((totalMarks * 20) / 60),
         breakdownByUnit,
         breakdownByCategory,
-        totalCost: costMap,
+        totalCost: calculatedCost,
     };
 }, [selectedQuestions, unitMap, categoryMap]);
 
