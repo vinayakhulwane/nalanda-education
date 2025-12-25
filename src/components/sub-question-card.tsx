@@ -27,7 +27,7 @@ interface SubQuestionCardProps {
 
 export function SubQuestionCard({ subQuestion, updateSubQuestion, deleteSubQuestion, duplicateSubQuestion }: SubQuestionCardProps) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: subQuestion.id });
-    const [isOpen, setIsOpen] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
 
     const style = {
         transform: CSS.Transform.toString(transform),
