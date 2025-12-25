@@ -115,7 +115,7 @@ function AddQuestionsPageContent() {
         }
     };
     
-    const addQuestion = (question: Question, source: 'manual' | 'random' = 'manual') => {
+    const addQuestion = (question: Question, source: 'manual' | 'random') => {
         if (!selectedQuestions.find(q => q.id === question.id)) {
             setSelectedQuestions([...selectedQuestions, { ...question, source }]);
         }
