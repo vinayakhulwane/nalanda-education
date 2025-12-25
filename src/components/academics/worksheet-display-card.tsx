@@ -50,7 +50,7 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
                     <span className="truncate">{worksheet.title}</span>
                 </CardTitle>
                 <CardDescription>
-                    <Badge variant={worksheet.worksheetType === 'sample' ? 'secondary' : 'default'} className="capitalize">
+                    <Badge variant={worksheet.worksheetType === 'sample' ? 'secondary' : worksheet.worksheetType === 'practice' ? 'outline' : 'default'} className="capitalize">
                         {worksheet.worksheetType}
                     </Badge>
                 </CardDescription>
@@ -69,7 +69,7 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
             <CardFooter>
                 <Button 
                     className="w-full" 
-                    onClick={() => router.push(`/worksheets/preview/${worksheet.id}`)}
+                    onClick={() => router.push(`/solve/${worksheet.id}`)}
                     disabled={isCompleted}
                 >
                     {isCompleted ? 'Completed' : 'Start'}
