@@ -28,6 +28,7 @@ function SavedWorksheetsPageContent() {
 
   const worksheetsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid || !subjectId) return null;
+    // This query now matches the security rule by filtering on authorId and subjectId.
     return query(
       collection(firestore, 'worksheets'),
       where('authorId', '==', user.uid),
@@ -132,7 +133,7 @@ function SavedWorksheetsPageContent() {
 
 export default function SavedWorksheetsPage() {
     return (
-        <Suspense fallback={<div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+        <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
             <SavedWorksheetsPageContent />
         </Suspense>
     )

@@ -124,8 +124,7 @@ service cloud.firestore {
     }
 
     match /worksheets/{worksheetId} {
-      // A user can read a specific worksheet if they are its author.
-      // Admins can read any worksheet.
+      // A user can read a specific worksheet if they are its author. Admins can read any worksheet.
       allow get: if isOwner(resource.data.authorId) || isAdmin();
       
       // A user can list worksheets if their query is filtering by their own authorId.
