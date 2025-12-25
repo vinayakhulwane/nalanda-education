@@ -258,12 +258,17 @@ export function WorksheetRandomBuilder({
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
                 </SheetHeader>
-                <Tabs defaultValue="review" className="flex-grow flex flex-col mt-4 overflow-hidden">
+                <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
                     <TabsList className="mx-6">
-                        <TabsTrigger value="review">Review</TabsTrigger>
                         <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
+                        <TabsTrigger value="review">Review</TabsTrigger>
                     </TabsList>
                     <div className="flex-grow overflow-y-auto px-6">
+                         <TabsContent value="blueprint" className="mt-4">
+                            <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg min-h-[200px]">
+                                Blueprint features coming soon.
+                            </div>
+                        </TabsContent>
                         <TabsContent value="review" className="mt-4">
                             <div className="space-y-6">
                                 <Card>
@@ -316,11 +321,6 @@ export function WorksheetRandomBuilder({
                                         </div>
                                     </CardContent>
                                 </Card>
-                            </div>
-                        </TabsContent>
-                        <TabsContent value="blueprint" className="mt-4">
-                            <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg min-h-[200px]">
-                                Blueprint features coming soon.
                             </div>
                         </TabsContent>
                     </div>
