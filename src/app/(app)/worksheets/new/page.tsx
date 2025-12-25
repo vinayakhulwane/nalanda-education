@@ -53,6 +53,15 @@ function NewWorksheetPageContent() {
     
     const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
+    const backUrl = useMemo(() => {
+        if (!classId || !subjectId) return '/worksheets'; // Fallback
+        if (userIsEditor) {
+            return `/worksheets/${classId}/${subjectId}`;
+        }
+        // For students, go back to the academics page
+        return `/academics/${classId}/${subjectId}`;
+    }, [classId, subjectId, userIsEditor]);
+
     const isFormValid = useMemo(() => {
         if (!title) return false;
         if (mode === 'exam') {
@@ -78,7 +87,6 @@ function NewWorksheetPageContent() {
         router.push(`/worksheets/add-questions?${queryParams.toString()}`);
     }
 
-    const backUrl = subjectId && classId ? `/worksheets/${classId}/${subjectId}` : '/worksheets';
     const isLoading = areUnitsLoading || isSubjectLoading;
 
     // Date logic
