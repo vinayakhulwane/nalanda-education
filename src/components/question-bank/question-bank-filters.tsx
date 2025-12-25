@@ -85,6 +85,37 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
         return categories.filter(c => c.name.toLowerCase().includes(searchTerms.category.toLowerCase()));
     }, [categories, searchTerms.category]);
 
+  const removeFilter = (type: 'unit' | 'category' | 'status' | 'currency' | 'search', value: string) => {
+    switch (type) {
+      case 'unit':
+        setFilters.setUnit(filters.unit.filter(v => v !== value));
+        break;
+      case 'category':
+        setFilters.setCategory(filters.category.filter(v => v !== value));
+        break;
+      case 'status':
+        setFilters.setStatus(filters.status.filter(v => v !== value));
+        break;
+      case 'currency':
+        setFilters.setCurrency(filters.currency.filter(v => v !== value));
+        break;
+      case 'search':
+        setFilters.setSearch('');
+        break;
+    }
+  };
+
+  const getFilterTagLabel = (type: 'unit' | 'category', id: string): string => {
+    if (type === 'unit') {
+      return units.find(u => u.id === id)?.name || id;
+    }
+    if (type === 'category') {
+      return categories.find(c => c.id === id)?.name || id;
+    }
+    return id;
+  };
+
+
   return (
     <div className="mb-6 space-y-4">
       <div className="flex items-center gap-4">
@@ -93,7 +124,7 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
             <Button variant="outline" className="h-10">
                 <Filter className="mr-2 h-4 w-4" />
                 Filter
-                {isFilterActive && <span className="ml-2 h-2 w-2 rounded-full bg-primary" />}
+                {isFilterActive && <Badge variant="secondary" className="ml-2 rounded-full h-5 w-5 p-0 justify-center">{activeFilterCount}</Badge>}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[450px] p-2" align="start">
@@ -238,6 +269,41 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
             <span>Showing {resultCount} results</span>
         </div>
       </div>
+       {isFilterActive && (
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+            <span className="text-sm font-semibold">Active:</span>
+            {filters.unit.map(id => (
+              <Badge key={id} variant="outline" className="pl-2">
+                {getFilterTagLabel('unit', id)}
+                <button onClick={() => removeFilter('unit', id)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
+            ))}
+            {filters.category.map(id => (
+              <Badge key={id} variant="outline" className="pl-2">
+                {getFilterTagLabel('category', id)}
+                <button onClick={() => removeFilter('category', id)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
+            ))}
+            {filters.status.map(id => (
+              <Badge key={id} variant="outline" className="pl-2 capitalize">
+                {id}
+                <button onClick={() => removeFilter('status', id)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
+            ))}
+            {filters.currency.map(id => (
+              <Badge key={id} variant="outline" className="pl-2 capitalize">
+                {id}
+                <button onClick={() => removeFilter('currency', id)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
+            ))}
+             {filters.search && (
+              <Badge variant="outline" className="pl-2">
+                Search: "{filters.search}"
+                <button onClick={() => removeFilter('search', '')} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
+            )}
+        </div>
+      )}
     </div>
   );
 }
