@@ -282,19 +282,14 @@ export function WorksheetRandomBuilder({
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
                 </SheetHeader>
-                <Tabs defaultValue="review" className="flex-grow flex flex-col mt-4 overflow-hidden">
+                <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
                     <TabsList className="mx-6">
                         <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
                         <TabsTrigger value="review">Review</TabsTrigger>
                     </TabsList>
                     <div className="flex-grow overflow-y-auto">
-                        <TabsContent value="blueprint" className="mt-4 px-6">
-                            <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg min-h-[200px]">
-                                Blueprint features coming soon.
-                            </div>
-                        </TabsContent>
-                        <TabsContent value="review" className="mt-4 px-6">
-                           <div className="space-y-6">
+                        <TabsContent value="blueprint" className="mt-4 px-6 pb-6">
+                             <div className="space-y-6">
                                 <Card>
                                     <CardHeader className="pb-2">
                                         <CardTitle className="text-base">Core Summary</CardTitle>
@@ -310,30 +305,6 @@ export function WorksheetRandomBuilder({
                                         </div>
                                     </CardContent>
                                 </Card>
-
-                                <div className="space-y-3">
-                                    {selectedQuestions.map(q => {
-                                        const CurrencyIcon = currencyIcons[q.currencyType] || Star;
-                                        return (
-                                        <Card key={q.id} className="p-3">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="flex-grow">
-                                                    <p className="text-sm font-semibold">{q.name}</p>
-                                                    <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
-                                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
-                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
-                                                        <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
-                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>
-                                                    </div>
-                                                </div>
-                                                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeQuestion(q.id)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive"/>
-                                                </Button>
-                                            </div>
-                                        </Card>
-                                    )})}
-                                </div>
                                 
                                 <Card>
                                     <CardHeader>
@@ -370,6 +341,36 @@ export function WorksheetRandomBuilder({
                                         </div>
                                     </CardContent>
                                 </Card>
+                            </div>
+                        </TabsContent>
+                        <TabsContent value="review" className="mt-4 px-6 pb-6">
+                           <div className="space-y-3">
+                                {selectedQuestions.map(q => {
+                                    const CurrencyIcon = currencyIcons[q.currencyType] || Star;
+                                    return (
+                                    <Card key={q.id} className="p-3">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-grow">
+                                                <p className="text-sm font-semibold">{q.name}</p>
+                                                <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
+                                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                    <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
+                                                    <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
+                                                    <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
+                                                    <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>
+                                                </div>
+                                            </div>
+                                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeQuestion(q.id)}>
+                                                <Trash2 className="h-4 w-4 text-destructive"/>
+                                            </Button>
+                                        </div>
+                                    </Card>
+                                )})}
+                                {selectedQuestions.length === 0 && (
+                                    <div className="text-center py-10 text-sm text-muted-foreground">
+                                        No questions selected.
+                                    </div>
+                                )}
                             </div>
                         </TabsContent>
                     </div>
