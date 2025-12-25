@@ -1,151 +1,13 @@
-
-
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FilePlus2, Save, ArrowLeft } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
-import { useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, query, where } from "firebase/firestore";
-import type { Subject, Unit } from "@/types";
+import { useDoc, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
+import type { Subject } from "@/types";
 import { Loader2 } from "lucide-react";
-import { useState, useMemo } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
-
-function CreateWorksheetModal({ subject, units, children }: { subject: Subject; units: Unit[]; children: React.ReactNode }) {
-    const router = useRouter();
-    const [isOpen, setIsOpen] = useState(false);
-    const [title, setTitle] = useState('');
-    const [unitId, setUnitId] = useState('');
-    const [mode, setMode] = useState<'practice' | 'exam'>('practice');
-    
-    // Date state
-    const [day, setDay] = useState<string>('');
-    const [month, setMonth] = useState<string>('');
-    const [year, setYear] = useState<string>(new Date().getFullYear().toString());
-    const [startTime, setStartTime] = useState('09:00');
-
-    const years = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() + i).toString());
-    const months = Array.from({ length: 12 }, (_, i) => ({ value: (i + 1).toString(), label: format(new Date(0, i), 'MMMM') }));
-    
-    const daysInMonth = useMemo(() => {
-        if (!month || !year) return 0;
-        return new Date(parseInt(year), parseInt(month), 0).getDate();
-    }, [month, year]);
-
-    const days = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
-
-    const isFormValid = useMemo(() => {
-        if (!title) return false;
-        if (mode === 'exam') {
-            return !!day && !!month && !!year;
-        }
-        return true;
-    }, [title, mode, day, month, year]);
-
-
-    const handleProceed = () => {
-        const params = new URLSearchParams();
-        params.set('classId', subject.classId);
-        params.set('subjectId', subject.id);
-        params.set('title', title);
-        params.set('unitId', unitId);
-        params.set('mode', mode);
-        if (mode === 'exam' && year && month && day) {
-            const [hours, minutes] = startTime.split(':').map(Number);
-            // Month is 0-indexed in JS Date, so subtract 1
-            const combinedDateTime = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
-            params.set('startTime', combinedDateTime.toISOString());
-        }
-        router.push(`/worksheets/new?${params.toString()}`);
-    }
-
-    return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>{children}</DialogTrigger>
-            <DialogContent className="sm:max-w-[525px]">
-                <DialogHeader>
-                    <DialogTitle>New Worksheet for {subject.name}</DialogTitle>
-                    <DialogDescription>Define the identity and rules for your new worksheet before adding questions.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="title">Title</Label>
-                        <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Chapter 5 Review" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="unit">Unit</Label>
-                        <Select onValueChange={setUnitId} value={unitId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a unit (optional)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Worksheet Mode</Label>
-                        <RadioGroup defaultValue="practice" onValueChange={(v) => setMode(v as 'practice' | 'exam')} className="flex gap-4">
-                            <Label htmlFor="practice" className="flex items-center space-x-2 border rounded-md p-3 flex-1 cursor-pointer hover:bg-muted/50">
-                                <RadioGroupItem value="practice" id="practice" />
-                                <span>Practice Mode</span>
-                            </Label>
-                            <Label htmlFor="exam" className="flex items-center space-x-2 border rounded-md p-3 flex-1 cursor-pointer hover:bg-muted/50">
-                                <RadioGroupItem value="exam" id="exam" />
-                                <span>Exam Mode</span>
-                            </Label>
-                        </RadioGroup>
-                    </div>
-                    {mode === 'exam' && (
-                        <div className="pt-2 animate-in fade-in space-y-4">
-                            <Label>Start Date & Time</Label>
-                             <div className="grid grid-cols-3 gap-2">
-                                <Select value={day} onValueChange={setDay}>
-                                    <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
-                                    <SelectContent>
-                                        {days.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                 <Select value={month} onValueChange={setMonth}>
-                                    <SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger>
-                                    <SelectContent>
-                                        {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                 <Select value={year} onValueChange={setYear}>
-                                    <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
-                                    <SelectContent>
-                                        {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="start-time">Start Time</Label>
-                                <Input
-                                    id="start-time"
-                                    type="time"
-                                    value={startTime}
-                                    onChange={(e) => setStartTime(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-                    <Button onClick={handleProceed} disabled={!isFormValid}>Add Questions</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 export default function SubjectWorksheetPage() {
   const router = useRouter();
@@ -156,17 +18,15 @@ export default function SubjectWorksheetPage() {
 
   const subjectDocRef = useMemoFirebase(() => (firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null), [firestore, subjectId]);
   const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
-  
-  const unitsQueryRef = useMemoFirebase(() => firestore && subjectId ? query(collection(firestore, 'units'), where('subjectId', '==', subjectId)) : null, [firestore, subjectId]);
-  const { data: units, isLoading: areUnitsLoading } = useCollection<Unit>(unitsQueryRef);
 
-  if (isSubjectLoading || areUnitsLoading) {
+  if (isSubjectLoading) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
   
   const savedWorksheetsUrl = `/worksheets/saved?classId=${classId}&subjectId=${subjectId}`;
+  const createWorksheetUrl = `/worksheets/new?classId=${classId}&subjectId=${subjectId}`;
 
-  if (!subject || !units) {
+  if (!subject) {
       return (
         <div>
             <Button variant="ghost" onClick={() => router.push(`/worksheets/${classId}`)} className="mb-4">
@@ -200,11 +60,9 @@ export default function SubjectWorksheetPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <CreateWorksheetModal subject={subject} units={units}>
-                        <Button className="w-full">
-                            Start Building
-                        </Button>
-                    </CreateWorksheetModal>
+                    <Button className="w-full" onClick={() => router.push(createWorksheetUrl)}>
+                        Start Building
+                    </Button>
                 </CardContent>
             </Card>
             <Card className="hover:shadow-lg transition-shadow">
