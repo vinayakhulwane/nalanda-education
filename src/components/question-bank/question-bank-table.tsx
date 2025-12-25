@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Edit, Trash, Sparkles, Coins, Gem, Eye, Crown } from "lucide-react";
+import { Edit, Trash, Sparkles, Coins, Gem, Eye, Crown, Bot } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useFirestore } from '@/firebase';
@@ -86,13 +86,18 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
                         <Badge variant={q.status === 'published' ? 'default' : 'secondary'} className={q.status === 'published' ? 'bg-green-600' : 'bg-gray-500'}>
                           {q.status}
                         </Badge>
+                        {q.gradingMode === 'ai' && (
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            <Bot className="h-3 w-3"/> AI Graded
+                          </Badge>
+                        )}
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger>
                               {CurrencyIcon && <CurrencyIcon className="h-4 w-4 text-muted-foreground" />}
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>{q.currencyType.charAt(0).toUpperCase() + q.currencyType.slice(1)}</p>
+                              <p className="capitalize">{q.currencyType}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
