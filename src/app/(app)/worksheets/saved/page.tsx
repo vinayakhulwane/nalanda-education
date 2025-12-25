@@ -114,9 +114,6 @@ function SavedWorksheetsPageContent() {
                           <DropdownMenuItem onClick={() => router.push(`/worksheets/preview/${ws.id}`)}>
                             <Eye className="mr-2 h-4 w-4" /> Preview & Print
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled>
-                            <Paperclip className="mr-2 h-4 w-4" /> Assign
-                          </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDeleteWorksheet(ws.id)} 
                             className="text-destructive focus:text-destructive"

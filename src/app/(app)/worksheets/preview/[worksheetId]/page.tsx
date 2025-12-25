@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, documentId } from 'firebase/firestore';
-import type { Worksheet, Question, Subject, Class, Unit, Category } from '@/types';
+import type { Worksheet, Question, Subject, Class } from '@/types';
 import { Loader2, ArrowLeft, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ function WorksheetPreviewContent() {
   // Fetch questions for the worksheet
   const questionsQuery = useMemoFirebase(() => {
     if (!firestore || !worksheet?.questions || worksheet.questions.length === 0) return null;
+    // Firestore 'in' queries are limited to 30 items. For worksheets with more questions, pagination would be needed.
     return query(collection(firestore, 'questions'), where(documentId(), 'in', worksheet.questions.slice(0,30)));
   }, [firestore, worksheet?.questions]);
   const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
@@ -32,13 +33,15 @@ function WorksheetPreviewContent() {
   const subjectRef = useMemoFirebase(() => (firestore && worksheet ? doc(firestore, 'subjects', worksheet.subjectId) : null), [firestore, worksheet]);
   const { data: subjectData, isLoading: isSubjectLoading } = useDoc<Subject>(subjectRef);
   
+  // Create a map for quick question lookup
   const questionsMap = useMemo(() => {
     if (!questions) return new Map();
     return new Map(questions.map(q => [q.id, q]));
   }, [questions]);
 
+  // Order the fetched questions according to the worksheet's question array
   const orderedQuestions = useMemo(() => {
-    if (!worksheet?.questions || !questions) return [];
+    if (!worksheet?.questions || !questionsMap.size) return [];
     return worksheet.questions.map(id => questionsMap.get(id)).filter(Boolean) as Question[];
   }, [worksheet?.questions, questionsMap]);
 
@@ -60,6 +63,14 @@ function WorksheetPreviewContent() {
         <Button variant="link" onClick={() => router.back()}>Go Back</Button>
       </div>
     );
+  }
+
+  const getTotalMarks = () => {
+    return orderedQuestions.reduce((total, q) => {
+        const questionMarks = q.solutionSteps?.reduce((stepSum, step) => 
+            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
+        return total + questionMarks;
+    }, 0);
   }
 
   return (
@@ -96,11 +107,11 @@ function WorksheetPreviewContent() {
             <div className="flex justify-between text-sm mt-4 text-gray-700">
                 <span><strong>Class:</strong> {classData?.name || '...'}</span>
                 <span><strong>Subject:</strong> {subjectData?.name || '...'}</span>
-                <span><strong>Date:</strong> {format(new Date(), 'PP')}</span>
+                <span><strong>Date:</strong> {worksheet.startTime ? format(worksheet.startTime.toDate(), 'PP') : format(new Date(), 'PP')}</span>
             </div>
              <div className="flex justify-between text-sm mt-2 text-gray-700">
                 <span><strong>Name:</strong> _________________________</span>
-                <span><strong>Score:</strong> __________ / {orderedQuestions.reduce((acc, q) => acc + (q.solutionSteps?.reduce((stepSum, step) => stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0), 0)}</span>
+                <span><strong>Score:</strong> __________ / {getTotalMarks()}</span>
             </div>
         </header>
         
