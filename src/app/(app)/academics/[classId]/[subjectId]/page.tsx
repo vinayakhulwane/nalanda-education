@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch, documentId } from "firebase/firestore";
 import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, use } from "react";
@@ -231,9 +231,8 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     const { user, userProfile } = useUser();
 
     // Query for practice worksheets created by the user
-    const worksheetsQuery = useMemoFirebase(() => {
+    const practiceWorksheetsQuery = useMemoFirebase(() => {
         if (!firestore || !user?.uid || !subjectId) return null;
-        
         return query(
             collection(firestore, 'worksheets'),
             where('subjectId', '==', subjectId),
@@ -242,7 +241,14 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
         );
     }, [firestore, user, subjectId]);
     
-    const { data: practiceWorksheets, isLoading } = useCollection<Worksheet>(worksheetsQuery);
+    const { data: practiceWorksheets, isLoading } = useCollection<Worksheet>(practiceWorksheetsQuery);
+
+    const { completed, notCompleted } = useMemo(() => {
+        const completedIds = userProfile?.completedWorksheets || [];
+        const completed = practiceWorksheets?.filter(ws => completedIds.includes(ws.id)) || [];
+        const notCompleted = practiceWorksheets?.filter(ws => !completedIds.includes(ws.id)) || [];
+        return { completed, notCompleted };
+    }, [practiceWorksheets, userProfile?.completedWorksheets]);
 
     const createWorksheetUrl = `/worksheets/new?classId=${classId}&subjectId=${subjectId}&source=practice`;
     
@@ -253,37 +259,68 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                 <CardDescription>Create your own worksheets, view saved ones, and check your attempt history.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <Card 
-                        className="flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => router.push(createWorksheetUrl)}
-                    >
-                        <div className="flex flex-col items-center text-center">
-                            <Plus className="h-10 w-10 text-muted-foreground mb-4"/>
-                            <h3 className="font-semibold">Create New Worksheet</h3>
-                            <p className="text-sm text-muted-foreground">Build a worksheet tailored to your needs.</p>
+                <Tabs defaultValue="saved">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="saved">Saved & To-Do</TabsTrigger>
+                        <TabsTrigger value="history">Attempt History</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="saved">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+                            <Card 
+                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-colors cursor-pointer"
+                                onClick={() => router.push(createWorksheetUrl)}
+                            >
+                                <div className="flex flex-col items-center text-center">
+                                    <Plus className="h-10 w-10 text-muted-foreground mb-4"/>
+                                    <h3 className="font-semibold">Create New Worksheet</h3>
+                                    <p className="text-sm text-muted-foreground">Build a worksheet tailored to your needs.</p>
+                                </div>
+                            </Card>
+                            {isLoading ? (
+                                <div className="flex justify-center items-center h-48 col-span-full">
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                notCompleted.map(ws => (
+                                    <WorksheetDisplayCard 
+                                        key={ws.id} 
+                                        worksheet={ws} 
+                                        isPractice={true}
+                                        completedAttempts={userProfile?.completedWorksheets || []}
+                                    />
+                                ))
+                            )}
                         </div>
-                    </Card>
-                    {isLoading ? (
-                        <div className="flex justify-center items-center h-48 col-span-full">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        {notCompleted.length === 0 && !isLoading && (
+                            <div className="text-center text-muted-foreground py-10 mt-4">
+                                <p>Your saved practice worksheets will appear here.</p>
+                            </div>
+                        )}
+                    </TabsContent>
+                    <TabsContent value="history">
+                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+                            {isLoading ? (
+                                <div className="flex justify-center items-center h-48 col-span-full">
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                completed.map(ws => (
+                                    <WorksheetDisplayCard 
+                                        key={ws.id} 
+                                        worksheet={ws} 
+                                        isPractice={true}
+                                        completedAttempts={userProfile?.completedWorksheets || []}
+                                    />
+                                ))
+                            )}
                         </div>
-                    ) : (
-                        practiceWorksheets?.map(ws => (
-                            <WorksheetDisplayCard 
-                                key={ws.id} 
-                                worksheet={ws} 
-                                isPractice={true}
-                                completedAttempts={userProfile?.completedWorksheets || []}
-                            />
-                        ))
-                    )}
-                </div>
-                {practiceWorksheets?.length === 0 && !isLoading && (
-                    <div className="text-center text-muted-foreground py-10 mt-4">
-                        <p>Your saved practice worksheets will appear here.</p>
-                    </div>
-                )}
+                         {completed.length === 0 && !isLoading && (
+                            <div className="text-center text-muted-foreground py-10 mt-4">
+                                <p>Your completed practice worksheets will appear here.</p>
+                            </div>
+                        )}
+                    </TabsContent>
+                </Tabs>
             </CardContent>
         </Card>
     )
