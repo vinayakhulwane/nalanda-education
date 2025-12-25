@@ -2,7 +2,7 @@
 import { PageHeader } from "@/components/page-header";
 import { WorksheetBuilder } from "@/components/worksheet-builder";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
-import type { Question, Subject, Worksheet } from "@/types";
+import type { Question, Subject, Worksheet, Unit, Category } from "@/types";
 import { collection, query, where, doc, addDoc, serverTimestamp } from "firebase/firestore";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -49,8 +49,19 @@ function AddQuestionsPageContent() {
     
     const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
     
+    const allUnitsQuery = useMemoFirebase(() => (firestore && subjectId ? query(collection(firestore, 'units'), where('subjectId', '==', subjectId)) : null), [firestore, subjectId]);
+    const { data: allUnits, isLoading: areUnitsLoading } = useCollection<Unit>(allUnitsQuery);
+
+    const allCategoriesQuery = useMemoFirebase(() => {
+        if (!firestore || !allUnits || allUnits.length === 0) return null;
+        const unitIds = allUnits.map(u => u.id);
+        // Firestore 'in' query limited to 30 items. This might need pagination for subjects with many units.
+        return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
+    }, [firestore, allUnits]);
+    const { data: allCategories, isLoading: areCategoriesLoading } = useCollection<Category>(allCategoriesQuery);
+    
     const backUrl = subjectId && classId ? `/worksheets/new?classId=${classId}&subjectId=${subjectId}` : '/worksheets';
-    const isLoading = isSubjectLoading || areQuestionsLoading;
+    const isLoading = isSubjectLoading || areQuestionsLoading || areUnitsLoading || areCategoriesLoading;
 
     const handleCreateWorksheet = async () => {
         if (!user || !firestore || !classId || !subjectId || !title) {
@@ -128,6 +139,8 @@ function AddQuestionsPageContent() {
                 <TabsContent value="random">
                      <WorksheetRandomBuilder 
                         availableQuestions={questions || []}
+                        units={allUnits || []}
+                        categories={allCategories || []}
                         selectedQuestions={selectedQuestions}
                         setSelectedQuestions={setSelectedQuestions}
                         onCreateWorksheet={handleCreateWorksheet}

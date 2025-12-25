@@ -1,6 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
-import type { Question, CurrencyType } from '@/types';
+import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -12,6 +12,8 @@ import { Checkbox } from './ui/checkbox';
 
 type WorksheetRandomBuilderProps = {
   availableQuestions: Question[];
+  units: Unit[];
+  categories: Category[];
   selectedQuestions: Question[];
   setSelectedQuestions: (questions: Question[]) => void;
   onCreateWorksheet: () => void;
@@ -19,11 +21,16 @@ type WorksheetRandomBuilderProps = {
 
 export function WorksheetRandomBuilder({
   availableQuestions,
+  units,
+  categories,
   selectedQuestions,
   setSelectedQuestions,
   onCreateWorksheet,
 }: WorksheetRandomBuilderProps) {
   const [filters, setFilters] = useState<CurrencyType[]>([]);
+
+  const unitMap = useMemo(() => new Map(units.map(u => [u.id, u.name])), [units]);
+  const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
 
   const filteredQuestions = useMemo(() => {
     if (filters.length === 0) return availableQuestions;
@@ -31,20 +38,20 @@ export function WorksheetRandomBuilder({
   }, [availableQuestions, filters]);
 
   const questionsByUnit = useMemo(() => {
-    // In a real app, you'd want to map unitId to unitName
     return filteredQuestions.reduce((acc, q) => {
-      acc[q.unitId] = (acc[q.unitId] || 0) + 1;
+      const unitName = unitMap.get(q.unitId) || q.unitId;
+      acc[unitName] = (acc[unitName] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-  }, [filteredQuestions]);
+  }, [filteredQuestions, unitMap]);
 
   const questionsByCategory = useMemo(() => {
-    // In a real app, you'd want to map categoryId to categoryName
     return filteredQuestions.reduce((acc, q) => {
-      acc[q.categoryId] = (acc[q.categoryId] || 0) + 1;
+      const categoryName = categoryMap.get(q.categoryId) || q.categoryId;
+      acc[categoryName] = (acc[categoryName] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-  }, [filteredQuestions]);
+  }, [filteredQuestions, categoryMap]);
 
   const questionsByCurrency = useMemo(() => {
     return availableQuestions.reduce((acc, q) => {
@@ -144,9 +151,9 @@ export function WorksheetRandomBuilder({
           <CardContent>
             <ScrollArea className="h-48">
               <div className="space-y-2">
-                {Object.entries(questionsByUnit).map(([unitId, count]) => (
-                  <div key={unitId} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                    <span>{unitId}</span>
+                {Object.entries(questionsByUnit).map(([unitName, count]) => (
+                  <div key={unitName} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
+                    <span>{unitName}</span>
                     <Badge variant="secondary">{count}</Badge>
                   </div>
                 ))}
@@ -164,9 +171,9 @@ export function WorksheetRandomBuilder({
           <CardContent>
              <ScrollArea className="h-48">
                <div className="space-y-2">
-                {Object.entries(questionsByCategory).map(([catId, count]) => (
-                  <div key={catId} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                    <span>{catId}</span>
+                {Object.entries(questionsByCategory).map(([catName, count]) => (
+                  <div key={catName} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
+                    <span>{catName}</span>
                     <Badge variant="secondary">{count}</Badge>
                   </div>
                 ))}
