@@ -86,12 +86,19 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
                         <Badge variant={q.status === 'published' ? 'default' : 'secondary'} className={q.status === 'published' ? 'bg-green-600' : 'bg-gray-500'}>
                           {q.status}
                         </Badge>
-                        {q.gradingMode === 'ai' && (
-                          <Badge variant="outline" className="flex items-center gap-1">
-                            <Bot className="h-3 w-3"/> AI Graded
-                          </Badge>
-                        )}
                         <TooltipProvider>
+                          {q.gradingMode === 'ai' && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="p-1">
+                                    <Bot className="h-3 w-3"/>
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>AI Graded</p>
+                                </TooltipContent>
+                              </Tooltip>
+                          )}
                           <Tooltip>
                             <TooltipTrigger>
                               {CurrencyIcon && <CurrencyIcon className="h-4 w-4 text-muted-foreground" />}
