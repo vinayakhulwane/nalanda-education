@@ -8,7 +8,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch } from "firebase/firestore";
 import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home } from "lucide-react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import type { Subject, Unit, Category, CustomTab, Worksheet } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -289,12 +289,9 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     )
 }
 
-export default function SubjectWorkspacePage() {
+function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, subjectId: string }) {
     const { user, userProfile, isUserProfileLoading } = useUser();
     const router = useRouter();
-    const params = useParams();
-    const classId = params.classId as string;
-    const subjectId = params.subjectId as string;
     const firestore = useFirestore();
     
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -652,6 +649,7 @@ export default function SubjectWorkspacePage() {
     );
 }
 
-    
-
-    
+export default function SubjectWorkspacePage({ params }: { params: { classId: string, subjectId: string } }) {
+    const { classId, subjectId } = params;
+    return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
+}
