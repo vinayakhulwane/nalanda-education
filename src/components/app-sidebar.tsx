@@ -59,7 +59,7 @@ export function AppSidebar() {
     { href: "#", icon: Users, label: "Students" },
   ];
 
-  let menuItems = [];
+  let menuItems: { href: string; icon: any; label: string }[] = [];
   if (userProfile?.role === 'admin') {
     menuItems = adminMenu;
   } else if (userProfile?.role === 'student') {
