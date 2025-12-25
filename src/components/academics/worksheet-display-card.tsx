@@ -20,17 +20,17 @@ interface WorksheetDisplayCardProps {
 }
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
-  spark: Sparkles,
-  coin: Coins,
-  gold: Crown,
-  diamond: Gem,
+    spark: Sparkles,
+    coin: Coins,
+    gold: Crown,
+    diamond: Gem,
 };
 
 const currencyColors: Record<CurrencyType, string> = {
-  spark: 'text-gray-400',
-  coin: 'text-yellow-500',
-  gold: 'text-amber-500',
-  diamond: 'text-blue-500',
+    spark: 'text-gray-400',
+    coin: 'text-yellow-500',
+    gold: 'text-amber-500',
+    diamond: 'text-blue-500',
 };
 
 
@@ -71,6 +71,7 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
 
     const isCompleted = isPractice ? completedAttempts.includes(worksheet.id) : false;
 
+    // --- LIST VIEW (This is where the Review button lives) ---
     if (view === 'list') {
         return (
             <Card className="flex flex-col sm:flex-row items-center">
@@ -96,6 +97,7 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
                 <CardFooter className="pt-6 pr-6">
                      <Button 
                         variant="secondary"
+                        // ✅ FIXED: Points to PREVIEW page now
                         onClick={() => router.push(`/worksheets/preview/${worksheet.id}`)}
                     >
                         <BookOpen className="mr-2 h-4 w-4"/>
@@ -106,7 +108,7 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
         )
     }
 
-    // Default 'card' view
+    // --- CARD VIEW (Default) ---
     return (
         <Card className="flex flex-col">
             <CardHeader>
