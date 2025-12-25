@@ -1,3 +1,4 @@
+
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,20 +92,25 @@ function CreateWorksheetModal({ subject, units, children }: { subject: Subject; 
                                         <Button
                                             variant={"outline"}
                                             className={cn(
-                                                "w-full justify-start text-left font-normal",
+                                                "w-full justify-start text-left font-normal rounded-xl border-muted-foreground/20 h-11",
                                                 !startDate && "text-muted-foreground"
                                             )}
                                         >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                                             {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
+                                    <PopoverContent className="w-auto p-0 rounded-2xl border-none shadow-2xl animate-in zoom-in-95 duration-200" align="start">
                                         <Calendar
                                             mode="single"
                                             selected={startDate}
                                             onSelect={setStartDate}
                                             initialFocus
+                                            className="p-3"
+                                            classNames={{
+                                                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-full",
+                                                day_today: "bg-accent text-accent-foreground rounded-full",
+                                            }}
                                         />
                                     </PopoverContent>
                                 </Popover>
