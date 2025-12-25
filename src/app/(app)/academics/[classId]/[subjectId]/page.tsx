@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch } from "firebase/firestore";
 import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
@@ -20,6 +20,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableUnitItem } from "@/components/academics/sortable-unit-item";
+
 
 function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
     const firestore = useFirestore();
@@ -36,6 +40,8 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
     const unitsQuery = useMemoFirebase(() => firestore && subjectId ? query(collection(firestore, 'units'), where('subjectId', '==', subjectId)) : null, [firestore, subjectId]);
     const { data: units, isLoading: areUnitsLoading } = useCollection<Unit>(unitsQuery);
 
+    const sortedUnits = useMemo(() => units?.sort((a, b) => a.order - b.order) || [], [units]);
+
     const categoriesQuery = useMemoFirebase(() => {
         if (!firestore || !units || units.length === 0) return null;
         const unitIds = units.map(u => u.id).filter(id => !!id);
@@ -43,6 +49,18 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
         return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds));
     }, [firestore, units]);
     const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);
+
+    const categoriesByUnit = useMemo(() => {
+        if (!categories) return {};
+        return categories.reduce((acc, category) => {
+            if (!acc[category.unitId]) {
+                acc[category.unitId] = [];
+            }
+            acc[category.unitId].push(category);
+            acc[category.unitId].sort((a,b) => a.order - b.order);
+            return acc;
+        }, {} as Record<string, Category[]>);
+    }, [categories]);
     
     const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
@@ -59,7 +77,8 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
         if (!firestore) return;
         switch (dialogType) {
             case 'addUnit':
-                addDocumentNonBlocking(collection(firestore, 'units'), { name: newName, description: newDescription, subjectId });
+                const newUnitOrder = units ? units.length : 0;
+                addDocumentNonBlocking(collection(firestore, 'units'), { name: newName, description: newDescription, subjectId, order: newUnitOrder });
                 break;
             case 'editUnit':
                 if (currentUnit) updateDocumentNonBlocking(doc(firestore, 'units', currentUnit.id), { name: newName, description: newDescription });
@@ -68,7 +87,10 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
                 if (currentUnit) deleteDocumentNonBlocking(doc(firestore, 'units', currentUnit.id));
                 break;
             case 'addCategory':
-                if (currentUnit) addDocumentNonBlocking(collection(firestore, 'categories'), { name: newName, description: newDescription, unitId: currentUnit.id });
+                if (currentUnit) {
+                     const newCategoryOrder = categoriesByUnit[currentUnit.id]?.length || 0;
+                    addDocumentNonBlocking(collection(firestore, 'categories'), { name: newName, description: newDescription, unitId: currentUnit.id, order: newCategoryOrder });
+                }
                 break;
             case 'editCategory':
                 if (currentCategory) updateDocumentNonBlocking(doc(firestore, 'categories', currentCategory.id), { name: newName, description: newDescription });
@@ -96,6 +118,30 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
         }
     }
 
+    const handleUnitDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (firestore && over && active.id !== over.id) {
+            const oldIndex = sortedUnits.findIndex(u => u.id === active.id);
+            const newIndex = sortedUnits.findIndex(u => u.id === over.id);
+            const newOrder = arrayMove(sortedUnits, oldIndex, newIndex);
+            
+            const batch = writeBatch(firestore);
+            newOrder.forEach((unit, index) => {
+                const unitRef = doc(firestore, 'units', unit.id);
+                batch.update(unitRef, { order: index });
+            });
+            await batch.commit();
+        }
+    }
+
+    if (areUnitsLoading || areCategoriesLoading) {
+         return (
+             <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        )
+    }
+
     return (
         <div className="mt-6">
             <div className="flex justify-between items-center mb-6">
@@ -105,62 +151,29 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
                     Add Unit
                 </Button>}
             </div>
-             {areUnitsLoading || areCategoriesLoading ? (
-                 <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            ): (
-                <Accordion type="multiple" className="w-full space-y-4">
-                    {units?.map(unit => (
-                        <AccordionItem value={unit.id} key={unit.id} className="bg-card border rounded-lg px-4">
-                             <div className="flex items-center">
-                                <GripVertical className="h-5 w-5 text-muted-foreground mr-2 cursor-grab" />
-                                <AccordionTrigger className="text-lg font-headline hover:no-underline flex-1">
-                                    {unit.name}
-                                </AccordionTrigger>
-                                 {userIsEditor && <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
-                                            <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => openDialog('editUnit', unit)}>Edit Unit</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => openDialog('addCategory', unit)}>Add Category</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => openDialog('deleteUnit', unit)} className="text-destructive focus:text-destructive">Delete Unit</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>}
-                             </div>
-                            <AccordionContent>
-                                <p className="text-muted-foreground text-sm pb-4">{unit.description}</p>
-                                <div className="space-y-2 pl-6 border-l-2 ml-3">
-                                   {categories?.filter(c => c.unitId === unit.id).map(category => (
-                                       <div key={category.id} className="flex items-center justify-between rounded-md p-2 hover:bg-muted/50">
-                                           <div>
-                                               <p className="font-medium">{category.name}</p>
-                                               <p className="text-sm text-muted-foreground">{category.description}</p>
-                                           </div>
-                                            {userIsEditor && <div className="flex items-center">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDialog('editCategory', unit, category)}><Edit className="h-4 w-4" /></Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDialog('deleteCategory', unit, category)}><Trash className="h-4 w-4 text-destructive" /></Button>
-                                            </div>}
-                                       </div>
-                                   ))}
-                                    {categories?.filter(c => c.unitId === unit.id).length === 0 && (
-                                        <p className="text-sm text-muted-foreground py-4">No categories in this unit.</p>
-                                    )}
-                                </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                    ))}
-                    {units?.length === 0 && (
-                        <Card className="text-center py-12">
-                            <CardContent>
-                                <p className="text-muted-foreground">No units found. {userIsEditor && 'Start by adding one.'}</p>
-                            </CardContent>
-                        </Card>
-                    )}
-                </Accordion>
+            
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleUnitDragEnd}>
+                <SortableContext items={sortedUnits.map(u => u.id)} strategy={verticalListSortingStrategy}>
+                    <Accordion type="multiple" className="w-full space-y-4">
+                        {sortedUnits.map(unit => (
+                            <SortableUnitItem
+                                key={unit.id}
+                                unit={unit}
+                                categories={categoriesByUnit[unit.id] || []}
+                                userIsEditor={userIsEditor}
+                                openDialog={openDialog}
+                            />
+                        ))}
+                    </Accordion>
+                </SortableContext>
+            </DndContext>
+            
+            {units?.length === 0 && (
+                <Card className="text-center py-12">
+                    <CardContent>
+                        <p className="text-muted-foreground">No units found. {userIsEditor && 'Start by adding one.'}</p>
+                    </CardContent>
+                </Card>
             )}
 
             {/* Generic Dialog for Add/Edit */}
@@ -594,5 +607,3 @@ export default function SubjectWorkspacePage() {
         </div>
     );
 }
-
-    

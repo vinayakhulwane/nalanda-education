@@ -41,6 +41,7 @@ export interface Unit {
   name: string;
   description: string;
   subjectId: string;
+  order: number;
 }
 
 export interface Category {
@@ -48,6 +49,7 @@ export interface Category {
   name: string;
   description: string;
   unitId: string;
+  order: number;
 }
 
 export interface Course {
