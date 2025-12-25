@@ -124,7 +124,15 @@ service cloud.firestore {
     }
 
     match /worksheets/{worksheetId} {
-      allow read: if isOwner(resource.data.authorId) || isAdmin();
+      // A user can read a specific worksheet if they are its author.
+      // Admins can read any worksheet.
+      allow get: if isOwner(resource.data.authorId) || isAdmin();
+      
+      // A user can list worksheets if their query is filtering by their own authorId.
+      // This is crucial for the "Saved Worksheets" page.
+      allow list: if isSignedIn() && request.query.get("authorId") == request.auth.uid;
+      
+      // Teachers and Admins are allowed to create, update, and delete worksheets.
       allow write: if isTeacher() || isAdmin();
     }
   }
