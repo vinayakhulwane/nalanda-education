@@ -31,6 +31,48 @@ type SubQuestionWithStep = SubQuestion & {
     stepObjective: string;
 }
 
+// --- Unit Conversion Utilities ---
+const unitPrefixes: Record<string, number> = {
+    'G': 1e9, 'M': 1e6, 'k': 1e3,
+    'd': 1e-1, 'c': 1e-2, 'm': 1e-3, 'µ': 1e-6, 'n': 1e-9,
+};
+
+function parseUnitAndValue(input: string): { value: number, unit: string } | null {
+    if (!input || typeof input !== 'string') return null;
+    
+    // Regex to find the first letter, which we assume is the start of the unit.
+    const match = input.trim().match(/^(-?[\d.]+)\s*([a-zA-Zµ]+.*)?$/);
+    if (!match) return null;
+
+    const value = parseFloat(match[1]);
+    const unit = match[2] || '';
+
+    if(isNaN(value)) return null;
+
+    return { value, unit };
+}
+
+function convertTo_Base(value: number, unit: string, baseUnit: string): number {
+    if (unit === baseUnit) return value;
+
+    // Handle prefixed units (e.g., 'kN' to 'N')
+    const unitPrefix = unit.replace(baseUnit, '');
+    if (unitPrefix && unitPrefixes[unitPrefix]) {
+        return value * unitPrefixes[unitPrefix];
+    }
+    
+    // Handle base unit with prefix to non-prefixed (e.g. 'N' to 'kN')
+    const basePrefix = baseUnit.replace(unit, '');
+    if (basePrefix && unitPrefixes[basePrefix]) {
+        return value / unitPrefixes[basePrefix];
+    }
+    
+    // Basic conversion logic for now, can be expanded.
+    // For now, if no prefix logic matches, return NaN to indicate failure
+    return NaN;
+}
+
+
 export function QuestionRunner({ question }: { question: Question }) {
   const [hasStarted, setHasStarted] = useState(false);
   const [answers, setAnswers] = useState<AnswerState>({});
@@ -83,11 +125,17 @@ export function QuestionRunner({ question }: { question: Question }) {
         let isCorrect = false;
         switch (subQ.answerType) {
             case 'numerical':
-                const studentValue = parseFloat(studentAnswer);
-                const correctValue = subQ.numericalAnswer?.correctValue ?? NaN;
-                const tolerance = subQ.numericalAnswer?.toleranceValue ?? 0;
-                // Basic tolerance for now, can be expanded
-                isCorrect = !isNaN(studentValue) && Math.abs(studentValue - correctValue) <= (tolerance/100 * correctValue);
+                const parsedAnswer = parseUnitAndValue(studentAnswer);
+                if (parsedAnswer) {
+                    const { baseUnit, correctValue, toleranceValue } = subQ.numericalAnswer || {};
+                    if(baseUnit && correctValue !== undefined) {
+                        const studentValueInBase = convertTo_Base(parsedAnswer.value, parsedAnswer.unit, baseUnit);
+                        const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
+                        if (!isNaN(studentValueInBase)) {
+                           isCorrect = Math.abs(studentValueInBase - correctValue) <= tolerance;
+                        }
+                    }
+                }
                 break;
             case 'mcq':
                 const correctOptions = subQ.mcqAnswer?.correctOptions || [];
@@ -137,11 +185,12 @@ export function QuestionRunner({ question }: { question: Question }) {
       case 'numerical':
         return (
           <Input
-            type="number"
+            type="text" // Changed to text to allow units
             value={valueToDisplay ?? ''}
             onChange={(e) => setCurrentAnswer(e.target.value)}
             disabled={isSubmitted}
             className="w-full md:w-1/2"
+            placeholder="e.g., 7 kN"
           />
         );
       case 'mcq':
@@ -198,7 +247,7 @@ export function QuestionRunner({ question }: { question: Question }) {
   };
 
     const getAnswerText = (subQuestion: SubQuestion, answer: any) => {
-        if (answer === null || answer === undefined) return 'Not Answered';
+        if (answer === null || answer === undefined || answer === '') return 'Not Answered';
         switch (subQuestion.answerType) {
             case 'numerical':
             case 'text':
@@ -219,7 +268,9 @@ export function QuestionRunner({ question }: { question: Question }) {
 
   const getCorrectAnswerText = (subQ: SubQuestion) => {
     switch (subQ.answerType) {
-        case 'numerical': return subQ.numericalAnswer?.correctValue.toString() || 'N/A';
+        case 'numerical':
+             const { correctValue, baseUnit } = subQ.numericalAnswer || {};
+             return `${correctValue ?? 'N/A'}${baseUnit ? ` ${baseUnit}` : ''}`;
         case 'text': return subQ.textAnswer?.keywords.join(', ') || 'N/A';
         case 'mcq':
             return subQ.mcqAnswer?.options
