@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Edit, Trash, Sparkles, Coins, Gem, Diamond, Eye } from "lucide-react";
+import { Edit, Trash, Sparkles, Coins, Gem, Eye, Crown } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useFirestore } from '@/firebase';
@@ -24,8 +24,8 @@ interface QuestionBankTableProps {
 const currencyIcons: { [key: string]: React.ElementType } = {
   spark: Sparkles,
   coin: Coins,
-  gold: Gem,
-  diamond: Diamond,
+  gold: Crown,
+  diamond: Gem,
 };
 
 export function QuestionBankTable({ questions, units, categories }: QuestionBankTableProps) {

@@ -5,7 +5,7 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Droplet, Star, Coins, Gem, Diamond } from 'lucide-react';
+import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Droplet, Star, Coins, Gem, Crown, Sparkles } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
@@ -24,10 +24,10 @@ type WorksheetRandomBuilderProps = {
 };
 
 const currencyIcons = {
-    spark: Droplet,
+    spark: Sparkles,
     coin: Coins,
-    gold: Gem,
-    diamond: Diamond,
+    gold: Crown,
+    diamond: Gem,
 };
 
 

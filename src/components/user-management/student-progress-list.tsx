@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Users, Filter, Wallet, BarChart2, Target, TrendingUp, Gem, Diamond, Coins } from "lucide-react";
+import { Loader2, Users, Filter, Wallet, BarChart2, Target, TrendingUp, Gem, Coins, Sparkles, Crown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
@@ -175,11 +175,11 @@ export function StudentProgressList() {
                                                                     <span>{detail.wallet.coins}</span>
                                                                 </div>
                                                                 <div className="flex justify-between items-center gap-4">
-                                                                    <span className="flex items-center gap-1"><Gem className="h-3 w-3 text-red-500" /> Gold:</span>
+                                                                    <span className="flex items-center gap-1"><Crown className="h-3 w-3 text-amber-500" /> Gold:</span>
                                                                     <span>{detail.wallet.gold}</span>
                                                                 </div>
                                                                  <div className="flex justify-between items-center gap-4">
-                                                                    <span className="flex items-center gap-1"><Diamond className="h-3 w-3 text-blue-500" /> Diamonds:</span>
+                                                                    <span className="flex items-center gap-1"><Gem className="h-3 w-3 text-blue-500" /> Diamonds:</span>
                                                                     <span>{detail.wallet.diamonds}</span>
                                                                 </div>
                                                             </div>
