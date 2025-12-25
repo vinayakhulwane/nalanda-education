@@ -211,7 +211,7 @@ export function WorksheetManualBuilder({
              </div>
              {isFilterActive && (
                  <div className="space-y-2">
-                     <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                          Showing {filteredQuestions.length} of {availableQuestions.length} questions.
                      </p>
                     <div className="flex gap-2 items-center flex-wrap">
@@ -237,19 +237,19 @@ export function WorksheetManualBuilder({
                     </div>
                 </div>
             )}
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredQuestions.map(q => {
                     const isSelected = selectedQuestions.some(sq => sq.id === q.id);
                     const CurrencyIcon = currencyIcons[q.currencyType];
                     return (
-                        <Card key={q.id}>
+                        <Card key={q.id} className="flex flex-col">
                             <CardHeader>
-                                <CardTitle className="text-lg">{q.name}</CardTitle>
-                                <CardDescription>
-                                    <div className="prose prose-sm dark:prose-invert max-w-none line-clamp-2" dangerouslySetInnerHTML={{ __html: q.mainQuestionText || ''}} />
+                                <CardTitle className="text-base line-clamp-1">{q.name}</CardTitle>
+                                <CardDescription className="text-xs line-clamp-2 h-8">
+                                    {q.mainQuestionText.replace(/<[^>]*>?/gm, '')}
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-3">
+                            <CardContent className="space-y-3 flex-grow">
                                 <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
                                     <span>{unitMap.get(q.unitId) || 'N/A'}</span>
                                     <span>&bull;</span>
@@ -283,12 +283,12 @@ export function WorksheetManualBuilder({
                                      <Badge variant="secondary">{getQuestionMarks(q)} Marks</Badge>
                                 </div>
                             </CardContent>
-                            <CardContent>
+                            <CardFooter>
                                  <Button onClick={() => addQuestion(q)} disabled={isSelected} className="w-full">
                                     <PlusCircle className="mr-2 h-4 w-4" />
                                     {isSelected ? 'Added' : 'Add to Worksheet'}
                                 </Button>
-                            </CardContent>
+                            </CardFooter>
                         </Card>
                     )
                 })}
