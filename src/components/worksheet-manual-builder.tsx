@@ -2,16 +2,19 @@
 import type { Question, Unit, Category, CurrencyType, Worksheet } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle } from 'lucide-react';
+import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Progress } from './ui/progress';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Checkbox } from './ui/checkbox';
+import { useUser } from '@/firebase';
 
 type WorksheetManualBuilderProps = {
     availableQuestions: Question[];
@@ -40,15 +43,60 @@ export function WorksheetManualBuilder({
     onCreateWorksheet,
 }: WorksheetManualBuilderProps) {
     const [worksheetType, setWorksheetType] = useState<'classroom' | 'sample'>('classroom');
+    const { userProfile } = useUser();
+    const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
+
+    const [filters, setFilters] = useState<{
+        units: string[];
+        categories: string[];
+        currencies: CurrencyType[];
+    }>({
+        units: [],
+        categories: [],
+        currencies: [],
+    });
+    
+    // When unit filter changes, reset category filter
+    useEffect(() => {
+        setFilters(prev => ({...prev, categories: []}));
+    }, [filters.units]);
 
     const unitMap = new Map(units.map(u => [u.id, u.name]));
     const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+    
+    const availableCategories = useMemo(() => {
+        if (filters.units.length === 0) return categories;
+        return categories.filter(c => filters.units.includes(c.unitId));
+    }, [categories, filters.units]);
+
+    const filteredQuestions = useMemo(() => {
+        if (filters.units.length === 0 && filters.categories.length === 0 && filters.currencies.length === 0) {
+            return availableQuestions;
+        }
+        return availableQuestions.filter(q => {
+            const unitMatch = filters.units.length === 0 || filters.units.includes(q.unitId);
+            const categoryMatch = filters.categories.length === 0 || filters.categories.includes(q.categoryId);
+            const currencyMatch = filters.currencies.length === 0 || filters.currencies.includes(q.currencyType);
+            return unitMatch && categoryMatch && currencyMatch;
+        });
+    }, [availableQuestions, filters]);
+    
+    const handleFilterChange = (filterType: 'units' | 'categories' | 'currencies', value: string, isChecked: boolean) => {
+        setFilters(prev => {
+            const currentValues = prev[filterType] as string[];
+            const newValues = isChecked
+                ? [...currentValues, value]
+                : currentValues.filter(v => v !== value);
+            return { ...prev, [filterType]: newValues };
+        });
+    }
+
     const getQuestionMarks = (question: Question): number => {
         return question.solutionSteps?.reduce((stepSum, step) => 
               stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
     }
 
-      const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost } = useMemo(() => {
+    const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost } = useMemo(() => {
     let totalMarks = 0;
     const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
     const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
@@ -91,12 +139,100 @@ export function WorksheetManualBuilder({
     };
 }, [selectedQuestions, unitMap, categoryMap]);
 
+    const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
 
     return (
         <div className="space-y-4">
-             <h3 className="text-xl font-semibold">Available Questions</h3>
+             <div className="flex justify-between items-center">
+                <h3 className="text-xl font-semibold">Available Questions</h3>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline">
+                        <Filter className="mr-2 h-4 w-4" />
+                        Filter
+                        {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2 rounded-full h-5 w-5 p-0 justify-center">{activeFilterCount}</Badge>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80" align="end">
+                        <Tabs defaultValue="unit" className="w-full">
+                            <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="unit">Unit</TabsTrigger>
+                                <TabsTrigger value="category" disabled={filters.units.length > 0 && availableCategories.length === 0}>Category</TabsTrigger>
+                                <TabsTrigger value="currency">Currency</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="unit" className="mt-2">
+                            <div className="space-y-2">
+                                {units.map(unit => (
+                                <div key={unit.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                    id={`manual-filter-unit-${unit.id}`}
+                                    checked={filters.units.includes(unit.id)}
+                                    onCheckedChange={(checked) => handleFilterChange('units', unit.id, !!checked)}
+                                    />
+                                    <Label htmlFor={`manual-filter-unit-${unit.id}`} className="capitalize">{unit.name}</Label>
+                                </div>
+                                ))}
+                            </div>
+                            </TabsContent>
+                            <TabsContent value="category" className="mt-2">
+                            <div className="space-y-2">
+                                {availableCategories.map(cat => (
+                                <div key={cat.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                    id={`manual-filter-cat-${cat.id}`}
+                                    checked={filters.categories.includes(cat.id)}
+                                    onCheckedChange={(checked) => handleFilterChange('categories', cat.id, !!checked)}
+                                    />
+                                    <Label htmlFor={`manual-filter-cat-${cat.id}`} className="capitalize">{cat.name}</Label>
+                                </div>
+                                ))}
+                                {filters.units.length > 0 && availableCategories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories found for the selected unit(s).</p>}
+                                {filters.units.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Please select a unit first.</p>}
+                            </div>
+                            </TabsContent>
+                            <TabsContent value="currency" className="mt-2">
+                            <div className="space-y-2">
+                                {(['spark', 'coin', 'gold', 'diamond'] as CurrencyType[]).map(currency => (
+                                <div key={currency} className="flex items-center space-x-2">
+                                    <Checkbox
+                                    id={`manual-filter-currency-${currency}`}
+                                    checked={filters.currencies.includes(currency)}
+                                    onCheckedChange={(checked) => handleFilterChange('currencies', currency, !!checked)}
+                                    />
+                                    <Label htmlFor={`manual-filter-currency-${currency}`} className="capitalize">{currency}</Label>
+                                </div>
+                                ))}
+                            </div>
+                            </TabsContent>
+                        </Tabs>
+                    </PopoverContent>
+                </Popover>
+             </div>
+             {activeFilterCount > 0 && (
+                <div className="flex gap-2 items-center flex-wrap">
+                    <span className="text-sm font-semibold">Active Filters:</span>
+                    {filters.units.map(id => (
+                    <Badge key={id} variant="outline" className="pl-2 capitalize">
+                        Unit: {unitMap.get(id) || id}
+                        <button onClick={() => handleFilterChange('units', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                    </Badge>
+                    ))}
+                    {filters.categories.map(id => (
+                    <Badge key={id} variant="outline" className="pl-2 capitalize">
+                        Category: {categoryMap.get(id) || id}
+                        <button onClick={() => handleFilterChange('categories', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                    </Badge>
+                    ))}
+                    {filters.currencies.map(c => (
+                    <Badge key={c} variant="outline" className="pl-2 capitalize">
+                        {c}
+                        <button onClick={() => handleFilterChange('currencies', c, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                    </Badge>
+                    ))}
+                </div>
+            )}
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {availableQuestions.map(q => {
+                {filteredQuestions.map(q => {
                     const isSelected = selectedQuestions.some(sq => sq.id === q.id);
                     const CurrencyIcon = currencyIcons[q.currencyType];
                     return (
@@ -151,7 +287,7 @@ export function WorksheetManualBuilder({
                     )
                 })}
             </div>
-            {availableQuestions.length === 0 && (
+            {filteredQuestions.length === 0 && (
                 <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
                     <p>No questions found for the current filters.</p>
                 </div>
@@ -171,15 +307,17 @@ export function WorksheetManualBuilder({
                     <SheetDescription>
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
-                     <div className="flex items-center space-x-2 pt-4">
-                        <Label htmlFor="worksheet-type-manual" className={cn("text-muted-foreground", worksheetType === 'sample' && 'font-semibold text-foreground')}>
-                            Sample Worksheet
-                        </Label>
-                        <Switch id="worksheet-type-manual" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
-                         <Label htmlFor="worksheet-type-manual" className={cn("text-muted-foreground", worksheetType === 'classroom' && 'font-semibold text-foreground')}>
-                           Classroom Assignment
-                        </Label>
-                    </div>
+                    {userIsEditor && (
+                        <div className="flex items-center space-x-2 pt-4">
+                            <Label htmlFor="worksheet-type-manual" className={cn("text-muted-foreground", worksheetType === 'sample' && 'font-semibold text-foreground')}>
+                                Sample Worksheet
+                            </Label>
+                            <Switch id="worksheet-type-manual" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
+                            <Label htmlFor="worksheet-type-manual" className={cn("text-muted-foreground", worksheetType === 'classroom' && 'font-semibold text-foreground')}>
+                            Classroom Assignment
+                            </Label>
+                        </div>
+                    )}
                 </SheetHeader>
                 <div className="flex-grow overflow-y-auto">
                     <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
