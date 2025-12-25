@@ -228,16 +228,20 @@ function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subject
 function PracticeZone({ classId, subjectId }: { classId: string, subjectId: string }) {
     const router = useRouter();
     const firestore = useFirestore();
-    const { user } = useUser();
+    const { user, userProfile } = useUser();
 
-    // In a real app, this query would be for student-created practice worksheets
-    // For now, we'll show sample worksheets as placeholders
+    // Query for practice worksheets created by the user or sample worksheets
     const worksheetsQuery = useMemoFirebase(() => {
         if (!firestore || !user || !subjectId) return null;
+        
+        // This is a placeholder. For a real app, you would have a more robust way
+        // to distinguish student-created practice worksheets.
+        // For now, we'll show 'sample' worksheets as a stand-in for user-created ones.
         return query(
             collection(firestore, 'worksheets'),
             where('subjectId', '==', subjectId),
-            where('worksheetType', '==', 'sample') // Placeholder: show sample worksheets
+            where('worksheetType', '==', 'sample') // Example: Student-created worksheets are of type 'sample'
+            // In a real scenario, you might query where authorId === user.uid and worksheetType === 'practice'
         );
     }, [firestore, user, subjectId]);
     
@@ -269,7 +273,12 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                         </div>
                     ) : (
                         practiceWorksheets?.map(ws => (
-                            <WorksheetDisplayCard key={ws.id} worksheet={ws} />
+                            <WorksheetDisplayCard 
+                                key={ws.id} 
+                                worksheet={ws} 
+                                isPractice={true}
+                                completedAttempts={userProfile?.completedWorksheets || []}
+                            />
                         ))
                     )}
                 </div>

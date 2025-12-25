@@ -13,9 +13,11 @@ import { Skeleton } from "../ui/skeleton";
 
 interface WorksheetDisplayCardProps {
     worksheet: Worksheet;
+    isPractice?: boolean;
+    completedAttempts?: string[];
 }
 
-export function WorksheetDisplayCard({ worksheet }: WorksheetDisplayCardProps) {
+export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [] }: WorksheetDisplayCardProps) {
     const router = useRouter();
     const firestore = useFirestore();
 
@@ -36,8 +38,9 @@ export function WorksheetDisplayCard({ worksheet }: WorksheetDisplayCardProps) {
         }, 0);
     }, [questions]);
     
-    // In a real app, this would come from the student's attempt history
-    const isCompleted = false; 
+    // For practice worksheets, a single attempt marks it as completed.
+    // In a real app, this logic would be more robust, likely involving a separate 'attempts' collection.
+    const isCompleted = isPractice ? completedAttempts.includes(worksheet.id) : false;
 
     return (
         <Card className="flex flex-col">

@@ -12,6 +12,7 @@ export interface User {
   diamonds: number;
   active?: boolean;
   enrollments?: string[];
+  completedWorksheets?: string[];
 }
 
 export interface Class {
