@@ -20,7 +20,7 @@ function AddQuestionsPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const firestore = useFirestore();
-    const { user } = useUser();
+    const { user, userProfile } = useUser();
     const { toast } = useToast();
 
     // Details from previous page
@@ -67,7 +67,7 @@ function AddQuestionsPageContent() {
     const isLoading = isSubjectLoading || areQuestionsLoading || areUnitsLoading || areCategoriesLoading;
 
     const handleCreateWorksheet = async (worksheetTypeParam: 'classroom' | 'sample' | 'practice') => {
-        if (!user || !firestore || !classId || !subjectId || !title) {
+        if (!user || !userProfile || !firestore || !classId || !subjectId || !title) {
             toast({
                 variant: 'destructive',
                 title: 'Error',
@@ -76,8 +76,10 @@ function AddQuestionsPageContent() {
             return;
         }
 
-        // Correctly determine worksheet type based on the source of creation
-        const finalWorksheetType = source === 'practice' ? 'practice' : worksheetTypeParam;
+        const isEditor = userProfile.role === 'admin' || userProfile.role === 'teacher';
+
+        // THE FIX: Force 'practice' type for students
+        const finalWorksheetType = isEditor ? worksheetTypeParam : 'practice';
 
         const newWorksheet: Omit<Worksheet, 'id'> = {
             title,
@@ -87,7 +89,7 @@ function AddQuestionsPageContent() {
             worksheetType: finalWorksheetType,
             questions: selectedQuestions.map(q => q.id),
             authorId: user.uid,
-            status: 'draft', // Or 'published' depending on desired flow
+            status: 'draft',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
@@ -113,7 +115,7 @@ function AddQuestionsPageContent() {
             });
             
             // Navigate based on where the user started the flow
-            if (source === 'practice' && classId && subjectId) {
+            if (finalWorksheetType === 'practice' && classId && subjectId) {
                  router.push(`/academics/${classId}/${subjectId}`);
             } else if (classId && subjectId) {
                 router.push(`/worksheets/saved?classId=${classId}&subjectId=${subjectId}`);
