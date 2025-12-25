@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import type { Question } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
@@ -10,23 +9,25 @@ import { Separator } from './ui/separator';
 
 type WorksheetBuilderProps = {
   availableQuestions: Question[];
+  selectedQuestions: Question[];
+  setSelectedQuestions: (questions: Question[]) => void;
+  onCreateWorksheet: () => void;
 };
 
-export function WorksheetBuilder({ availableQuestions }: WorksheetBuilderProps) {
-  const [worksheetQuestions, setWorksheetQuestions] = useState<Question[]>([]);
+export function WorksheetBuilder({ availableQuestions, selectedQuestions, setSelectedQuestions, onCreateWorksheet }: WorksheetBuilderProps) {
 
   const addQuestion = (question: Question) => {
-    if (!worksheetQuestions.find(q => q.id === question.id)) {
-      setWorksheetQuestions([...worksheetQuestions, question]);
+    if (!selectedQuestions.find(q => q.id === question.id)) {
+      setSelectedQuestions([...selectedQuestions, question]);
     }
   };
 
   const removeQuestion = (questionId: string) => {
-    setWorksheetQuestions(worksheetQuestions.filter(q => q.id !== questionId));
+    setSelectedQuestions(selectedQuestions.filter(q => q.id !== questionId));
   };
 
   return (
-    <div className="grid lg:grid-cols-3 gap-6">
+    <div className="grid lg:grid-cols-3 gap-6 mt-4">
       <div className="lg:col-span-2">
         <h2 className="font-headline text-xl font-bold mb-4">Available Questions</h2>
         <ScrollArea className="h-[600px] pr-4">
@@ -39,20 +40,21 @@ export function WorksheetBuilder({ availableQuestions }: WorksheetBuilderProps) 
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2">
-                    <Badge variant="secondary">{q.classId}</Badge>
-                    <Badge variant="outline">{q.subjectId}</Badge>
+                    <Badge variant="secondary">{q.unitId}</Badge>
+                    <Badge variant="outline">{q.categoryId}</Badge>
                 </div>
               </CardContent>
               <CardFooter>
-                <Button size="sm" variant="outline" className="w-full" onClick={() => addQuestion(q)}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add to Worksheet
+                <Button size="sm" variant="outline" className="w-full" onClick={() => addQuestion(q)} disabled={!!selectedQuestions.find(sq => sq.id === q.id)}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> 
+                  {selectedQuestions.find(sq => sq.id === q.id) ? 'Added' : 'Add to Worksheet'}
                 </Button>
               </CardFooter>
             </Card>
           ))}
             {availableQuestions.length === 0 && (
                 <div className="col-span-full text-center text-muted-foreground py-10">
-                    No questions available. Create some in the Numerical Management section.
+                    No questions available for this subject/unit. Create some in the Numerical Management section.
                 </div>
             )}
         </div>
@@ -66,14 +68,14 @@ export function WorksheetBuilder({ availableQuestions }: WorksheetBuilderProps) 
                 Worksheet Blueprint
             </CardTitle>
             <CardDescription>
-              {worksheetQuestions.length} question(s) added.
+              {selectedQuestions.length} question(s) added.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[400px]">
-                {worksheetQuestions.length > 0 ? (
+                {selectedQuestions.length > 0 ? (
                     <div className="space-y-3">
-                        {worksheetQuestions.map((q, index) => (
+                        {selectedQuestions.map((q, index) => (
                             <div key={q.id} className="flex items-center justify-between">
                                 <span className="text-sm flex-grow pr-2">
                                     {index + 1}. {q.name}
@@ -93,11 +95,11 @@ export function WorksheetBuilder({ availableQuestions }: WorksheetBuilderProps) 
           </CardContent>
           <Separator />
           <CardFooter className="flex-col gap-2 pt-4">
-            <Button className="w-full" disabled={worksheetQuestions.length === 0}>
+            <Button className="w-full" disabled={selectedQuestions.length === 0} onClick={onCreateWorksheet}>
               <FilePlus2 className="mr-2 h-4 w-4" /> Create Assignment
             </Button>
-            {worksheetQuestions.length > 0 && 
-                <Button variant="ghost" className="w-full" onClick={() => setWorksheetQuestions([])}>
+            {selectedQuestions.length > 0 && 
+                <Button variant="ghost" className="w-full" onClick={() => setSelectedQuestions([])}>
                     Clear all
                 </Button>
             }

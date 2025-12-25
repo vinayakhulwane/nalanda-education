@@ -1,8 +1,7 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
-import { WorksheetBuilder } from "@/components/worksheet-builder";
-import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
-import type { Question, Unit, Subject } from "@/types";
+import { useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
+import type { Subject, Unit } from "@/types";
 import { collection, query, where, doc } from "firebase/firestore";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -23,7 +22,6 @@ function NewWorksheetPageContent() {
     const subjectId = searchParams.get('subjectId');
     
     // Form State
-    const [formSubmitted, setFormSubmitted] = useState(false);
     const [title, setTitle] = useState('');
     const [unitId, setUnitId] = useState('');
     const [mode, setMode] = useState<'practice' | 'exam'>('practice');
@@ -41,20 +39,6 @@ function NewWorksheetPageContent() {
 
     const unitsQueryRef = useMemoFirebase(() => firestore && subjectId ? query(collection(firestore, 'units'), where('subjectId', '==', subjectId)) : null, [firestore, subjectId]);
     const { data: units, isLoading: areUnitsLoading } = useCollection<Unit>(unitsQueryRef);
-
-    const questionsQuery = useMemoFirebase(() => {
-        if (!firestore || !formSubmitted) return null; // Only fetch questions after form submission
-        let q = collection(firestore, 'questions');
-        if (unitId) {
-            return query(q, where('unitId', '==', unitId));
-        }
-        if (subjectId) {
-            return query(q, where('subjectId', '==', subjectId));
-        }
-        return q;
-    }, [firestore, subjectId, unitId, formSubmitted]);
-    
-    const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
     
     useEffect(() => {
         if (day && month && year) {
@@ -75,11 +59,24 @@ function NewWorksheetPageContent() {
     }, [title, mode, examDate]);
     
     const handleProceed = () => {
-        setFormSubmitted(true);
+        const queryParams = new URLSearchParams({
+            classId: classId || '',
+            subjectId: subjectId || '',
+            title,
+            unitId,
+            mode,
+        });
+
+        if (mode === 'exam' && examDate) {
+            queryParams.append('examDate', examDate.toISOString());
+            queryParams.append('startTime', startTime);
+        }
+        
+        router.push(`/worksheets/add-questions?${queryParams.toString()}`);
     }
 
     const backUrl = subjectId && classId ? `/worksheets/${classId}/${subjectId}` : '/worksheets';
-    const isLoading = areUnitsLoading || isSubjectLoading || (formSubmitted && areQuestionsLoading);
+    const isLoading = areUnitsLoading || isSubjectLoading;
 
     // Date logic
     const today = new Date();
@@ -131,115 +128,99 @@ function NewWorksheetPageContent() {
         )
     }
 
-    if (!formSubmitted) {
-        return (
-             <div>
-                <Button variant="ghost" onClick={() => router.push(backUrl)} className="mb-4">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back
-                </Button>
-                <PageHeader
-                    title="Create New Worksheet"
-                    description={`For subject: ${subject?.name || 'Loading...'}`}
-                />
-                 <Card className="max-w-3xl mx-auto">
-                    <CardHeader>
-                        <CardTitle>Worksheet Details</CardTitle>
-                        <CardDescription>Define the identity and rules for your new worksheet before adding questions.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="title">Title</Label>
-                            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Chapter 5 Review" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="unit">Unit (Optional)</Label>
-                            <Select onValueChange={setUnitId} value={unitId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Filter questions by a specific unit" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {units?.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Worksheet Mode</Label>
-                            <RadioGroup defaultValue="practice" onValueChange={(v) => setMode(v as 'practice' | 'exam')} className="flex gap-4">
-                                <Label htmlFor="practice" className="flex items-center space-x-2 border rounded-md p-3 flex-1 cursor-pointer hover:bg-muted/50 data-[state=checked]:border-primary">
-                                    <RadioGroupItem value="practice" id="practice" />
-                                    <span>Practice Mode</span>
-                                </Label>
-                                <Label htmlFor="exam" className="flex items-center space-x-2 border rounded-md p-3 flex-1 cursor-pointer hover:bg-muted/50 data-[state=checked]:border-primary">
-                                    <RadioGroupItem value="exam" id="exam" />
-                                    <span>Exam Mode</span>
-                                </Label>
-                            </RadioGroup>
-                        </div>
-                        {mode === 'exam' && (
-                            <div className="pt-2 animate-in fade-in space-y-4">
-                                <Label>Start Date & Time</Label>
-                                <div className="flex flex-wrap gap-4">
-                                    <Select onValueChange={handleYearChange} value={year}>
-                                        <SelectTrigger className="w-[140px]">
-                                            <SelectValue placeholder="Year" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {years.map(y => (
-                                                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                     <Select onValueChange={handleMonthChange} value={month} disabled={!year}>
-                                        <SelectTrigger className="w-[180px]">
-                                            <SelectValue placeholder="Month" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {availableMonths.map(m => (
-                                                <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                     <Select onValueChange={setDay} value={day} disabled={!month}>
-                                        <SelectTrigger className="w-[120px]">
-                                            <SelectValue placeholder="Day" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {availableDays.map(d => (
-                                                <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Input
-                                        id="start-time"
-                                        type="time"
-                                        value={startTime}
-                                        onChange={(e) => setStartTime(e.target.value)}
-                                        className="w-[150px]"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                         <Button onClick={handleProceed} disabled={!isFormValid} className="w-full">Add Questions</Button>
-                    </CardContent>
-                </Card>
-            </div>
-        )
-    }
-
     return (
         <div>
-            <Button variant="ghost" onClick={() => setFormSubmitted(false)} className="mb-4">
+            <Button variant="ghost" onClick={() => router.push(backUrl)} className="mb-4">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Details
+                Back
             </Button>
             <PageHeader
-                title={title || "Create New Worksheet"}
-                description="Build your assignment by selecting questions from the bank."
+                title="Create New Worksheet"
+                description={`For subject: ${subject?.name || 'Loading...'}`}
             />
-            <WorksheetBuilder availableQuestions={questions || []} />
+            <Card className="max-w-3xl mx-auto">
+                <CardHeader>
+                    <CardTitle>Worksheet Details</CardTitle>
+                    <CardDescription>Define the identity and rules for your new worksheet before adding questions.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="title">Title</Label>
+                        <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Chapter 5 Review" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="unit">Unit (Optional)</Label>
+                        <Select onValueChange={setUnitId} value={unitId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Filter questions by a specific unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {units?.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Worksheet Mode</Label>
+                        <RadioGroup defaultValue="practice" onValueChange={(v) => setMode(v as 'practice' | 'exam')} className="flex gap-4">
+                            <Label htmlFor="practice" className="flex items-center space-x-2 border rounded-md p-3 flex-1 cursor-pointer hover:bg-muted/50 data-[state=checked]:border-primary">
+                                <RadioGroupItem value="practice" id="practice" />
+                                <span>Practice Mode</span>
+                            </Label>
+                            <Label htmlFor="exam" className="flex items-center space-x-2 border rounded-md p-3 flex-1 cursor-pointer hover:bg-muted/50 data-[state=checked]:border-primary">
+                                <RadioGroupItem value="exam" id="exam" />
+                                <span>Exam Mode</span>
+                            </Label>
+                        </RadioGroup>
+                    </div>
+                    {mode === 'exam' && (
+                        <div className="pt-2 animate-in fade-in space-y-4">
+                            <Label>Start Date & Time</Label>
+                            <div className="flex flex-wrap gap-4">
+                                <Select onValueChange={handleYearChange} value={year}>
+                                    <SelectTrigger className="w-[140px]">
+                                        <SelectValue placeholder="Year" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {years.map(y => (
+                                            <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                    <Select onValueChange={handleMonthChange} value={month} disabled={!year}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Month" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableMonths.map(m => (
+                                            <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                    <Select onValueChange={setDay} value={day} disabled={!month}>
+                                    <SelectTrigger className="w-[120px]">
+                                        <SelectValue placeholder="Day" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableDays.map(d => (
+                                            <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Input
+                                    id="start-time"
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                    className="w-[150px]"
+                                />
+                            </div>
+                        </div>
+                    )}
+                        <Button onClick={handleProceed} disabled={!isFormValid} className="w-full">Add Questions</Button>
+                </CardContent>
+            </Card>
         </div>
-    );
+    )
 }
 
 export default function NewWorksheetPage() {

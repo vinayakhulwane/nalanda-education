@@ -163,4 +163,6 @@ export interface Worksheet {
     questions: string[]; // Array of question IDs
     authorId: string;
     status: 'draft' | 'published';
+    createdAt: any; // Firestore ServerTimestamp
+    updatedAt: any; // Firestore ServerTimestamp
 }
