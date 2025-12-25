@@ -2,8 +2,8 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { doc, collection, query, where, documentId, updateDoc, arrayUnion } from 'firebase/firestore';
-import type { Worksheet, Question, SubQuestion, CurrencyType } from '@/types';
+import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDoc, serverTimestamp, getDocs, limit, orderBy } from 'firebase/firestore';
+import type { Worksheet, Question, WorksheetAttempt } from '@/types';
 import { Loader2, ArrowLeft, ArrowRight, CheckCircle, Timer, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
@@ -30,6 +30,7 @@ export default function SolveWorksheetPage() {
   const [isFinished, setIsFinished] = useState(false);
   const [answers, setAnswers] = useState<AnswerState>({});
   const [results, setResults] = useState<ResultState>({});
+  const [timeTaken, setTimeTaken] = useState(0);
 
   // Fetch worksheet
   const worksheetRef = useMemoFirebase(() => (firestore && worksheetId ? doc(firestore, 'worksheets', worksheetId) : null), [firestore, worksheetId]);
@@ -38,17 +39,33 @@ export default function SolveWorksheetPage() {
   // Fetch questions for the worksheet
   const questionsQuery = useMemoFirebase(() => {
     if (!firestore || !worksheet?.questions || worksheet.questions.length === 0) return null;
-    // Firestore 'in' queries are limited to 30 items. For worksheets with more questions, pagination would be needed.
     return query(collection(firestore, 'questions'), where(documentId(), 'in', worksheet.questions.slice(0,30)));
   }, [firestore, worksheet?.questions]);
   const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
   
   useEffect(() => {
-      // If the user has already completed this worksheet, show the results immediately.
-      if (userProfile?.completedWorksheets?.includes(worksheetId)) {
-          setIsFinished(true);
-      }
-  }, [userProfile, worksheetId]);
+    const checkExistingAttempt = async () => {
+        if (user && firestore && userProfile?.completedWorksheets?.includes(worksheetId)) {
+            const attemptsQuery = query(
+                collection(firestore, 'attempts'),
+                where('userId', '==', user.uid),
+                where('worksheetId', '==', worksheetId),
+                orderBy('attemptedAt', 'desc'),
+                limit(1)
+            );
+            const querySnapshot = await getDocs(attemptsQuery);
+            if (!querySnapshot.empty) {
+                const lastAttempt = querySnapshot.docs[0].data() as WorksheetAttempt;
+                setAnswers(lastAttempt.answers);
+                setResults(lastAttempt.results);
+                setTimeTaken(lastAttempt.timeTaken);
+                setIsFinished(true);
+            }
+        }
+    };
+    checkExistingAttempt();
+  }, [user, firestore, worksheetId, userProfile?.completedWorksheets]);
+
 
   const orderedQuestions = useMemo(() => {
     if (!worksheet?.questions || !questions) return [];
@@ -63,7 +80,6 @@ export default function SolveWorksheetPage() {
           stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
       return total + questionMarks;
     }, 0);
-    // Set a minimum duration of 1 minute
     const duration = marks > 0 ? marks * 20 : 60;
     return { totalMarks: marks, totalDuration: duration };
   }, [orderedQuestions]);
@@ -112,17 +128,28 @@ export default function SolveWorksheetPage() {
   };
   
   const handleFinish = async () => {
+    const finalTimeTaken = startTime ? Math.floor((new Date().getTime() - startTime.getTime()) / 1000) : 0;
+    setTimeTaken(finalTimeTaken);
     setIsFinished(true);
 
-    if (user && firestore && worksheet?.worksheetType === 'practice') {
-        const userRef = doc(firestore, 'users', user.uid);
-        await updateDoc(userRef, {
-            completedWorksheets: arrayUnion(worksheetId)
-        });
-    }
-
-    if (worksheet) {
-      // Don't navigate away, just show results on the same page.
+    if (user && firestore && worksheet) {
+        if (worksheet.worksheetType === 'practice' && !userProfile?.completedWorksheets?.includes(worksheetId)) {
+            const userRef = doc(firestore, 'users', user.uid);
+            await updateDoc(userRef, {
+                completedWorksheets: arrayUnion(worksheetId)
+            });
+        }
+        
+        // Save the attempt
+        const attemptData: Omit<WorksheetAttempt, 'id'> = {
+            userId: user.uid,
+            worksheetId: worksheet.id,
+            answers,
+            results,
+            timeTaken: finalTimeTaken,
+            attemptedAt: serverTimestamp()
+        };
+        await addDoc(collection(firestore, 'attempts'), attemptData);
     }
   }
 
@@ -144,7 +171,6 @@ export default function SolveWorksheetPage() {
   const isLastQuestion = currentQuestionIndex === orderedQuestions.length - 1;
 
   if (isFinished) {
-    const timeTaken = startTime ? Math.floor((new Date().getTime() - startTime.getTime()) / 1000) : 0;
     return (
         <WorksheetResults 
             worksheet={worksheet}

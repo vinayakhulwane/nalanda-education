@@ -211,6 +211,21 @@
       },
       "required": ["title", "classId", "subjectId", "mode", "worksheetType", "questions", "authorId", "status"]
     },
+    "WorksheetAttempt": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Worksheet Attempt",
+      "description": "Stores a user's attempt at a worksheet.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "worksheetId": { "type": "string" },
+        "answers": { "type": "object" },
+        "results": { "type": "object" },
+        "timeTaken": { "type": "number" },
+        "attemptedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "worksheetId", "answers", "results", "timeTaken", "attemptedAt"]
+    },
     "EconomySettings": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Economy Settings",
@@ -316,6 +331,16 @@
             "$ref": "#/backend/entities/Worksheet"
           },
           "description": "Stores worksheets created by teachers and admins."
+        }
+      },
+      {
+        "path": "/attempts/{attemptId}",
+        "definition": {
+          "entityName": "WorksheetAttempt",
+          "schema": {
+            "$ref": "#/backend/entities/WorksheetAttempt"
+          },
+          "description": "Stores user attempts for worksheets."
         }
       },
       {

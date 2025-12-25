@@ -169,6 +169,17 @@ export interface Worksheet {
     updatedAt: any; // Firestore ServerTimestamp
 }
 
+export interface WorksheetAttempt {
+    id: string;
+    userId: string;
+    worksheetId: string;
+    answers: Record<string, { answer: any }>;
+    results: Record<string, { isCorrect: boolean }>;
+    timeTaken: number;
+    attemptedAt: any; // Firestore ServerTimestamp
+}
+
+
 export interface EconomySettings {
     coinsPerGold: number;
     goldPerDiamond: number;
