@@ -71,6 +71,13 @@ export function WorksheetRandomBuilder({
     }, {} as Record<CurrencyType, number>);
   }, [availableQuestions]);
   
+  const selectedQuestionsByCurrency = useMemo(() => {
+    return selectedQuestions.reduce((acc, q) => {
+      acc[q.currencyType] = (acc[q.currencyType] || 0) + 1;
+      return acc;
+    }, {} as Record<CurrencyType, number>);
+  }, [selectedQuestions]);
+
   const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost } = useMemo(() => {
     let totalMarks = 0;
     const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
@@ -232,19 +239,24 @@ export function WorksheetRandomBuilder({
             <CardTitle>Add Random by Type</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {allCurrencyTypes.map(currency => (
-              <div key={currency} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                <span className="capitalize">{currency}</span>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">
-                    {questionsByCurrency[currency] || 0} available
-                  </Badge>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => addRandomQuestion(currency)}>
-                    <PlusCircle className="h-5 w-5 text-primary" />
-                  </Button>
+            {allCurrencyTypes.map(currency => {
+              const totalOfType = questionsByCurrency[currency] || 0;
+              const selectedOfType = selectedQuestionsByCurrency[currency] || 0;
+              const remaining = totalOfType - selectedOfType;
+              return (
+                <div key={currency} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
+                  <span className="capitalize">{currency}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      {remaining} available
+                    </Badge>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => addRandomQuestion(currency)} disabled={remaining <= 0}>
+                      <PlusCircle className="h-5 w-5 text-primary" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       </div>
