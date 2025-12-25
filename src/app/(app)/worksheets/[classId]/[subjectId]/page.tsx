@@ -4,20 +4,18 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FilePlus2, Save, ArrowLeft, CalendarIcon } from "lucide-react";
+import { FilePlus2, Save, ArrowLeft } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
 import type { Subject, Unit } from "@/types";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 function CreateWorksheetModal({ subject, units, children }: { subject: Subject; units: Unit[]; children: React.ReactNode }) {
@@ -26,10 +24,31 @@ function CreateWorksheetModal({ subject, units, children }: { subject: Subject; 
     const [title, setTitle] = useState('');
     const [unitId, setUnitId] = useState('');
     const [mode, setMode] = useState<'practice' | 'exam'>('practice');
-    const [startDate, setStartDate] = useState<Date | undefined>();
+    
+    // Date state
+    const [day, setDay] = useState<string>('');
+    const [month, setMonth] = useState<string>('');
+    const [year, setYear] = useState<string>(new Date().getFullYear().toString());
     const [startTime, setStartTime] = useState('09:00');
 
-    const isFormValid = title && (mode === 'practice' || (mode === 'exam' && startDate));
+    const years = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() + i).toString());
+    const months = Array.from({ length: 12 }, (_, i) => ({ value: (i + 1).toString(), label: format(new Date(0, i), 'MMMM') }));
+    
+    const daysInMonth = useMemo(() => {
+        if (!month || !year) return 0;
+        return new Date(parseInt(year), parseInt(month), 0).getDate();
+    }, [month, year]);
+
+    const days = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
+
+    const isFormValid = useMemo(() => {
+        if (!title) return false;
+        if (mode === 'exam') {
+            return !!day && !!month && !!year;
+        }
+        return true;
+    }, [title, mode, day, month, year]);
+
 
     const handleProceed = () => {
         const params = new URLSearchParams();
@@ -38,10 +57,10 @@ function CreateWorksheetModal({ subject, units, children }: { subject: Subject; 
         params.set('title', title);
         params.set('unitId', unitId);
         params.set('mode', mode);
-        if (mode === 'exam' && startDate) {
+        if (mode === 'exam' && year && month && day) {
             const [hours, minutes] = startTime.split(':').map(Number);
-            const combinedDateTime = new Date(startDate);
-            combinedDateTime.setHours(hours, minutes);
+            // Month is 0-indexed in JS Date, so subtract 1
+            const combinedDateTime = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), hours, minutes);
             params.set('startTime', combinedDateTime.toISOString());
         }
         router.push(`/worksheets/new?${params.toString()}`);
@@ -86,32 +105,35 @@ function CreateWorksheetModal({ subject, units, children }: { subject: Subject; 
                     </div>
                     {mode === 'exam' && (
                         <div className="pt-2 animate-in fade-in space-y-4">
-                            <div className="p-4 border rounded-md">
-                                <Calendar
-                                    mode="single"
-                                    selected={startDate}
-                                    onSelect={setStartDate}
-                                    initialFocus
-                                />
+                            <Label>Start Date & Time</Label>
+                             <div className="grid grid-cols-3 gap-2">
+                                <Select value={day} onValueChange={setDay}>
+                                    <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
+                                    <SelectContent>
+                                        {days.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                 <Select value={month} onValueChange={setMonth}>
+                                    <SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger>
+                                    <SelectContent>
+                                        {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                 <Select value={year} onValueChange={setYear}>
+                                    <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
+                                    <SelectContent>
+                                        {years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Start Date</Label>
-                                    <Input
-                                        readOnly
-                                        value={startDate ? format(startDate, "PPP") : "Select a date above"}
-                                        className="bg-muted"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="start-time">Start Time</Label>
-                                    <Input
-                                        id="start-time"
-                                        type="time"
-                                        value={startTime}
-                                        onChange={(e) => setStartTime(e.target.value)}
-                                    />
-                                </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="start-time">Start Time</Label>
+                                <Input
+                                    id="start-time"
+                                    type="time"
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                />
                             </div>
                         </div>
                     )}
