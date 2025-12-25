@@ -251,79 +251,81 @@ export function WorksheetRandomBuilder({
                     </Button>
                 </div>
             </SheetTrigger>
-            <SheetContent className="w-[400px] sm:w-[540px] flex flex-col">
-                <SheetHeader>
-                    <SheetTitle>Review & Blueprint</SheetTitle>
+            <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
+                <SheetHeader className="p-6 pb-0">
+                    <SheetTitle>Review &amp; Blueprint</SheetTitle>
                     <SheetDescription>
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
                 </SheetHeader>
-                <Tabs defaultValue="review" className="flex-grow flex flex-col">
-                    <TabsList className="self-start">
+                <Tabs defaultValue="review" className="flex-grow flex flex-col mt-4 overflow-hidden">
+                    <TabsList className="mx-6">
                         <TabsTrigger value="review">Review</TabsTrigger>
                         <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="review" className="flex-grow mt-4">
-                        <div className="space-y-6">
-                             <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base">Core Summary</CardTitle>
-                                </CardHeader>
-                                <CardContent className="flex justify-around">
-                                    <div className="text-center">
-                                        <p className="text-2xl font-bold">{selectedQuestions.length}</p>
-                                        <p className="text-xs text-muted-foreground">Total Questions</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-2xl font-bold">{totalMarks}</p>
-                                        <p className="text-xs text-muted-foreground">Total Marks</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Content Breakdown</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <h4 className="text-sm font-semibold mb-2">By Unit</h4>
-                                        <div className="space-y-3">
-                                            {Object.entries(breakdownByUnit).map(([name, data]) => (
-                                                <div key={name}>
-                                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                        <span>{name}</span>
-                                                        <span>{data.count} Qs, {data.marks} Marks</span>
-                                                    </div>
-                                                    <Progress value={(data.count / selectedQuestions.length) * 100} />
-                                                </div>
-                                            ))}
+                    <div className="flex-grow overflow-y-auto px-6">
+                        <TabsContent value="review" className="mt-4">
+                            <div className="space-y-6">
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-base">Core Summary</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="flex justify-around">
+                                        <div className="text-center">
+                                            <p className="text-2xl font-bold">{selectedQuestions.length}</p>
+                                            <p className="text-xs text-muted-foreground">Total Questions</p>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-semibold mb-2">By Category</h4>
-                                        <div className="space-y-3">
-                                             {Object.entries(breakdownByCategory).map(([name, data]) => (
-                                                <div key={name}>
-                                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                        <span>{name}</span>
-                                                        <span>{data.count} Qs, {data.marks} Marks</span>
-                                                    </div>
-                                                    <Progress value={(data.count / selectedQuestions.length) * 100} />
-                                                </div>
-                                            ))}
+                                        <div className="text-center">
+                                            <p className="text-2xl font-bold">{totalMarks}</p>
+                                            <p className="text-xs text-muted-foreground">Total Marks</p>
                                         </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </TabsContent>
-                    <TabsContent value="blueprint" className="flex-grow mt-4">
-                        <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
-                           Blueprint features coming soon.
-                        </div>
-                    </TabsContent>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">Content Breakdown</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div>
+                                            <h4 className="text-sm font-semibold mb-2">By Unit</h4>
+                                            <div className="space-y-3">
+                                                {Object.entries(breakdownByUnit).map(([name, data]) => (
+                                                    <div key={name}>
+                                                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                            <span>{name}</span>
+                                                            <span>{data.count} Qs, {data.marks} Marks</span>
+                                                        </div>
+                                                        <Progress value={(data.count / selectedQuestions.length) * 100} />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-semibold mb-2">By Category</h4>
+                                            <div className="space-y-3">
+                                                {Object.entries(breakdownByCategory).map(([name, data]) => (
+                                                    <div key={name}>
+                                                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                            <span>{name}</span>
+                                                            <span>{data.count} Qs, {data.marks} Marks</span>
+                                                        </div>
+                                                        <Progress value={(data.count / selectedQuestions.length) * 100} />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </TabsContent>
+                        <TabsContent value="blueprint" className="mt-4">
+                            <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg min-h-[200px]">
+                                Blueprint features coming soon.
+                            </div>
+                        </TabsContent>
+                    </div>
                 </Tabs>
-                <SheetFooter className="bg-card border-t -mx-6 px-6 py-4 mt-auto">
+                <SheetFooter className="bg-card border-t px-6 py-4 mt-auto">
                     <div className="flex justify-between items-center w-full">
                         <div className="text-sm">
                             <p className="font-semibold">Est. Time: {estimatedTime} mins</p>
