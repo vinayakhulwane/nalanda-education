@@ -140,6 +140,7 @@ export function WorksheetManualBuilder({
 }, [selectedQuestions, unitMap, categoryMap]);
 
     const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
+    const isFilterActive = activeFilterCount > 0;
 
     return (
         <div className="space-y-4">
@@ -208,27 +209,32 @@ export function WorksheetManualBuilder({
                     </PopoverContent>
                 </Popover>
              </div>
-             {activeFilterCount > 0 && (
-                <div className="flex gap-2 items-center flex-wrap">
-                    <span className="text-sm font-semibold">Active Filters:</span>
-                    {filters.units.map(id => (
-                    <Badge key={id} variant="outline" className="pl-2 capitalize">
-                        Unit: {unitMap.get(id) || id}
-                        <button onClick={() => handleFilterChange('units', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-                    </Badge>
-                    ))}
-                    {filters.categories.map(id => (
-                    <Badge key={id} variant="outline" className="pl-2 capitalize">
-                        Category: {categoryMap.get(id) || id}
-                        <button onClick={() => handleFilterChange('categories', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-                    </Badge>
-                    ))}
-                    {filters.currencies.map(c => (
-                    <Badge key={c} variant="outline" className="pl-2 capitalize">
-                        {c}
-                        <button onClick={() => handleFilterChange('currencies', c, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-                    </Badge>
-                    ))}
+             {isFilterActive && (
+                 <div className="space-y-2">
+                     <p className="text-sm text-muted-foreground">
+                         Showing {filteredQuestions.length} of {availableQuestions.length} questions.
+                     </p>
+                    <div className="flex gap-2 items-center flex-wrap">
+                        <span className="text-sm font-semibold">Active Filters:</span>
+                        {filters.units.map(id => (
+                        <Badge key={id} variant="outline" className="pl-2 capitalize">
+                            Unit: {unitMap.get(id) || id}
+                            <button onClick={() => handleFilterChange('units', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                        </Badge>
+                        ))}
+                        {filters.categories.map(id => (
+                        <Badge key={id} variant="outline" className="pl-2 capitalize">
+                            Category: {categoryMap.get(id) || id}
+                            <button onClick={() => handleFilterChange('categories', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                        </Badge>
+                        ))}
+                        {filters.currencies.map(c => (
+                        <Badge key={c} variant="outline" className="pl-2 capitalize">
+                            {c}
+                            <button onClick={() => handleFilterChange('currencies', c, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                        </Badge>
+                        ))}
+                    </div>
                 </div>
             )}
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
