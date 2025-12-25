@@ -18,15 +18,20 @@ function NewWorksheetPageContent() {
 
     const classId = searchParams.get('classId');
     const subjectId = searchParams.get('subjectId');
+    const unitId = searchParams.get('unitId');
+    const title = searchParams.get('title');
 
     const questionsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        // If subjectId is provided, filter by it. Otherwise, fetch all questions.
-        if (subjectId) {
-            return query(collection(firestore, 'questions'), where('subjectId', '==', subjectId));
+        let q = collection(firestore, 'questions');
+        if (unitId) {
+            return query(q, where('unitId', '==', unitId));
         }
-        return collection(firestore, 'questions');
-    }, [firestore, subjectId]);
+        if (subjectId) {
+            return query(q, where('subjectId', '==', subjectId));
+        }
+        return q;
+    }, [firestore, subjectId, unitId]);
     
     const { data: questions, isLoading } = useCollection<Question>(questionsQuery);
 
@@ -47,8 +52,8 @@ function NewWorksheetPageContent() {
                 Back
             </Button>
             <PageHeader
-                title="Create a New Worksheet"
-                description="Build a custom assignment by selecting questions from the question bank."
+                title={title || "Create New Worksheet"}
+                description="Build your assignment by selecting questions from the bank."
             />
             <WorksheetBuilder availableQuestions={questions || []} />
         </div>

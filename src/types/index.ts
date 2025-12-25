@@ -150,3 +150,17 @@ export interface Question {
 }
 
 export type QuestionFilter = 'unit' | 'category' | 'status' | 'currency';
+
+
+export interface Worksheet {
+    id: string;
+    title: string;
+    classId: string;
+    subjectId: string;
+    unitId?: string;
+    mode: 'practice' | 'exam';
+    startTime?: Date; // For exam mode
+    questions: string[]; // Array of question IDs
+    authorId: string;
+    status: 'draft' | 'published';
+}
