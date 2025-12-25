@@ -116,11 +116,11 @@ export default function SolveWorksheetPage() {
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b h-16 flex items-center px-6">
-            <div className="flex items-center gap-2">
-                <Timer className="h-5 w-5 text-muted-foreground" />
-                <span className="text-lg font-semibold font-mono">{formatTime(timeLeft)}</span>
-            </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <Timer className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-lg font-semibold font-mono">{formatTime(timeLeft)}</span>
+                </div>
                 <Button variant="destructive" onClick={handleFinish}>
                     <X className="mr-2" /> End Attempt
                 </Button>
