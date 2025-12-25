@@ -146,10 +146,10 @@ export function WorksheetRandomBuilder({
     });
     
     const calculatedCost: Record<CurrencyType, number> = {
-        spark: countByCurrency.spark,
-        coin: Math.ceil(marksByCurrency.coin * 0.5),
-        gold: Math.ceil(marksByCurrency.gold * 0.5),
-        diamond: Math.ceil(marksByCurrency.diamond * 0.5),
+      spark: countByCurrency.spark,
+      coin: Math.ceil(marksByCurrency.coin * ((selectedQuestions.find(q=>q.currencyType === 'coin')?.costPercentage || 50) / 100)),
+      gold: Math.ceil(marksByCurrency.gold * ((selectedQuestions.find(q=>q.currencyType === 'gold')?.costPercentage || 50) / 100)),
+      diamond: Math.ceil(marksByCurrency.diamond * ((selectedQuestions.find(q=>q.currencyType === 'diamond')?.costPercentage || 50) / 100)),
     };
 
     const insufficient = !userIsEditor && (

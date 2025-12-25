@@ -139,6 +139,7 @@ export interface Question {
   unitId: string;
   categoryId: string;
   currencyType: CurrencyType;
+  costPercentage?: number;
   // Step 2: Steps
   solutionSteps: SolutionStep[];
   // Step 4: Grading
@@ -160,7 +161,7 @@ export interface Worksheet {
     subjectId: string;
     unitId?: string;
     mode: 'practice' | 'exam';
-    worksheetType: 'classroom' | 'sample';
+    worksheetType: 'classroom' | 'sample' | 'practice';
     startTime?: Date; // For exam mode
     questions: string[]; // Array of question IDs
     authorId: string;

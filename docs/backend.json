@@ -172,6 +172,9 @@
           "type": "string",
           "enum": ["spark", "coin", "gold", "diamond"]
         },
+        "costPercentage": {
+            "type": "number"
+        },
         "status": {
           "type": "string",
           "enum": ["draft", "published"]

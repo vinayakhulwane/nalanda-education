@@ -72,7 +72,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
         setQuestion(prev => ({...prev, subjectId: newSubjectId, unitId: '', categoryId: ''}));
     }
 
-    const isFormValid = !!question.name && !!question.mainQuestionText && !!question.classId && !!question.subjectId && !!question.unitId && !!question.categoryId && !!question.currencyType;
+    const isFormValid = !!question.name && !!question.mainQuestionText && !!question.classId && !!question.subjectId && !!question.unitId && !!question.categoryId && !!question.currencyType && question.costPercentage !== undefined;
 
      useEffect(() => {
       onValidityChange(isFormValid);
@@ -186,19 +186,25 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
                     </Select>
                 </div>
             </div>
-             <div className="space-y-2">
-                <Label>Currency Type</Label>
-                <Select onValueChange={val => setQuestion({...question, currencyType: val as any})} value={question.currencyType}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select a currency reward for this question" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="spark">Spark</SelectItem>
-                        <SelectItem value="coin">Coin</SelectItem>
-                        <SelectItem value="gold">Gold</SelectItem>
-                        <SelectItem value="diamond">Diamond</SelectItem>
-                    </SelectContent>
-                </Select>
+            <div className="grid md:grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label>Currency Type</Label>
+                    <Select onValueChange={val => setQuestion({...question, currencyType: val as any})} value={question.currencyType}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a currency reward for this question" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="spark">Spark</SelectItem>
+                            <SelectItem value="coin">Coin</SelectItem>
+                            <SelectItem value="gold">Gold</SelectItem>
+                            <SelectItem value="diamond">Diamond</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="cost-percentage">Cost Percentage</Label>
+                    <Input id="cost-percentage" type="number" placeholder="e.g. 50 for 50%" value={question.costPercentage ?? ''} onChange={e => setQuestion({...question, costPercentage: parseInt(e.target.value, 10) || 0})} />
+                </div>
             </div>
 
         </div>
@@ -302,7 +308,7 @@ export function QuestionBuilderWizard() {
     // This effect re-evaluates validity whenever the current step or the question data changes.
      switch (currentStep) {
         case 1:
-            const isMetaValid = !!question.name && !!question.mainQuestionText && !!question.classId && !!question.subjectId && !!question.unitId && !!question.categoryId && !!question.currencyType;
+            const isMetaValid = !!question.name && !!question.mainQuestionText && !!question.classId && !!question.subjectId && !!question.unitId && !!question.categoryId && !!question.currencyType && question.costPercentage !== undefined;
             setStepValid(isMetaValid);
             break;
         case 2:
