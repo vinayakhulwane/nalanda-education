@@ -114,7 +114,7 @@ export default function SolveWorksheetPage() {
 
 
   return (
-    <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <div className="flex flex-col h-screen p-4 sm:p-6 lg:p-8">
         <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b h-16 flex items-center px-6">
             <div className="ml-auto flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -127,17 +127,17 @@ export default function SolveWorksheetPage() {
             </div>
         </header>
 
-        <main className="mt-16">
-            <Card>
+        <main className="flex-grow mt-16 flex flex-col">
+            <Card className="flex-grow flex flex-col">
                     <CardHeader>
                         <CardTitle>{worksheet.title}</CardTitle>
                         <CardDescription>Question {currentQuestionIndex + 1} of {orderedQuestions.length}</CardDescription>
                         <Progress value={progressPercentage} className="mt-2" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex-grow overflow-y-auto">
                         <QuestionRunner question={activeQuestion} />
                     </CardContent>
-                    <CardFooter className="flex justify-between">
+                    <CardFooter className="flex justify-between mt-auto">
                         <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Previous
