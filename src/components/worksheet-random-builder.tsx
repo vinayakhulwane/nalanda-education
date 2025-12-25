@@ -4,7 +4,7 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
-import { ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles, WalletWarning } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from './ui/tooltip';
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
 
@@ -110,7 +111,7 @@ export function WorksheetRandomBuilder({
     }, {} as Record<CurrencyType, number>);
   }, [selectedQuestions]);
 
-  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost } = useMemo(() => {
+  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost, hasInsufficientBalance } = useMemo(() => {
     let totalMarks = 0;
     const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
     const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
@@ -144,14 +145,21 @@ export function WorksheetRandomBuilder({
         diamond: Math.ceil(marksByCurrency.diamond * 0.5),
     };
 
+    const insufficient = !userIsEditor && (
+        (userProfile?.coins || 0) < calculatedCost.coin ||
+        (userProfile?.gold || 0) < calculatedCost.gold ||
+        (userProfile?.diamonds || 0) < calculatedCost.diamond
+    );
+
     return { 
         totalMarks, 
         estimatedTime: Math.ceil((totalMarks * 20) / 60),
         breakdownByUnit,
         breakdownByCategory,
         totalCost: calculatedCost,
+        hasInsufficientBalance: insufficient,
     };
-}, [selectedQuestions, unitMap, categoryMap]);
+}, [selectedQuestions, unitMap, categoryMap, userProfile, userIsEditor]);
 
 
   const addRandomQuestion = (currency: CurrencyType) => {
@@ -185,6 +193,12 @@ export function WorksheetRandomBuilder({
   
   const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
   const isFilterActive = activeFilterCount > 0;
+  
+    const createButton = (
+        <Button onClick={() => onCreateWorksheet(worksheetType)} disabled={hasInsufficientBalance}>
+            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
+        </Button>
+    );
 
 
   return (
@@ -489,9 +503,18 @@ export function WorksheetRandomBuilder({
                                 })}
                             </div>
                         </div>
-                        <Button onClick={() => onCreateWorksheet(worksheetType)}>
-                            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
-                        </Button>
+                         {hasInsufficientBalance ? (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span>{createButton}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="flex items-center gap-2"><WalletWarning className="h-4 w-4" /> Not enough balance</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                         ) : createButton }
                     </div>
                 </SheetFooter>
             </SheetContent>

@@ -2,7 +2,7 @@
 import type { Question, Unit, Category, CurrencyType, Worksheet } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
-import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X } from 'lucide-react';
+import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X, WalletWarning } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
@@ -98,51 +98,64 @@ export function WorksheetManualBuilder({
               stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
     }
 
-    const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost } = useMemo(() => {
-    let totalMarks = 0;
-    const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
-    const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
-    
-    const marksByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
-    const countByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
-
-    selectedQuestions.forEach(q => {
-        const marks = q.solutionSteps?.reduce((stepSum, step) => 
-            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
-        totalMarks += marks;
+    const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost, hasInsufficientBalance } = useMemo(() => {
+        let totalMarks = 0;
+        const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
+        const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
         
-        marksByCurrency[q.currencyType] += marks;
-        countByCurrency[q.currencyType]++;
+        const marksByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
+        const countByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
 
-        const unitName = unitMap.get(q.unitId) || 'Uncategorized';
-        if (!breakdownByUnit[unitName]) breakdownByUnit[unitName] = { count: 0, marks: 0 };
-        breakdownByUnit[unitName].count++;
-        breakdownByUnit[unitName].marks += marks;
+        selectedQuestions.forEach(q => {
+            const marks = q.solutionSteps?.reduce((stepSum, step) => 
+                stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
+            totalMarks += marks;
+            
+            marksByCurrency[q.currencyType] += marks;
+            countByCurrency[q.currencyType]++;
+
+            const unitName = unitMap.get(q.unitId) || 'Uncategorized';
+            if (!breakdownByUnit[unitName]) breakdownByUnit[unitName] = { count: 0, marks: 0 };
+            breakdownByUnit[unitName].count++;
+            breakdownByUnit[unitName].marks += marks;
+            
+            const categoryName = categoryMap.get(q.categoryId) || 'Uncategorized';
+            if (!breakdownByCategory[categoryName]) breakdownByCategory[categoryName] = { count: 0, marks: 0 };
+            breakdownByCategory[categoryName].count++;
+            breakdownByCategory[categoryName].marks += marks;
+        });
         
-        const categoryName = categoryMap.get(q.categoryId) || 'Uncategorized';
-        if (!breakdownByCategory[categoryName]) breakdownByCategory[categoryName] = { count: 0, marks: 0 };
-        breakdownByCategory[categoryName].count++;
-        breakdownByCategory[categoryName].marks += marks;
-    });
-    
-    const calculatedCost: Record<CurrencyType, number> = {
-        spark: countByCurrency.spark,
-        coin: Math.ceil(marksByCurrency.coin * 0.5),
-        gold: Math.ceil(marksByCurrency.gold * 0.5),
-        diamond: Math.ceil(marksByCurrency.diamond * 0.5),
-    };
+        const calculatedCost: Record<CurrencyType, number> = {
+            spark: countByCurrency.spark,
+            coin: Math.ceil(marksByCurrency.coin * 0.5),
+            gold: Math.ceil(marksByCurrency.gold * 0.5),
+            diamond: Math.ceil(marksByCurrency.diamond * 0.5),
+        };
 
-    return { 
-        totalMarks, 
-        estimatedTime: Math.ceil((totalMarks * 20) / 60),
-        breakdownByUnit,
-        breakdownByCategory,
-        totalCost: calculatedCost,
-    };
-}, [selectedQuestions, unitMap, categoryMap]);
+        const insufficient = !userIsEditor && (
+            (userProfile?.coins || 0) < calculatedCost.coin ||
+            (userProfile?.gold || 0) < calculatedCost.gold ||
+            (userProfile?.diamonds || 0) < calculatedCost.diamond
+        );
+
+        return { 
+            totalMarks, 
+            estimatedTime: Math.ceil((totalMarks * 20) / 60),
+            breakdownByUnit,
+            breakdownByCategory,
+            totalCost: calculatedCost,
+            hasInsufficientBalance: insufficient,
+        };
+    }, [selectedQuestions, unitMap, categoryMap, userProfile, userIsEditor]);
 
     const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
     const isFilterActive = activeFilterCount > 0;
+    
+    const createButton = (
+        <Button onClick={() => onCreateWorksheet(worksheetType)} disabled={hasInsufficientBalance}>
+            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
+        </Button>
+    );
 
     return (
         <div className="space-y-4">
@@ -441,9 +454,18 @@ export function WorksheetManualBuilder({
                                 })}
                             </div>
                         </div>
-                        <Button onClick={() => onCreateWorksheet(worksheetType)}>
-                            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
-                        </Button>
+                         {hasInsufficientBalance ? (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span>{createButton}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="flex items-center gap-2"><WalletWarning className="h-4 w-4" /> Not enough balance</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                         ) : createButton }
                     </div>
                 </SheetFooter>
             </SheetContent>
