@@ -4,19 +4,15 @@ import { WorksheetBuilder } from "@/components/worksheet-builder";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import type { Question, Unit, Subject } from "@/types";
 import { collection, query, where, doc } from "firebase/firestore";
-import { Loader2, ArrowLeft, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState, useMemo } from 'react';
+import { Suspense, useState, useMemo, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 
 function NewWorksheetPageContent() {
     const router = useRouter();
@@ -33,6 +29,11 @@ function NewWorksheetPageContent() {
     const [mode, setMode] = useState<'practice' | 'exam'>('practice');
     const [examDate, setExamDate] = useState<Date | undefined>(undefined);
     const [startTime, setStartTime] = useState('09:00');
+
+    // Date dropdown states
+    const [day, setDay] = useState('');
+    const [month, setMonth] = useState('');
+    const [year, setYear] = useState('');
 
     // Data Fetching
     const subjectDocRef = useMemoFirebase(() => (firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null), [firestore, subjectId]);
@@ -55,6 +56,16 @@ function NewWorksheetPageContent() {
     
     const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
     
+    useEffect(() => {
+        if (day && month && year) {
+            // JS months are 0-indexed, so subtract 1
+            const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            setExamDate(newDate);
+        } else {
+            setExamDate(undefined);
+        }
+    }, [day, month, year]);
+
     const isFormValid = useMemo(() => {
         if (!title) return false;
         if (mode === 'exam') {
@@ -66,9 +77,17 @@ function NewWorksheetPageContent() {
     const handleProceed = () => {
         setFormSubmitted(true);
     }
-    
+
     const backUrl = subjectId && classId ? `/worksheets/${classId}/${subjectId}` : '/worksheets';
     const isLoading = areUnitsLoading || isSubjectLoading || (formSubmitted && areQuestionsLoading);
+
+    // Dynamic date parts for dropdowns
+    const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i);
+    const months = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
+    const daysInMonth = useMemo(() => {
+        if (!month || !year) return 31;
+        return new Date(parseInt(year), parseInt(month), 0).getDate();
+    }, [month, year]);
 
     if (isLoading) {
         return (
@@ -126,29 +145,37 @@ function NewWorksheetPageContent() {
                         {mode === 'exam' && (
                             <div className="pt-2 animate-in fade-in space-y-4">
                                 <Label>Start Date & Time</Label>
-                                <div className="flex gap-4">
-                                     <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "w-[280px] justify-start text-left font-normal",
-                                                !examDate && "text-muted-foreground"
-                                            )}
-                                            >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {examDate ? format(examDate, "PPP") : <span>Pick a date</span>}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                selected={examDate}
-                                                onSelect={setExamDate}
-                                                initialFocus
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
+                                <div className="flex flex-wrap gap-4">
+                                    <Select onValueChange={setDay} value={day}>
+                                        <SelectTrigger className="w-[120px]">
+                                            <SelectValue placeholder="Day" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
+                                                <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                     <Select onValueChange={setMonth} value={month}>
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue placeholder="Month" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {months.map(m => (
+                                                <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                     <Select onValueChange={setYear} value={year}>
+                                        <SelectTrigger className="w-[140px]">
+                                            <SelectValue placeholder="Year" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {years.map(y => (
+                                                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     <Input
                                         id="start-time"
                                         type="time"
