@@ -366,7 +366,9 @@ export function WorksheetRandomBuilder({
                                                 <p className="text-sm font-semibold">{q.name}</p>
                                                 <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
                                                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                    <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
+                                                    {q.gradingMode === 'ai' && (
+                                                      <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
+                                                    )}
                                                     <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
                                                     <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
                                                     <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>
