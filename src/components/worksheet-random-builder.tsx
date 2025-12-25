@@ -4,7 +4,7 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
-import { ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles, AlertCircle } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from './ui/tooltip';
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
 
@@ -118,56 +117,32 @@ export function WorksheetRandomBuilder({
     }, {} as Record<CurrencyType, number>);
   }, [selectedQuestions]);
 
-  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost, hasInsufficientBalance } = useMemo(() => {
+  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory } = useMemo(() => {
     let totalMarks = 0;
     const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
     const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
-    
-    const marksByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
-    const countByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
-
     selectedQuestions.forEach(q => {
-        const marks = q.solutionSteps?.reduce((stepSum, step) => 
-            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
-        totalMarks += marks;
-        
-        marksByCurrency[q.currencyType] += marks;
-        countByCurrency[q.currencyType]++;
+      const marks = q.solutionSteps?.reduce((stepSum, step) => 
+          stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
+      totalMarks += marks;
 
-        const unitName = unitMap.get(q.unitId) || 'Uncategorized';
-        if (!breakdownByUnit[unitName]) breakdownByUnit[unitName] = { count: 0, marks: 0 };
-        breakdownByUnit[unitName].count++;
-        breakdownByUnit[unitName].marks += marks;
-        
-        const categoryName = categoryMap.get(q.categoryId) || 'Uncategorized';
-        if (!breakdownByCategory[categoryName]) breakdownByCategory[categoryName] = { count: 0, marks: 0 };
-        breakdownByCategory[categoryName].count++;
-        breakdownByCategory[categoryName].marks += marks;
+      const unitName = unitMap.get(q.unitId) || 'Uncategorized';
+      if (!breakdownByUnit[unitName]) breakdownByUnit[unitName] = { count: 0, marks: 0 };
+      breakdownByUnit[unitName].count++;
+      breakdownByUnit[unitName].marks += marks;
+      
+      const categoryName = categoryMap.get(q.categoryId) || 'Uncategorized';
+      if (!breakdownByCategory[categoryName]) breakdownByCategory[categoryName] = { count: 0, marks: 0 };
+      breakdownByCategory[categoryName].count++;
+      breakdownByCategory[categoryName].marks += marks;
     });
-    
-    const calculatedCost: Record<CurrencyType, number> = {
-      spark: countByCurrency.spark,
-      coin: Math.ceil(marksByCurrency.coin * ((selectedQuestions.find(q=>q.currencyType === 'coin')?.costPercentage || 50) / 100)),
-      gold: Math.ceil(marksByCurrency.gold * ((selectedQuestions.find(q=>q.currencyType === 'gold')?.costPercentage || 50) / 100)),
-      diamond: Math.ceil(marksByCurrency.diamond * ((selectedQuestions.find(q=>q.currencyType === 'diamond')?.costPercentage || 50) / 100)),
-    };
-
-    const insufficient = !userIsEditor && (
-        (userProfile?.coins || 0) < calculatedCost.coin ||
-        (userProfile?.gold || 0) < calculatedCost.gold ||
-        (userProfile?.diamonds || 0) < calculatedCost.diamond
-    );
-
     return { 
-        totalMarks, 
-        estimatedTime: Math.ceil((totalMarks * 20) / 60),
-        breakdownByUnit,
-        breakdownByCategory,
-        totalCost: calculatedCost,
-        hasInsufficientBalance: insufficient,
+      totalMarks, 
+      estimatedTime: Math.ceil((totalMarks * 20) / 60),
+      breakdownByUnit,
+      breakdownByCategory
     };
-}, [selectedQuestions, unitMap, categoryMap, userProfile, userIsEditor]);
-
+  }, [selectedQuestions, unitMap, categoryMap]);
 
   const addRandomQuestion = (currency: CurrencyType) => {
     const candidates = availableQuestions.filter(q => 
@@ -208,12 +183,6 @@ export function WorksheetRandomBuilder({
         onCreateWorksheet('practice');
     }
   }
-
-    const createButton = (
-        <Button onClick={handleCreateClick} disabled={hasInsufficientBalance}>
-            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
-        </Button>
-    );
 
 
   return (
@@ -509,32 +478,10 @@ export function WorksheetRandomBuilder({
                 </div>
                 <SheetFooter className="bg-card border-t px-6 py-4 mt-auto">
                     <div className="flex justify-between items-center w-full">
-                        <div className="text-sm">
-                            <p className="font-semibold">Est. Time: {estimatedTime} mins</p>
-                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                {Object.entries(totalCost).filter(([,count]) => count > 0).map(([currency, count]) => {
-                                    const Icon = currencyIcons[currency as CurrencyType] || Sparkles;
-                                    const color = currencyColors[currency as CurrencyType];
-                                    return (
-                                        <span key={currency} className={cn("flex items-center gap-1 capitalize", color)}>
-                                            <Icon className="h-3 w-3" /> {count}
-                                        </span>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                         {hasInsufficientBalance ? (
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span>{createButton}</span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p className="flex items-center gap-2"><AlertCircle className="h-4 w-4" /> Not enough balance</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                         ) : createButton }
+                        <p className="text-sm font-semibold">Est. Time: {estimatedTime} mins</p>
+                         <Button onClick={handleCreateClick}>
+                            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
+                        </Button>
                     </div>
                 </SheetFooter>
             </SheetContent>

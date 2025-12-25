@@ -2,7 +2,7 @@
 import type { Question, Unit, Category, CurrencyType, Worksheet } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
-import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X, AlertCircle } from 'lucide-react';
+import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
@@ -12,8 +12,6 @@ import { Progress } from './ui/progress';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Checkbox } from './ui/checkbox';
 import { useUser } from '@/firebase';
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
@@ -56,71 +54,27 @@ export function WorksheetManualBuilder({
     const { userProfile } = useUser();
     const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
-    const [filters, setFilters] = useState<{
-        units: string[];
-        categories: string[];
-        currencies: CurrencyType[];
-    }>({
-        units: [],
-        categories: [],
-        currencies: [],
-    });
-    
-    // When unit filter changes, reset category filter
-    useEffect(() => {
-        setFilters(prev => ({...prev, categories: []}));
-    }, [filters.units]);
-
+    const [activeTab, setActiveTab] = useState<'unit' | 'category' | 'currency'>('unit');
     const unitMap = new Map(units.map(u => [u.id, u.name]));
     const categoryMap = new Map(categories.map(c => [c.id, c.name]));
-    
-    const availableCategories = useMemo(() => {
-        if (filters.units.length === 0) return categories;
-        return categories.filter(c => filters.units.includes(c.unitId));
-    }, [categories, filters.units]);
 
-    const filteredQuestions = useMemo(() => {
-        if (filters.units.length === 0 && filters.categories.length === 0 && filters.currencies.length === 0) {
-            return availableQuestions;
-        }
-        return availableQuestions.filter(q => {
-            const unitMatch = filters.units.length === 0 || filters.units.includes(q.unitId);
-            const categoryMatch = filters.categories.length === 0 || filters.categories.includes(q.categoryId);
-            const currencyMatch = filters.currencies.length === 0 || filters.currencies.includes(q.currencyType);
-            return unitMatch && categoryMatch && currencyMatch;
-        });
-    }, [availableQuestions, filters]);
-    
-    const handleFilterChange = (filterType: 'units' | 'categories' | 'currencies', value: string, isChecked: boolean) => {
-        setFilters(prev => {
-            const currentValues = prev[filterType] as string[];
-            const newValues = isChecked
-                ? [...currentValues, value]
-                : currentValues.filter(v => v !== value);
-            return { ...prev, [filterType]: newValues };
-        });
-    }
+    const questionsByUnit = useMemo(() => {
+        return availableQuestions.reduce((acc, q) => {
+            const unitName = unitMap.get(q.unitId) || q.unitId;
+            if (!acc[unitName]) acc[unitName] = [];
+            acc[unitName].push(q);
+            return acc;
+        }, {} as Record<string, Question[]>);
+    }, [availableQuestions, unitMap]);
 
-    const getQuestionMarks = (question: Question): number => {
-        return question.solutionSteps?.reduce((stepSum, step) => 
-              stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
-    }
-
-    const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost, hasInsufficientBalance } = useMemo(() => {
+    const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory } = useMemo(() => {
         let totalMarks = 0;
         const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
         const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
-        
-        const marksByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
-        const countByCurrency: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
-
         selectedQuestions.forEach(q => {
             const marks = q.solutionSteps?.reduce((stepSum, step) => 
                 stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
             totalMarks += marks;
-            
-            marksByCurrency[q.currencyType] += marks;
-            countByCurrency[q.currencyType]++;
 
             const unitName = unitMap.get(q.unitId) || 'Uncategorized';
             if (!breakdownByUnit[unitName]) breakdownByUnit[unitName] = { count: 0, marks: 0 };
@@ -132,32 +86,18 @@ export function WorksheetManualBuilder({
             breakdownByCategory[categoryName].count++;
             breakdownByCategory[categoryName].marks += marks;
         });
-        
-        const calculatedCost: Record<CurrencyType, number> = {
-            spark: countByCurrency.spark,
-            coin: Math.ceil(marksByCurrency.coin * ((selectedQuestions.find(q=>q.currencyType === 'coin')?.costPercentage || 50) / 100)),
-            gold: Math.ceil(marksByCurrency.gold * ((selectedQuestions.find(q=>q.currencyType === 'gold')?.costPercentage || 50) / 100)),
-            diamond: Math.ceil(marksByCurrency.diamond * ((selectedQuestions.find(q=>q.currencyType === 'diamond')?.costPercentage || 50) / 100)),
-        };
-
-        const insufficient = !userIsEditor && (
-            (userProfile?.coins || 0) < calculatedCost.coin ||
-            (userProfile?.gold || 0) < calculatedCost.gold ||
-            (userProfile?.diamonds || 0) < calculatedCost.diamond
-        );
-
         return { 
             totalMarks, 
             estimatedTime: Math.ceil((totalMarks * 20) / 60),
             breakdownByUnit,
-            breakdownByCategory,
-            totalCost: calculatedCost,
-            hasInsufficientBalance: insufficient,
+            breakdownByCategory
         };
-    }, [selectedQuestions, unitMap, categoryMap, userProfile, userIsEditor]);
-
-    const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
-    const isFilterActive = activeFilterCount > 0;
+    }, [selectedQuestions, unitMap, categoryMap]);
+    
+    const getQuestionMarks = (question: Question): number => {
+        return question.solutionSteps?.reduce((stepSum, step) => 
+              stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
+    }
     
     const handleCreateClick = () => {
         if (userIsEditor) {
@@ -167,175 +107,78 @@ export function WorksheetManualBuilder({
         }
     }
 
-    const createButton = (
-        <Button onClick={handleCreateClick} disabled={hasInsufficientBalance}>
-            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
-        </Button>
-    );
 
     return (
-        <div className="space-y-4">
-             <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold">Available Questions</h3>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline">
-                        <Filter className="mr-2 h-4 w-4" />
-                        Filter
-                        {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2 rounded-full h-5 w-5 p-0 justify-center">{activeFilterCount}</Badge>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80" align="end">
-                        <Tabs defaultValue="unit" className="w-full">
-                            <TabsList className="grid w-full grid-cols-3">
-                                <TabsTrigger value="unit">Unit</TabsTrigger>
-                                <TabsTrigger value="category" disabled={filters.units.length > 0 && availableCategories.length === 0}>Category</TabsTrigger>
-                                <TabsTrigger value="currency">Currency</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="unit" className="mt-2">
-                            <div className="space-y-2">
-                                {units.map(unit => (
-                                <div key={unit.id} className="flex items-center space-x-2">
-                                    <Checkbox
-                                    id={`manual-filter-unit-${unit.id}`}
-                                    checked={filters.units.includes(unit.id)}
-                                    onCheckedChange={(checked) => handleFilterChange('units', unit.id, !!checked)}
-                                    />
-                                    <Label htmlFor={`manual-filter-unit-${unit.id}`} className="capitalize">{unit.name}</Label>
-                                </div>
-                                ))}
-                            </div>
-                            </TabsContent>
-                            <TabsContent value="category" className="mt-2">
-                            <div className="space-y-2">
-                                {availableCategories.map(cat => (
-                                <div key={cat.id} className="flex items-center space-x-2">
-                                    <Checkbox
-                                    id={`manual-filter-cat-${cat.id}`}
-                                    checked={filters.categories.includes(cat.id)}
-                                    onCheckedChange={(checked) => handleFilterChange('categories', cat.id, !!checked)}
-                                    />
-                                    <Label htmlFor={`manual-filter-cat-${cat.id}`} className="capitalize">{cat.name}</Label>
-                                </div>
-                                ))}
-                                {filters.units.length > 0 && availableCategories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories found for the selected unit(s).</p>}
-                                {filters.units.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Please select a unit first.</p>}
-                            </div>
-                            </TabsContent>
-                            <TabsContent value="currency" className="mt-2">
-                            <div className="space-y-2">
-                                {(['spark', 'coin', 'gold', 'diamond'] as CurrencyType[]).map(currency => (
-                                <div key={currency} className="flex items-center space-x-2">
-                                    <Checkbox
-                                    id={`manual-filter-currency-${currency}`}
-                                    checked={filters.currencies.includes(currency)}
-                                    onCheckedChange={(checked) => handleFilterChange('currencies', currency, !!checked)}
-                                    />
-                                    <Label htmlFor={`manual-filter-currency-${currency}`} className="capitalize">{currency}</Label>
-                                </div>
-                                ))}
-                            </div>
-                            </TabsContent>
-                        </Tabs>
-                    </PopoverContent>
-                </Popover>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+             <div className="lg:col-span-2">
+                <h3 className="text-xl font-semibold mb-4">Available Questions</h3>
+                 <Tabs defaultValue="unit" className="w-full">
+                    <TabsList>
+                        <TabsTrigger value="unit">By Unit</TabsTrigger>
+                        <TabsTrigger value="category">By Category</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="unit">
+                        {Object.entries(questionsByUnit).map(([unitName, questions]) => (
+                             <Card key={unitName} className="mb-4">
+                                <CardHeader>
+                                    <CardTitle className="text-lg">{unitName}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {questions.map(q => {
+                                         const isSelected = selectedQuestions.some(sq => sq.id === q.id);
+                                         const CurrencyIcon = currencyIcons[q.currencyType];
+                                         const currencyColor = currencyColors[q.currencyType];
+                                         return (
+                                            <Card key={q.id} className="flex flex-col">
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="text-base line-clamp-1">{q.name}</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="space-y-2 flex-grow">
+                                                     <div className="flex items-center gap-2">
+                                                        <TooltipProvider>
+                                                            {q.gradingMode === 'ai' && (
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild><Badge variant="outline" className="p-1"><Bot className="h-3 w-3"/></Badge></TooltipTrigger>
+                                                                    <TooltipContent><p>AI Graded</p></TooltipContent>
+                                                                </Tooltip>
+                                                            )}
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Badge variant="outline" className={cn("capitalize flex items-center gap-1", currencyColor)}><CurrencyIcon className="h-3 w-3" /> {q.currencyType}</Badge>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent><p className="capitalize">{q.currencyType}</p></TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                        <Badge variant="secondary">{getQuestionMarks(q)} Marks</Badge>
+                                                    </div>
+                                                </CardContent>
+                                                <CardFooter>
+                                                    <Button onClick={() => addQuestion(q, 'manual')} disabled={isSelected} className="w-full">
+                                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                                        {isSelected ? 'Added' : 'Add'}
+                                                    </Button>
+                                                </CardFooter>
+                                            </Card>
+                                         )
+                                    })}
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </TabsContent>
+                    <TabsContent value="category">
+                        {/* Placeholder for category view */}
+                        <Card><CardContent className="p-6 text-center text-muted-foreground">Category view coming soon.</CardContent></Card>
+                    </TabsContent>
+                </Tabs>
              </div>
-             {isFilterActive && (
-                 <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                         Showing {filteredQuestions.length} of {availableQuestions.length} questions.
-                     </p>
-                    <div className="flex gap-2 items-center flex-wrap">
-                        <span className="text-sm font-semibold">Active Filters:</span>
-                        {filters.units.map(id => (
-                        <Badge key={id} variant="outline" className="pl-2 capitalize">
-                            Unit: {unitMap.get(id) || id}
-                            <button onClick={() => handleFilterChange('units', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-                        </Badge>
-                        ))}
-                        {filters.categories.map(id => (
-                        <Badge key={id} variant="outline" className="pl-2 capitalize">
-                            Category: {categoryMap.get(id) || id}
-                            <button onClick={() => handleFilterChange('categories', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-                        </Badge>
-                        ))}
-                        {filters.currencies.map(c => (
-                        <Badge key={c} variant="outline" className="pl-2 capitalize">
-                            {c}
-                            <button onClick={() => handleFilterChange('currencies', c, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-                        </Badge>
-                        ))}
-                    </div>
-                </div>
-            )}
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredQuestions.map(q => {
-                    const isSelected = selectedQuestions.some(sq => sq.id === q.id);
-                    const CurrencyIcon = currencyIcons[q.currencyType];
-                    const currencyColor = currencyColors[q.currencyType];
-                    return (
-                        <Card key={q.id} className="flex flex-col">
-                            <CardHeader>
-                                <CardTitle className="text-base line-clamp-1">{q.name}</CardTitle>
-                                <CardDescription className="text-xs line-clamp-2 h-8">
-                                    {q.mainQuestionText.replace(/<[^>]*>?/gm, '')}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3 flex-grow">
-                                <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                                    <span>{unitMap.get(q.unitId) || 'N/A'}</span>
-                                    <span>&bull;</span>
-                                    <span>{categoryMap.get(q.categoryId) || 'N/A'}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                     <TooltipProvider>
-                                        {q.gradingMode === 'ai' && (
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                <Badge variant="outline" className="p-1">
-                                                    <Bot className="h-3 w-3"/>
-                                                </Badge>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                <p>AI Graded</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        )}
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Badge variant="outline" className={cn("capitalize flex items-center gap-1", currencyColor)}>
-                                                    <CurrencyIcon className="h-3 w-3" /> {q.currencyType}
-                                                </Badge>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p className="capitalize">{q.currencyType}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                     </TooltipProvider>
-                                     <Badge variant="secondary">{getQuestionMarks(q)} Marks</Badge>
-                                </div>
-                            </CardContent>
-                            <CardFooter>
-                                 <Button onClick={() => addQuestion(q, 'manual')} disabled={isSelected} className="w-full">
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    {isSelected ? 'Added' : 'Add to Worksheet'}
-                                </Button>
-                            </CardFooter>
-                        </Card>
-                    )
-                })}
-            </div>
-            {filteredQuestions.length === 0 && (
-                <div className="text-center text-muted-foreground py-10 border-2 border-dashed rounded-lg">
-                    <p>No questions found for the current filters.</p>
-                </div>
-            )}
-             <Sheet>
+             <div className="lg:col-span-1">
+                <Sheet>
             <SheetTrigger asChild>
-                <div className="fixed bottom-6 right-6">
-                    <Button size="lg" className="rounded-full h-16 w-16 shadow-xl" disabled={selectedQuestions.length === 0}>
-                        <ShoppingCart className="h-6 w-6" />
-                        <Badge className="absolute -top-1 -right-1">{selectedQuestions.length}</Badge>
+                <div className="fixed bottom-6 right-6 lg:relative lg:bottom-auto lg:right-auto">
+                    <Button size="lg" className="rounded-full h-16 w-16 shadow-xl lg:w-full lg:h-auto lg:rounded-md" disabled={selectedQuestions.length === 0}>
+                        <ShoppingCart className="h-6 w-6 lg:mr-2" />
+                        <span className="hidden lg:inline">Review & Create</span>
+                        <Badge className="absolute -top-1 -right-1 lg:static lg:ml-auto">{selectedQuestions.length}</Badge>
                     </Button>
                 </div>
             </SheetTrigger>
@@ -461,36 +304,15 @@ export function WorksheetManualBuilder({
                 </div>
                 <SheetFooter className="bg-card border-t px-6 py-4 mt-auto">
                     <div className="flex justify-between items-center w-full">
-                        <div className="text-sm">
-                            <p className="font-semibold">Est. Time: {estimatedTime} mins</p>
-                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                {Object.entries(totalCost).filter(([,count]) => count > 0).map(([currency, count]) => {
-                                    const Icon = currencyIcons[currency as CurrencyType] || Sparkles;
-                                    const color = currencyColors[currency as CurrencyType];
-                                    return (
-                                        <span key={currency} className={cn("flex items-center gap-1 capitalize", color)}>
-                                            <Icon className="h-3 w-3" /> {count}
-                                        </span>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                         {hasInsufficientBalance ? (
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span>{createButton}</span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p className="flex items-center gap-2"><AlertCircle className="h-4 w-4" /> Not enough balance</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                         ) : createButton }
+                        <p className="text-sm font-semibold">Est. Time: {estimatedTime} mins</p>
+                        <Button onClick={handleCreateClick}>
+                            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
+                        </Button>
                     </div>
                 </SheetFooter>
             </SheetContent>
         </Sheet>
+             </div>
         </div>
     );
 }

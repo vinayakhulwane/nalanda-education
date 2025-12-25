@@ -139,7 +139,6 @@ export interface Question {
   unitId: string;
   categoryId: string;
   currencyType: CurrencyType;
-  costPercentage?: number;
   // Step 2: Steps
   solutionSteps: SolutionStep[];
   // Step 4: Grading
