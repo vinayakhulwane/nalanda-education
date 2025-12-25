@@ -1,14 +1,15 @@
 'use client';
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, documentId } from 'firebase/firestore';
-import type { Worksheet, Question } from '@/types';
+import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { doc, collection, query, where, documentId, updateDoc, arrayUnion } from 'firebase/firestore';
+import type { Worksheet, Question, SubQuestion, CurrencyType } from '@/types';
 import { Loader2, ArrowLeft, ArrowRight, CheckCircle, Timer, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { WorksheetResults, type AnswerState, type ResultState } from '@/components/worksheet-results';
 
 function formatTime(seconds: number) {
   const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -23,8 +24,12 @@ export default function SolveWorksheetPage() {
   const params = useParams();
   const worksheetId = params.worksheetId as string;
   const firestore = useFirestore();
+  const { user } = useUser();
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isFinished, setIsFinished] = useState(false);
+  const [answers, setAnswers] = useState<AnswerState>({});
+  const [results, setResults] = useState<ResultState>({});
 
   // Fetch worksheet
   const worksheetRef = useMemoFirebase(() => (firestore && worksheetId ? doc(firestore, 'worksheets', worksheetId) : null), [firestore, worksheetId]);
@@ -51,31 +56,45 @@ export default function SolveWorksheetPage() {
           stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
       return total + questionMarks;
     }, 0);
-    return { totalMarks: marks, totalDuration: marks * 20 };
+    // Set a minimum duration of 1 minute
+    const duration = marks > 0 ? marks * 20 : 60;
+    return { totalMarks: marks, totalDuration: duration };
   }, [orderedQuestions]);
 
   const [timeLeft, setTimeLeft] = useState(totalDuration);
+  const [startTime, setStartTime] = useState<Date | null>(null);
 
-  useEffect(() => {
+   useEffect(() => {
     if (totalDuration > 0) {
       setTimeLeft(totalDuration);
     }
   }, [totalDuration]);
 
   useEffect(() => {
-    if (timeLeft <= 0) return;
-    const timerId = setInterval(() => {
-      setTimeLeft(prevTime => prevTime - 1);
-    }, 1000);
-    return () => clearInterval(timerId);
-  }, [timeLeft]);
+    if (startTime && !isFinished) {
+       if (timeLeft <= 0) {
+        handleFinish();
+        return;
+      }
+      const timerId = setInterval(() => {
+        setTimeLeft(prevTime => prevTime - 1);
+      }, 1000);
+      return () => clearInterval(timerId);
+    }
+  }, [timeLeft, startTime, isFinished]);
 
 
   const isLoading = isWorksheetLoading || areQuestionsLoading;
   
+  const handleStart = () => {
+    setStartTime(new Date());
+  }
+
   const handleNext = () => {
     if (currentQuestionIndex < orderedQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+        handleFinish();
     }
   };
 
@@ -85,13 +104,18 @@ export default function SolveWorksheetPage() {
     }
   };
   
-  const handleFinish = () => {
-    // In a real app, you would submit answers here and navigate to a results page
-    console.log('Worksheet finished!');
+  const handleFinish = async () => {
+    setIsFinished(true);
+
+    if (user && firestore && worksheet?.worksheetType === 'practice') {
+        const userRef = doc(firestore, 'users', user.uid);
+        await updateDoc(userRef, {
+            completedWorksheets: arrayUnion(worksheetId)
+        });
+    }
+
     if (worksheet) {
-      router.push(`/academics/${worksheet.classId}/${worksheet.subjectId}`);
-    } else {
-      router.push('/dashboard');
+      // Don't navigate away, just show results on the same page.
     }
   }
 
@@ -111,6 +135,35 @@ export default function SolveWorksheetPage() {
   const activeQuestion = orderedQuestions[currentQuestionIndex];
   const progressPercentage = ((currentQuestionIndex + 1) / orderedQuestions.length) * 100;
   const isLastQuestion = currentQuestionIndex === orderedQuestions.length - 1;
+
+  if (isFinished) {
+    const timeTaken = startTime ? Math.floor((new Date().getTime() - startTime.getTime()) / 1000) : 0;
+    return (
+        <WorksheetResults 
+            worksheet={worksheet}
+            questions={orderedQuestions}
+            answers={answers}
+            results={results}
+            timeTaken={timeTaken}
+        />
+    )
+  }
+
+  if (!startTime) {
+    return (
+        <div className="flex flex-col h-screen p-4 sm:p-6 lg:p-8 items-center justify-center">
+             <Card className="max-w-2xl text-center">
+                <CardHeader>
+                    <CardTitle>{worksheet.title}</CardTitle>
+                    <CardDescription>Ready to begin? You'll have {formatTime(totalDuration)} to complete {orderedQuestions.length} questions.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button size="lg" onClick={handleStart}>Start Attempt</Button>
+                </CardContent>
+            </Card>
+        </div>
+    )
+  }
 
 
   return (
@@ -135,7 +188,13 @@ export default function SolveWorksheetPage() {
                         <Progress value={progressPercentage} className="mt-2" />
                     </CardHeader>
                     <CardContent className="flex-grow overflow-y-auto">
-                        <QuestionRunner question={activeQuestion} />
+                        <QuestionRunner 
+                            key={activeQuestion.id} 
+                            question={activeQuestion}
+                            onAnswerSubmit={(subQuestionId, answer) => setAnswers(prev => ({...prev, [subQuestionId]: { answer }}))}
+                            onResultCalculated={(subQuestionId, isCorrect) => setResults(prev => ({...prev, [subQuestionId]: { isCorrect }}))}
+                            initialAnswers={answers}
+                        />
                     </CardContent>
                     <CardFooter className="flex justify-between mt-auto">
                         <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>
