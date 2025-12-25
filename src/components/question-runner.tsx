@@ -57,28 +57,37 @@ function parseUnitAndValue(input: string): { value: number, unit: string } | nul
 
 
 function convertToBase(value: number, unit: string, baseUnit: string): number {
-    const normalizedUnit = unit.toLowerCase().trim();
-    const normalizedBaseUnit = baseUnit.toLowerCase().trim();
+    // 1. Normalize inputs: trim, lowercase, and map % to "percent"
+    let nUnit = unit.toLowerCase().trim();
+    let nBase = baseUnit.toLowerCase().trim();
 
-    // --- NEW RULE: Handle Unitless ---
-    // If the requirement is unitless, and the student provides no unit, it's a match.
-    if ((normalizedBaseUnit === 'unitless' || normalizedBaseUnit === '') && normalizedUnit === '') {
+    if (nUnit === '%') nUnit = 'percent';
+    if (nBase === '%') nBase = 'percent';
+
+    // 2. "The Same" Rule: Allow empty units for 'unitless' OR 'percent'
+    // This allows a student to just type "50" instead of "50%" or "50 percent"
+    if (nUnit === '' && (nBase === '' || nBase === 'unitless' || nBase === 'percent')) {
         return value;
     }
 
-    if (normalizedUnit === normalizedBaseUnit) return value;
+    // 3. Direct Match (handles percent === percent or N === N)
+    if (nUnit === nBase) return value;
     
-    // Handle cases where one unit is a prefixed version of the other (e.g. kN vs N)
-    if (normalizedUnit.endsWith(normalizedBaseUnit) && normalizedBaseUnit !== '') { // e.g. unit 'kn', base 'n'
-      const prefix = normalizedUnit.replace(normalizedBaseUnit, '');
+    // 4. Prefix Logic (e.g., kN to N)
+    // Ensure we don't try to prefix match empty strings or percentages
+    if (nBase !== '' && nBase !== 'percent' && nUnit.endsWith(nBase)) {
+      const prefix = nUnit.replace(nBase, '');
       if (prefix && unitPrefixes[prefix]) {
         return value * unitPrefixes[prefix];
       }
-    } else if (normalizedBaseUnit.endsWith(normalizedUnit) && normalizedUnit !== '') { // e.g. unit 'n', base 'kn'
-      const prefix = normalizedBaseUnit.replace(normalizedUnit, '');
-      if (prefix && unitPrefixes[prefix]) {
-        return value / unitPrefixes[prefix];
-      }
+    } 
+    
+    // If we have a base unit like 'kN' and student provides 'N'
+    if (nUnit !== '' && nBase.endsWith(nUnit)) {
+       const prefix = nBase.replace(nUnit, '');
+       if (prefix && unitPrefixes[prefix]) {
+         return value / unitPrefixes[prefix];
+       }
     }
 
     return NaN;
@@ -137,16 +146,20 @@ export function QuestionRunner({ question }: { question: Question }) {
         let isCorrect = false;
         switch (subQ.answerType) {
             case 'numerical':
-                const parsedAnswer = parseUnitAndValue(studentAnswer);
+                const parsed = parseUnitAndValue(studentAnswer);
                 const { baseUnit, correctValue, toleranceValue } = subQ.numericalAnswer || {};
 
-                if (parsedAnswer && correctValue !== undefined) {
+                if (parsed && correctValue !== undefined) {
+                    // Tolerance is often a percentage (e.g., 1%)
                     const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
+                    
+                    // Pass the raw baseUnit to our new convertToBase
                     const studentValueInBase = convertToBase(
-                        parsedAnswer.value, 
-                        parsedAnswer.unit, 
-                        baseUnit || 'unitless' // Default to unitless if not specified
+                        parsed.value, 
+                        parsed.unit, 
+                        baseUnit || 'unitless'
                     );
+
                     if (!isNaN(studentValueInBase)) {
                         isCorrect = Math.abs(studentValueInBase - correctValue) <= tolerance;
                     }
