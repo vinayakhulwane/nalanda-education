@@ -14,6 +14,7 @@ import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
+import { useUser } from '@/firebase';
 
 type WorksheetRandomBuilderProps = {
   availableQuestions: Question[];
@@ -52,6 +53,8 @@ export function WorksheetRandomBuilder({
     currencies: [],
   });
   const [worksheetType, setWorksheetType] = useState<'classroom' | 'sample'>('classroom');
+  const { userProfile } = useUser();
+  const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
   const unitMap = useMemo(() => new Map(units.map(u => [u.id, u.name])), [units]);
   const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
@@ -359,15 +362,17 @@ export function WorksheetRandomBuilder({
                     <SheetDescription>
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
-                    <div className="flex items-center space-x-2 pt-4">
-                        <Label htmlFor="worksheet-type" className={cn("text-muted-foreground", worksheetType === 'sample' && 'font-semibold text-foreground')}>
-                            Sample Worksheet
-                        </Label>
-                        <Switch id="worksheet-type" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
-                         <Label htmlFor="worksheet-type" className={cn("text-muted-foreground", worksheetType === 'classroom' && 'font-semibold text-foreground')}>
-                           Classroom Assignment
-                        </Label>
-                    </div>
+                    {userIsEditor && (
+                      <div className="flex items-center space-x-2 pt-4">
+                          <Label htmlFor="worksheet-type" className={cn("text-muted-foreground", worksheetType === 'sample' && 'font-semibold text-foreground')}>
+                              Sample Worksheet
+                          </Label>
+                          <Switch id="worksheet-type" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
+                          <Label htmlFor="worksheet-type" className={cn("text-muted-foreground", worksheetType === 'classroom' && 'font-semibold text-foreground')}>
+                            Classroom Assignment
+                          </Label>
+                      </div>
+                    )}
                 </SheetHeader>
                 <div className="flex-grow overflow-y-auto">
                     <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
@@ -490,4 +495,3 @@ export function WorksheetRandomBuilder({
     </div>
   );
 }
-
