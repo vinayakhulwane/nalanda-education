@@ -1,14 +1,22 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, documentId } from 'firebase/firestore';
-import type { Worksheet, Question, Subject, Class } from '@/types';
-import { Loader2, ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react';
+import type { Worksheet, Question } from '@/types';
+import { Loader2, ArrowLeft, ArrowRight, CheckCircle, Timer, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+
+function formatTime(seconds: number) {
+  const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+  const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
 
 export default function SolveWorksheetPage() {
   const router = useRouter();
@@ -30,12 +38,38 @@ export default function SolveWorksheetPage() {
   }, [firestore, worksheet?.questions]);
   const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
   
-  // Create a map for quick question lookup and then order them
   const orderedQuestions = useMemo(() => {
     if (!worksheet?.questions || !questions) return [];
     const questionsMap = new Map(questions.map(q => [q.id, q]));
     return worksheet.questions.map(id => questionsMap.get(id)).filter(Boolean) as Question[];
   }, [worksheet?.questions, questions]);
+
+  const { totalMarks, totalDuration } = useMemo(() => {
+    if (!orderedQuestions) return { totalMarks: 0, totalDuration: 0 };
+    const marks = orderedQuestions.reduce((total, question) => {
+      const questionMarks = question.solutionSteps?.reduce((stepSum, step) => 
+          stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
+      return total + questionMarks;
+    }, 0);
+    return { totalMarks: marks, totalDuration: marks * 20 };
+  }, [orderedQuestions]);
+
+  const [timeLeft, setTimeLeft] = useState(totalDuration);
+
+  useEffect(() => {
+    if (totalDuration > 0) {
+      setTimeLeft(totalDuration);
+    }
+  }, [totalDuration]);
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const timerId = setInterval(() => {
+      setTimeLeft(prevTime => prevTime - 1);
+    }, 1000);
+    return () => clearInterval(timerId);
+  }, [timeLeft]);
+
 
   const isLoading = isWorksheetLoading || areQuestionsLoading;
   
@@ -80,39 +114,48 @@ export default function SolveWorksheetPage() {
 
 
   return (
-    <div className="max-w-4xl mx-auto">
-        <Button variant="ghost" onClick={() => router.back()} className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-        </Button>
-       
-       <Card>
-            <CardHeader>
-                <CardTitle>{worksheet.title}</CardTitle>
-                <CardDescription>Question {currentQuestionIndex + 1} of {orderedQuestions.length}</CardDescription>
-                <Progress value={progressPercentage} className="mt-2" />
-            </CardHeader>
-            <CardContent>
-                <QuestionRunner question={activeQuestion} />
-            </CardContent>
-            <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Previous
+    <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b h-16 flex items-center px-6">
+            <div className="flex items-center gap-2">
+                <Timer className="h-5 w-5 text-muted-foreground" />
+                <span className="text-lg font-semibold font-mono">{formatTime(timeLeft)}</span>
+            </div>
+            <div className="ml-auto">
+                <Button variant="destructive" onClick={handleFinish}>
+                    <X className="mr-2" /> End Attempt
                 </Button>
-                 {isLastQuestion ? (
-                     <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700">
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Finish Attempt
-                    </Button>
-                ) : (
-                    <Button onClick={handleNext}>
-                        Next
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                )}
-            </CardFooter>
-       </Card>
+            </div>
+        </header>
+
+        <main className="mt-16">
+            <Card>
+                    <CardHeader>
+                        <CardTitle>{worksheet.title}</CardTitle>
+                        <CardDescription>Question {currentQuestionIndex + 1} of {orderedQuestions.length}</CardDescription>
+                        <Progress value={progressPercentage} className="mt-2" />
+                    </CardHeader>
+                    <CardContent>
+                        <QuestionRunner question={activeQuestion} />
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                        <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Previous
+                        </Button>
+                        {isLastQuestion ? (
+                            <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700">
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Finish Attempt
+                            </Button>
+                        ) : (
+                            <Button onClick={handleNext}>
+                                Next
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        )}
+                    </CardFooter>
+            </Card>
+        </main>
     </div>
   );
 }
