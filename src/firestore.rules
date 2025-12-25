@@ -138,8 +138,12 @@ service cloud.firestore {
     match /attempts/{attemptId} {
       // A user can create their own attempt.
       allow create: if isOwner(request.resource.data.userId);
-      // A user can read their own attempts. Teachers/Admins can read any attempt.
-      allow read: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
+      
+      // A user can read their own attempts, but only if they query by their own userId
+      allow list: if request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy']) &&
+                   request.query.userId == request.auth.uid;
+      allow get: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
+
       // No one can update or delete attempts to preserve history.
       allow update, delete: if false;
     }
