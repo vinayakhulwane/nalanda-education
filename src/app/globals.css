@@ -7,6 +7,9 @@ body {
 }
 
 @layer base {
+  html {
+    font-size: 90%;
+  }
   :root {
     --background: 236 50% 94%;
     --foreground: 231 48% 15%;
