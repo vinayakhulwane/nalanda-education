@@ -167,3 +167,8 @@ export interface Worksheet {
     createdAt: any; // Firestore ServerTimestamp
     updatedAt: any; // Firestore ServerTimestamp
 }
+
+export interface EconomySettings {
+    coinsPerGold: number;
+    goldPerDiamond: number;
+}

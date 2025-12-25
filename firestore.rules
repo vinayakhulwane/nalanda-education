@@ -134,5 +134,10 @@ service cloud.firestore {
       // Teachers and Admins are allowed to create, update, and delete worksheets.
       allow write: if isTeacher() || isAdmin();
     }
+
+    match /settings/{settingId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+    }
   }
 }

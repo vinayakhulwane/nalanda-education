@@ -49,7 +49,7 @@ export function AppSidebar() {
     { href: "/academics", icon: Briefcase, label: "Academics" },
     { href: "/numerical-management", icon: BookPlus, label: "Numerical Management" },
     { href: "/worksheets", icon: FilePlus2, label: "Worksheet Generator" },
-    { href: "#", icon: Building2, label: "Economy Setting" },
+    { href: "/economy-settings", icon: Building2, label: "Economy Setting" },
   ];
   
   const teacherMenu = [
