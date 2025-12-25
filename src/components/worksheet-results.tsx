@@ -86,16 +86,24 @@ export function WorksheetResults({
     const rewards: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
     
     questions.forEach(q => {
+        let obtainedMarksForQuestion = 0;
         q.solutionSteps.forEach(step => {
             step.subQuestions.forEach(subQ => {
                 totalMarks += subQ.marks;
                 if(results[subQ.id]?.isCorrect) {
                     score += subQ.marks;
-                    // For simplicity, let's say each correct subquestion gives 1 of the currency type
-                    rewards[q.currencyType] = (rewards[q.currencyType] || 0) + 1;
+                    obtainedMarksForQuestion += subQ.marks;
                 }
             })
-        })
+        });
+
+        if (q.currencyType === 'spark') {
+            const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5);
+            rewards.coin += rewardValue;
+        } else {
+            const rewardValue = obtainedMarksForQuestion;
+            rewards[q.currencyType] += rewardValue;
+        }
     })
 
     return { totalMarks, score, rewards };
