@@ -66,10 +66,8 @@ function NumericalManagementSubjectCard({ subject, classId }: { subject: Subject
 }
 
 
-export default function NumericalManagementSubjectsPage() {
+function NumericalManagementSubjectsPageContent({ classId }: { classId: string }) {
     const router = useRouter();
-    const params = useParams();
-    const classId = params.classId as string;
     const firestore = useFirestore();
 
     const classDocRef = useMemoFirebase(() => {
@@ -120,4 +118,9 @@ export default function NumericalManagementSubjectsPage() {
             </div>
         </div>
     )
+}
+
+
+export default function NumericalManagementSubjectsPage({ params }: { params: { classId: string } }) {
+    return <NumericalManagementSubjectsPageContent classId={params.classId} />;
 }
