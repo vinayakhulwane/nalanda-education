@@ -16,12 +16,14 @@ import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
 
+type QuestionWithSource = Question & { source?: 'manual' | 'random' };
+
 type WorksheetRandomBuilderProps = {
   availableQuestions: Question[];
   units: Unit[];
   categories: Category[];
-  selectedQuestions: Question[];
-  setSelectedQuestions: (questions: Question[]) => void;
+  selectedQuestions: QuestionWithSource[];
+  setSelectedQuestions: (questions: QuestionWithSource[]) => void;
   onCreateWorksheet: (worksheetType: 'classroom' | 'sample') => void;
   removeQuestion: (questionId: string) => void;
 };
@@ -160,7 +162,7 @@ export function WorksheetRandomBuilder({
     );
     if (candidates.length > 0) {
       const randomIndex = Math.floor(Math.random() * candidates.length);
-      setSelectedQuestions([...selectedQuestions, candidates[randomIndex]]);
+      setSelectedQuestions([...selectedQuestions, {...candidates[randomIndex], source: 'random'}]);
     }
   };
   
@@ -444,12 +446,15 @@ export function WorksheetRandomBuilder({
                                         <Card key={q.id} className="p-3">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-grow">
+                                                    {q.source === 'manual' && <p className="font-semibold text-sm">{q.name}</p>}
                                                     <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
                                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                                         {q.gradingMode === 'ai' && (
                                                             <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
                                                         )}
-                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
+                                                        {q.source === 'random' && (
+                                                            <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
+                                                        )}
                                                         <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
                                                         <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>
                                                     </div>

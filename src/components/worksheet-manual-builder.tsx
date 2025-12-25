@@ -16,10 +16,12 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Checkbox } from './ui/checkbox';
 import { useUser } from '@/firebase';
 
+type QuestionWithSource = Question & { source?: 'manual' | 'random' };
+
 type WorksheetManualBuilderProps = {
     availableQuestions: Question[];
-    selectedQuestions: Question[];
-    addQuestion: (question: Question) => void;
+    selectedQuestions: QuestionWithSource[];
+    addQuestion: (question: Question, source: 'manual' | 'random') => void;
     removeQuestion: (questionId: string) => void;
     units: Unit[];
     categories: Category[];
@@ -284,7 +286,7 @@ export function WorksheetManualBuilder({
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                 <Button onClick={() => addQuestion(q)} disabled={isSelected} className="w-full">
+                                 <Button onClick={() => addQuestion(q, 'manual')} disabled={isSelected} className="w-full">
                                     <PlusCircle className="mr-2 h-4 w-4" />
                                     {isSelected ? 'Added' : 'Add to Worksheet'}
                                 </Button>
@@ -395,11 +397,14 @@ export function WorksheetManualBuilder({
                                         <Card key={q.id} className="p-3">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-grow">
-                                                    <p className="font-semibold text-sm">{q.name}</p>
+                                                    {q.source === 'manual' && <p className="font-semibold text-sm">{q.name}</p>}
                                                     <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
                                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                                         {q.gradingMode === 'ai' && (
                                                             <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
+                                                        )}
+                                                        {q.source === 'random' && (
+                                                            <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
                                                         )}
                                                         <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
                                                         <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>

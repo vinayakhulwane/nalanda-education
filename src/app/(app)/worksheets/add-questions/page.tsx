@@ -13,6 +13,9 @@ import { useUser } from "@/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorksheetManualBuilder } from "@/components/worksheet-manual-builder";
 
+// Add a source property to track where the question came from
+type QuestionWithSource = Question & { source?: 'manual' | 'random' };
+
 function AddQuestionsPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -29,7 +32,7 @@ function AddQuestionsPageContent() {
     const examDate = searchParams.get('examDate');
     const startTime = searchParams.get('startTime');
 
-    const [selectedQuestions, setSelectedQuestions] = useState<Question[]>([]);
+    const [selectedQuestions, setSelectedQuestions] = useState<QuestionWithSource[]>([]);
 
     const subjectDocRef = useMemoFirebase(() => (firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null), [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
@@ -112,9 +115,9 @@ function AddQuestionsPageContent() {
         }
     };
     
-    const addQuestion = (question: Question) => {
+    const addQuestion = (question: Question, source: 'manual' | 'random' = 'manual') => {
         if (!selectedQuestions.find(q => q.id === question.id)) {
-            setSelectedQuestions([...selectedQuestions, question]);
+            setSelectedQuestions([...selectedQuestions, { ...question, source }]);
         }
     };
 
