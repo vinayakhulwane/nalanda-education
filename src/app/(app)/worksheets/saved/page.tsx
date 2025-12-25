@@ -27,17 +27,23 @@ function SavedWorksheetsPageContent() {
 
 
   const worksheetsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid || !subjectId) return null;
-    // This query now matches the security rule by filtering on authorId and subjectId.
+    if (!firestore || !user?.uid) return null;
+    // This query now matches the security rule by filtering on authorId.
     return query(
       collection(firestore, 'worksheets'),
       where('authorId', '==', user.uid),
-      where('subjectId', '==', subjectId),
       orderBy('createdAt', 'desc')
     );
-  }, [firestore, user?.uid, subjectId]);
+  }, [firestore, user?.uid]);
 
-  const { data: worksheets, isLoading } = useCollection<Worksheet>(worksheetsQuery);
+  const { data: allUserWorksheets, isLoading } = useCollection<Worksheet>(worksheetsQuery);
+
+  const subjectWorksheets = useMemo(() => {
+    if (!allUserWorksheets || !subjectId) return [];
+    // Client-side filtering for the subject
+    return allUserWorksheets.filter(ws => ws.subjectId === subjectId);
+  }, [allUserWorksheets, subjectId]);
+
 
   const backUrl = subjectId && classId ? `/worksheets/${classId}/${subjectId}` : '/worksheets';
 
@@ -67,7 +73,7 @@ function SavedWorksheetsPageContent() {
                     <div className="flex h-48 items-center justify-center">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
-                ) : worksheets && worksheets.length > 0 ? (
+                ) : subjectWorksheets && subjectWorksheets.length > 0 ? (
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -80,7 +86,7 @@ function SavedWorksheetsPageContent() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {worksheets.map(ws => (
+                            {subjectWorksheets.map(ws => (
                                 <TableRow key={ws.id}>
                                     <TableCell className="font-medium">{ws.title}</TableCell>
                                     <TableCell>
