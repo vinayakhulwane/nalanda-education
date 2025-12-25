@@ -244,7 +244,7 @@ export function WorksheetRandomBuilder({
                   </span>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">
-                      {remaining} available
+                      {remaining}
                     </Badge>
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => addRandomQuestion(currency)} disabled={remaining <= 0}>
                       <PlusCircle className="h-5 w-5 text-primary" />
@@ -379,7 +379,7 @@ export function WorksheetRandomBuilder({
                                     const Icon = currencyIcons[currency as CurrencyType] || Sparkles;
                                     return (
                                         <span key={currency} className="flex items-center gap-1 capitalize">
-                                            <Icon className="h-3 w-3" /> {count} {currency}
+                                            <Icon className="h-3 w-3" /> {count}
                                         </span>
                                     )
                                 })}
@@ -395,3 +395,5 @@ export function WorksheetRandomBuilder({
     </div>
   );
 }
+
+    
