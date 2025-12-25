@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import type { Question, Unit, Category } from '@/types';
@@ -6,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Edit, Trash, Sparkles, Coins, Gem, Diamond } from "lucide-react";
+import { Edit, Trash, Sparkles, Coins, Gem, Diamond, Eye } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 
 interface QuestionBankTableProps {
   questions: Question[];
@@ -25,12 +27,18 @@ const currencyIcons: { [key: string]: React.ElementType } = {
 export function QuestionBankTable({ questions, units, categories }: QuestionBankTableProps) {
   const router = useRouter();
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
 
   const handleDeleteClick = (question: Question) => {
     setSelectedQuestion(question);
     setDeleteDialogOpen(true);
   };
+  
+  const handleViewClick = (question: Question) => {
+    setSelectedQuestion(question);
+    setIsViewModalOpen(true);
+  }
 
   const confirmDelete = () => {
     if (selectedQuestion) {
@@ -83,6 +91,9 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
                     <TableCell>{getUnitName(q.unitId)}</TableCell>
                     <TableCell>{getCategoryName(q.categoryId)}</TableCell>
                     <TableCell className="text-right">
+                       <Button variant="ghost" size="icon" onClick={() => handleViewClick(q)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => router.push(`/questions/new?questionId=${q.id}`)}>
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -118,6 +129,22 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+        <DialogContent className="sm:max-w-[625px]">
+          <DialogHeader>
+            <DialogTitle>{selectedQuestion?.name}</DialogTitle>
+             <DialogDescription>
+              Question Preview
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: selectedQuestion?.mainQuestionText || '' }} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
