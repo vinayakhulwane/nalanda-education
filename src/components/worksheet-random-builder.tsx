@@ -5,7 +5,7 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Droplet, Star } from 'lucide-react';
+import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Droplet, Star, Coins, Gem, Diamond } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
@@ -25,9 +25,9 @@ type WorksheetRandomBuilderProps = {
 
 const currencyIcons = {
     spark: Droplet,
-    coin: Star,
-    gold: Star,
-    diamond: Star,
+    coin: Coins,
+    gold: Gem,
+    diamond: Diamond,
 };
 
 
@@ -84,7 +84,6 @@ export function WorksheetRandomBuilder({
     const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
     const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
     
-    // For now, let's assume cost is 1 per question of its currency type. This can be refined.
     const costMap: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
 
     selectedQuestions.forEach(q => {
@@ -194,7 +193,6 @@ export function WorksheetRandomBuilder({
       </Card>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* By Unit */}
         <Card>
           <CardHeader>
             <CardTitle>By Unit</CardTitle>
@@ -212,7 +210,6 @@ export function WorksheetRandomBuilder({
           </CardContent>
         </Card>
 
-        {/* By Category */}
         <Card>
           <CardHeader>
             <CardTitle>By Category</CardTitle>
@@ -230,7 +227,6 @@ export function WorksheetRandomBuilder({
           </CardContent>
         </Card>
 
-        {/* Add Random by Type */}
         <Card>
           <CardHeader>
             <CardTitle>Add Random by Type</CardTitle>
@@ -392,10 +388,15 @@ export function WorksheetRandomBuilder({
                     <div className="flex justify-between items-center w-full">
                         <div className="text-sm">
                             <p className="font-semibold">Est. Time: {estimatedTime} mins</p>
-                            <div className="flex gap-2 text-xs text-muted-foreground">
-                                {Object.entries(totalCost).filter(([,count]) => count > 0).map(([currency, count]) => (
-                                    <span key={currency} className="capitalize">{count} {currency}</span>
-                                ))}
+                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                {Object.entries(totalCost).filter(([,count]) => count > 0).map(([currency, count]) => {
+                                    const Icon = currencyIcons[currency as CurrencyType] || Star;
+                                    return (
+                                        <span key={currency} className="flex items-center gap-1 capitalize">
+                                            <Icon className="h-3 w-3" /> {count} {currency}
+                                        </span>
+                                    )
+                                })}
                             </div>
                         </div>
                         <Button onClick={onCreateWorksheet}>
