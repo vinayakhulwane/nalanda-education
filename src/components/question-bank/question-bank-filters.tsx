@@ -1,9 +1,13 @@
 'use client';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Filter, Search, X } from "lucide-react";
 import type { Unit, Category } from "@/types";
-import { Search, X } from "lucide-react";
 
 interface QuestionBankFiltersProps {
   units: Unit[];
@@ -34,51 +38,89 @@ export function QuestionBankFilters({ units, categories, filters, setFilters, re
         filters.currency !== 'all' && { key: 'currency', label: `Currency: ${filters.currency.charAt(0).toUpperCase() + filters.currency.slice(1)}` },
         filters.search !== '' && {key: 'search', label: `Search: "${filters.search}"`},
     ].filter(Boolean) as { key: string; label: string }[];
-  
-    return (
-    <div className="mb-6 space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <Select value={filters.unit} onValueChange={setFilters.setUnit}>
-          <SelectTrigger><SelectValue placeholder="Filter by unit..." /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Units</SelectItem>
-            {units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filters.category} onValueChange={setFilters.setCategory} disabled={filters.unit === 'all'}>
-          <SelectTrigger><SelectValue placeholder="Filter by category..." /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-             {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filters.status} onValueChange={setFilters.setStatus}>
-          <SelectTrigger><SelectValue placeholder="Filter by status..." /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="published">Published</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filters.currency} onValueChange={setFilters.setCurrency}>
-          <SelectTrigger><SelectValue placeholder="Filter by currency..." /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Currencies</SelectItem>
-            <SelectItem value="spark">Spark</SelectItem>
-            <SelectItem value="coin">Coin</SelectItem>
-            <SelectItem value="gold">Gold</SelectItem>
-            <SelectItem value="diamond">Diamond</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="relative flex-grow">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by title..." className="pl-10" value={filters.search} onChange={e => setFilters.setSearch(e.target.value)} />
-        </div>
-      </div>
+    
+    const isFilterActive = activeFilters.length > 0;
 
-       <div className="flex items-center gap-2 text-sm text-muted-foreground">
+  return (
+    <div className="mb-6 space-y-4">
+      <div className="flex items-center gap-4">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="h-10">
+                <Filter className="mr-2 h-4 w-4" />
+                Filter
+                {isFilterActive && <span className="ml-2 h-2 w-2 rounded-full bg-primary" />}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-96 p-0" align="start">
+            <Tabs defaultValue="unit" className="w-full">
+              <TabsList className="grid w-full grid-cols-5 bg-muted/60 h-auto p-1 rounded-b-none">
+                <TabsTrigger value="unit" className="text-xs">Unit</TabsTrigger>
+                <TabsTrigger value="category" className="text-xs" disabled={filters.unit === 'all'}>Category</TabsTrigger>
+                <TabsTrigger value="status" className="text-xs">Status</TabsTrigger>
+                <TabsTrigger value="currency" className="text-xs">Currency</TabsTrigger>
+                <TabsTrigger value="search" className="text-xs">Search</TabsTrigger>
+              </TabsList>
+              <ScrollArea className="h-64">
+                <div className="p-4">
+                    <TabsContent value="unit">
+                        <RadioGroup value={filters.unit} onValueChange={setFilters.setUnit}>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="all" id="unit-all" />
+                                <Label htmlFor="unit-all">All Units</Label>
+                            </div>
+                            {units.map(u => (
+                                <div key={u.id} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={u.id} id={`unit-${u.id}`} />
+                                    <Label htmlFor={`unit-${u.id}`}>{u.name}</Label>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                    </TabsContent>
+                    <TabsContent value="category">
+                         <RadioGroup value={filters.category} onValueChange={setFilters.setCategory}>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="all" id="cat-all" />
+                                <Label htmlFor="cat-all">All Categories</Label>
+                            </div>
+                            {categories.map(c => (
+                                <div key={c.id} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={c.id} id={`cat-${c.id}`} />
+                                    <Label htmlFor={`cat-${c.id}`}>{c.name}</Label>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                    </TabsContent>
+                    <TabsContent value="status">
+                         <RadioGroup value={filters.status} onValueChange={setFilters.setStatus}>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="status-all" /><Label htmlFor="status-all">All Statuses</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="published" id="status-published" /><Label htmlFor="status-published">Published</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="draft" id="status-draft" /><Label htmlFor="status-draft">Draft</Label></div>
+                        </RadioGroup>
+                    </TabsContent>
+                     <TabsContent value="currency">
+                         <RadioGroup value={filters.currency} onValueChange={setFilters.setCurrency}>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="curr-all" /><Label htmlFor="curr-all">All Currencies</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="spark" id="curr-spark" /><Label htmlFor="curr-spark">Spark</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="coin" id="curr-coin" /><Label htmlFor="curr-coin">Coin</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="gold" id="curr-gold" /><Label htmlFor="curr-gold">Gold</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="diamond" id="curr-diamond" /><Label htmlFor="curr-diamond">Diamond</Label></div>
+                        </RadioGroup>
+                    </TabsContent>
+                     <TabsContent value="search">
+                        <div className="relative flex-grow">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input placeholder="Search by title..." className="pl-10 h-10" value={filters.search} onChange={e => setFilters.setSearch(e.target.value)} />
+                        </div>
+                    </TabsContent>
+                </div>
+              </ScrollArea>
+            </Tabs>
+          </PopoverContent>
+        </Popover>
+         <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <span>Showing {resultCount} results</span>
-            {activeFilters.length > 0 && <span>|</span>}
+            {isFilterActive && <span>|</span>}
             <div className="flex flex-wrap items-center gap-1">
                 {activeFilters.map(f => (
                     <span key={f.key} className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded-md">
@@ -86,9 +128,10 @@ export function QuestionBankFilters({ units, categories, filters, setFilters, re
                         <button onClick={() => resetFilters(f.key)}><X className="h-3 w-3"/></button>
                     </span>
                 ))}
-                 {activeFilters.length > 0 && <Button variant="link" size="sm" onClick={() => resetFilters('all')} className="text-xs h-auto p-1">Clear all</Button>}
+                 {isFilterActive && <Button variant="link" size="sm" onClick={() => resetFilters('all')} className="text-xs h-auto p-1">Clear all</Button>}
             </div>
         </div>
+      </div>
     </div>
   );
 }
