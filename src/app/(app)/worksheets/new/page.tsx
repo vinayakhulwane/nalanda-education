@@ -81,13 +81,47 @@ function NewWorksheetPageContent() {
     const backUrl = subjectId && classId ? `/worksheets/${classId}/${subjectId}` : '/worksheets';
     const isLoading = areUnitsLoading || isSubjectLoading || (formSubmitted && areQuestionsLoading);
 
-    // Dynamic date parts for dropdowns
-    const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i);
-    const months = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
+    // Date logic
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-indexed
+    const currentDay = today.getDate();
+
+    const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+    
+    const availableMonths = useMemo(() => {
+        const allMonths = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
+        if (parseInt(year) === currentYear) {
+            return allMonths.slice(currentMonth - 1);
+        }
+        return allMonths;
+    }, [year, currentYear, currentMonth]);
+
     const daysInMonth = useMemo(() => {
         if (!month || !year) return 31;
         return new Date(parseInt(year), parseInt(month), 0).getDate();
     }, [month, year]);
+
+    const availableDays = useMemo(() => {
+        const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+        if (parseInt(year) === currentYear && parseInt(month) === currentMonth) {
+            return days.filter(d => d >= currentDay);
+        }
+        return days;
+    }, [daysInMonth, year, month, currentYear, currentMonth, currentDay]);
+
+
+    const handleYearChange = (newYear: string) => {
+        setYear(newYear);
+        setMonth('');
+        setDay('');
+    }
+
+    const handleMonthChange = (newMonth: string) => {
+        setMonth(newMonth);
+        setDay('');
+    }
+
 
     if (isLoading) {
         return (
@@ -146,33 +180,33 @@ function NewWorksheetPageContent() {
                             <div className="pt-2 animate-in fade-in space-y-4">
                                 <Label>Start Date & Time</Label>
                                 <div className="flex flex-wrap gap-4">
-                                    <Select onValueChange={setDay} value={day}>
-                                        <SelectTrigger className="w-[120px]">
-                                            <SelectValue placeholder="Day" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
-                                                <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                     <Select onValueChange={setMonth} value={month}>
-                                        <SelectTrigger className="w-[180px]">
-                                            <SelectValue placeholder="Month" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {months.map(m => (
-                                                <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                     <Select onValueChange={setYear} value={year}>
+                                    <Select onValueChange={handleYearChange} value={year}>
                                         <SelectTrigger className="w-[140px]">
                                             <SelectValue placeholder="Year" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {years.map(y => (
                                                 <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                     <Select onValueChange={handleMonthChange} value={month} disabled={!year}>
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue placeholder="Month" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableMonths.map(m => (
+                                                <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                     <Select onValueChange={setDay} value={day} disabled={!month}>
+                                        <SelectTrigger className="w-[120px]">
+                                            <SelectValue placeholder="Day" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableDays.map(d => (
+                                                <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
