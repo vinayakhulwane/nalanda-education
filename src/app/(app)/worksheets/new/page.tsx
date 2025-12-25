@@ -6,7 +6,8 @@ import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import type { Question } from "@/types";
 import { collection, query, where } from "firebase/firestore";
 import { Loader2, ArrowLeft } from "lucide-react";
-import { useRouter, useSearchParams, Suspense } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from 'react';
 import { Button } from "@/components/ui/button";
 
 
