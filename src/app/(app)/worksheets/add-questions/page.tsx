@@ -31,6 +31,7 @@ function AddQuestionsPageContent() {
     const mode = searchParams.get('mode') as 'practice' | 'exam';
     const examDate = searchParams.get('examDate');
     const startTime = searchParams.get('startTime');
+    const source = searchParams.get('source');
 
     const [selectedQuestions, setSelectedQuestions] = useState<QuestionWithSource[]>([]);
 
@@ -65,7 +66,7 @@ function AddQuestionsPageContent() {
     const backUrl = subjectId && classId ? `/worksheets/new?classId=${classId}&subjectId=${subjectId}` : '/worksheets';
     const isLoading = isSubjectLoading || areQuestionsLoading || areUnitsLoading || areCategoriesLoading;
 
-    const handleCreateWorksheet = async (worksheetType: 'classroom' | 'sample') => {
+    const handleCreateWorksheet = async (worksheetType: 'classroom' | 'sample' | 'practice') => {
         if (!user || !firestore || !classId || !subjectId || !title) {
             toast({
                 variant: 'destructive',
@@ -107,7 +108,16 @@ function AddQuestionsPageContent() {
                 title: 'Worksheet Created',
                 description: `"${title}" has been saved.`
             });
-            router.push(`/worksheets/saved?classId=${classId}&subjectId=${subjectId}`);
+            
+            // Navigate based on where the user started the flow
+            if (source === 'practice' && classId && subjectId) {
+                 router.push(`/academics/${classId}/${subjectId}`);
+            } else if (classId && subjectId) {
+                router.push(`/worksheets/saved?classId=${classId}&subjectId=${subjectId}`);
+            } else {
+                 router.push(`/dashboard`);
+            }
+
         } catch (error) {
             console.error('Error creating worksheet:', error);
             toast({

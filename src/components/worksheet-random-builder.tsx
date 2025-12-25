@@ -24,7 +24,7 @@ type WorksheetRandomBuilderProps = {
   categories: Category[];
   selectedQuestions: QuestionWithSource[];
   setSelectedQuestions: (questions: QuestionWithSource[]) => void;
-  onCreateWorksheet: (worksheetType: 'classroom' | 'sample') => void;
+  onCreateWorksheet: (worksheetType: 'classroom' | 'sample' | 'practice') => void;
   removeQuestion: (questionId: string) => void;
 };
 
@@ -194,8 +194,16 @@ export function WorksheetRandomBuilder({
   const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
   const isFilterActive = activeFilterCount > 0;
   
+  const handleCreateClick = () => {
+    if (userIsEditor) {
+        onCreateWorksheet(worksheetType);
+    } else {
+        onCreateWorksheet('practice');
+    }
+  }
+
     const createButton = (
-        <Button onClick={() => onCreateWorksheet(worksheetType)} disabled={hasInsufficientBalance}>
+        <Button onClick={handleCreateClick} disabled={hasInsufficientBalance}>
             Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
         </Button>
     );
