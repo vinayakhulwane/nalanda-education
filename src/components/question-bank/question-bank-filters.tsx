@@ -4,11 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { Unit, Category } from "@/types";
 import { Search, X } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Card, CardContent } from "../ui/card";
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
-import { Label } from "../ui/label";
-import { ScrollArea } from "../ui/scroll-area";
 
 interface QuestionBankFiltersProps {
   units: Unit[];
@@ -42,81 +37,44 @@ export function QuestionBankFilters({ units, categories, filters, setFilters, re
   
     return (
     <div className="mb-6 space-y-4">
-        <Tabs defaultValue="unit">
-            <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="unit">Unit</TabsTrigger>
-                <TabsTrigger value="category" disabled={filters.unit === 'all'}>Category</TabsTrigger>
-                <TabsTrigger value="status">Status</TabsTrigger>
-                <TabsTrigger value="currency">Currency</TabsTrigger>
-                <TabsTrigger value="search">Search</TabsTrigger>
-            </TabsList>
-            <Card className="mt-2">
-                <CardContent className="p-4">
-                    <ScrollArea className="h-48">
-                         <TabsContent value="unit">
-                            <RadioGroup value={filters.unit} onValueChange={setFilters.setUnit}>
-                                <div className="space-y-2">
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="all" id="unit-all" />
-                                        <Label htmlFor="unit-all">All Units</Label>
-                                    </div>
-                                    {units.map(u => (
-                                        <div key={u.id} className="flex items-center space-x-2">
-                                            <RadioGroupItem value={u.id} id={`unit-${u.id}`} />
-                                            <Label htmlFor={`unit-${u.id}`}>{u.name}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </RadioGroup>
-                        </TabsContent>
-                         <TabsContent value="category">
-                             <RadioGroup value={filters.category} onValueChange={setFilters.setCategory}>
-                                 <div className="space-y-2">
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="all" id="cat-all" />
-                                        <Label htmlFor="cat-all">All Categories</Label>
-                                    </div>
-                                    {categories.map(c => (
-                                        <div key={c.id} className="flex items-center space-x-2">
-                                            <RadioGroupItem value={c.id} id={`cat-${c.id}`} />
-                                            <Label htmlFor={`cat-${c.id}`}>{c.name}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                             </RadioGroup>
-                         </TabsContent>
-                        <TabsContent value="status">
-                           <RadioGroup value={filters.status} onValueChange={setFilters.setStatus}>
-                                <div className="space-y-2">
-                                    <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="status-all" /><Label htmlFor="status-all">All Statuses</Label></div>
-                                    <div className="flex items-center space-x-2"><RadioGroupItem value="published" id="status-published" /><Label htmlFor="status-published">Published</Label></div>
-                                    <div className="flex items-center space-x-2"><RadioGroupItem value="draft" id="status-draft" /><Label htmlFor="status-draft">Draft</Label></div>
-                                </div>
-                            </RadioGroup>
-                        </TabsContent>
-                        <TabsContent value="currency">
-                             <RadioGroup value={filters.currency} onValueChange={setFilters.setCurrency}>
-                                <div className="space-y-2">
-                                    <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="curr-all" /><Label htmlFor="curr-all">All Currencies</Label></div>
-                                    <div className="flex items-center space-x-2"><RadioGroupItem value="spark" id="curr-spark" /><Label htmlFor="curr-spark">Spark</Label></div>
-                                    <div className="flex items-center space-x-2"><RadioGroupItem value="coin" id="curr-coin" /><Label htmlFor="curr-coin">Coin</Label></div>
-                                    <div className="flex items-center space-x-2"><RadioGroupItem value="gold" id="curr-gold" /><Label htmlFor="curr-gold">Gold</Label></div>
-                                    <div className="flex items-center space-x-2"><RadioGroupItem value="diamond" id="curr-diamond" /><Label htmlFor="curr-diamond">Diamond</Label></div>
-                                </div>
-                            </RadioGroup>
-                        </TabsContent>
-                        <TabsContent value="search">
-                            <div className="p-2">
-                                <div className="relative flex-grow">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search by title..." className="pl-10" value={filters.search} onChange={e => setFilters.setSearch(e.target.value)} />
-                                </div>
-                            </div>
-                        </TabsContent>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
-        </Tabs>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <Select value={filters.unit} onValueChange={setFilters.setUnit}>
+          <SelectTrigger><SelectValue placeholder="Filter by unit..." /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Units</SelectItem>
+            {units.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filters.category} onValueChange={setFilters.setCategory} disabled={filters.unit === 'all'}>
+          <SelectTrigger><SelectValue placeholder="Filter by category..." /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+             {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filters.status} onValueChange={setFilters.setStatus}>
+          <SelectTrigger><SelectValue placeholder="Filter by status..." /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filters.currency} onValueChange={setFilters.setCurrency}>
+          <SelectTrigger><SelectValue placeholder="Filter by currency..." /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Currencies</SelectItem>
+            <SelectItem value="spark">Spark</SelectItem>
+            <SelectItem value="coin">Coin</SelectItem>
+            <SelectItem value="gold">Gold</SelectItem>
+            <SelectItem value="diamond">Diamond</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="relative flex-grow">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by title..." className="pl-10" value={filters.search} onChange={e => setFilters.setSearch(e.target.value)} />
+        </div>
+      </div>
 
        <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Showing {resultCount} results</span>
