@@ -1,6 +1,7 @@
 
+
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Question, Unit, Category } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,11 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
 
   const getUnitName = (id: string) => units.find(u => u.id === id)?.name || 'N/A';
   const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || 'N/A';
+
+  const processedQuestionText = useMemo(() => {
+    if (!selectedQuestion?.mainQuestionText) return '';
+    return selectedQuestion.mainQuestionText.replace(/&nbsp;/g, ' ');
+  }, [selectedQuestion]);
 
   return (
     <>
@@ -138,7 +144,7 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
               Question Preview
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: selectedQuestion?.mainQuestionText || '' }} />
+          <div className="py-4 prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: processedQuestionText }} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close</Button>
           </DialogFooter>
@@ -147,4 +153,3 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
     </>
   );
 }
-
