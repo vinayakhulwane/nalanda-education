@@ -10,6 +10,8 @@ import { Suspense, useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/firebase";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WorksheetManualBuilder } from "@/components/worksheet-manual-builder";
 
 function AddQuestionsPageContent() {
     const router = useRouter();
@@ -108,6 +110,12 @@ function AddQuestionsPageContent() {
             });
         }
     };
+    
+    const addQuestion = (question: Question) => {
+        if (!selectedQuestions.find(q => q.id === question.id)) {
+            setSelectedQuestions([...selectedQuestions, question]);
+        }
+    };
 
 
     if (isLoading) {
@@ -128,14 +136,32 @@ function AddQuestionsPageContent() {
                 title={title || "Add Questions"}
                 description={`Building worksheet for ${subject?.name || 'subject'}. Select questions for your assignment.`}
             />
-            <WorksheetRandomBuilder 
-                availableQuestions={questions || []}
-                units={allUnits || []}
-                categories={allCategories || []}
-                selectedQuestions={selectedQuestions}
-                setSelectedQuestions={setSelectedQuestions}
-                onCreateWorksheet={handleCreateWorksheet}
-            />
+            <Tabs defaultValue="random" className="w-full">
+                <TabsList>
+                    <TabsTrigger value="random">Random Worksheet</TabsTrigger>
+                    <TabsTrigger value="manual">Manual Worksheet</TabsTrigger>
+                </TabsList>
+                <TabsContent value="random">
+                     <WorksheetRandomBuilder 
+                        availableQuestions={questions || []}
+                        units={allUnits || []}
+                        categories={allCategories || []}
+                        selectedQuestions={selectedQuestions}
+                        setSelectedQuestions={setSelectedQuestions}
+                        onCreateWorksheet={handleCreateWorksheet}
+                    />
+                </TabsContent>
+                 <TabsContent value="manual">
+                    <WorksheetManualBuilder
+                        availableQuestions={questions || []}
+                        selectedQuestions={selectedQuestions}
+                        addQuestion={addQuestion}
+                        units={allUnits || []}
+                        categories={allCategories || []}
+                    />
+                </TabsContent>
+            </Tabs>
+
         </div>
     );
 }

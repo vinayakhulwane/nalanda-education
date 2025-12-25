@@ -6,7 +6,6 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
 import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles } from 'lucide-react';
-import { ScrollArea } from './ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -124,12 +123,6 @@ export function WorksheetRandomBuilder({
       setSelectedQuestions([...selectedQuestions, candidates[randomIndex]]);
     }
   };
-  
-    const addQuestion = (question: Question) => {
-        if (!selectedQuestions.find(q => q.id === question.id)) {
-        setSelectedQuestions([...selectedQuestions, question]);
-        }
-    };
   
   const removeQuestion = (questionId: string) => {
     setSelectedQuestions(selectedQuestions.filter(q => q.id !== questionId));
