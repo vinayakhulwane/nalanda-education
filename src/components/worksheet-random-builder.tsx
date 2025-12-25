@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import type { Question, CurrencyType, Unit, Category } from '@/types';
@@ -192,7 +193,7 @@ export function WorksheetRandomBuilder({
         </CardContent>
       </Card>
       
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* By Unit */}
         <Card>
           <CardHeader>
@@ -290,106 +291,108 @@ export function WorksheetRandomBuilder({
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
                 </SheetHeader>
-                <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
-                    <TabsList className="mx-6">
-                        <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
-                        <TabsTrigger value="review">Review</TabsTrigger>
-                    </TabsList>
-                    <div className="flex-grow overflow-y-auto">
-                        <TabsContent value="blueprint" className="mt-4 px-6 pb-6">
-                             <div className="space-y-6">
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-base">Core Summary</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="flex justify-around">
-                                        <div className="text-center">
-                                            <p className="text-2xl font-bold">{selectedQuestions.length}</p>
-                                            <p className="text-xs text-muted-foreground">Total Questions</p>
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-2xl font-bold">{totalMarks}</p>
-                                            <p className="text-xs text-muted-foreground">Total Marks</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">Content Breakdown</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div>
-                                            <h4 className="text-sm font-semibold mb-2">By Unit</h4>
-                                            <div className="space-y-3">
-                                                {Object.entries(breakdownByUnit).map(([name, data]) => (
-                                                    <div key={name}>
-                                                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                            <span>{name}</span>
-                                                            <span>{data.count} Qs, {data.marks} Marks</span>
-                                                        </div>
-                                                        <Progress value={(data.count / selectedQuestions.length) * 100} />
-                                                    </div>
-                                                ))}
+                <div className="flex-grow overflow-y-auto">
+                    <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
+                        <TabsList className="mx-6">
+                            <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
+                            <TabsTrigger value="review">Review</TabsTrigger>
+                        </TabsList>
+                        <div className="flex-grow overflow-y-auto">
+                            <TabsContent value="blueprint" className="mt-4 px-6 pb-6">
+                                <div className="space-y-6">
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-base">Core Summary</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex justify-around">
+                                            <div className="text-center">
+                                                <p className="text-2xl font-bold">{selectedQuestions.length}</p>
+                                                <p className="text-xs text-muted-foreground">Total Questions</p>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <h4 className="text-sm font-semibold mb-2">By Category</h4>
-                                            <div className="space-y-3">
-                                                {Object.entries(breakdownByCategory).map(([name, data]) => (
-                                                    <div key={name}>
-                                                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                            <span>{name}</span>
-                                                            <span>{data.count} Qs, {data.marks} Marks</span>
-                                                        </div>
-                                                        <Progress value={(data.count / selectedQuestions.length) * 100} />
-                                                    </div>
-                                                ))}
+                                            <div className="text-center">
+                                                <p className="text-2xl font-bold">{totalMarks}</p>
+                                                <p className="text-xs text-muted-foreground">Total Marks</p>
                                             </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </TabsContent>
-                        <TabsContent value="review" className="mt-4 px-6 pb-6">
-                           <div className="space-y-3">
-                                {selectedQuestions.map(q => {
-                                    const CurrencyIcon = currencyIcons[q.currencyType] || Star;
-                                    return (
-                                    <Card key={q.id} className="p-3">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="flex-grow">
-                                                <p className="text-sm font-semibold">{q.name}</p>
-                                                <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
-                                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                    {q.gradingMode === 'ai' && (
-                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
-                                                    )}
-                                                    <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
-                                                    <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
-                                                    <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>
+                                        </CardContent>
+                                    </Card>
+                                    
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">Content Breakdown</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div>
+                                                <h4 className="text-sm font-semibold mb-2">By Unit</h4>
+                                                <div className="space-y-3">
+                                                    {Object.entries(breakdownByUnit).map(([name, data]) => (
+                                                        <div key={name}>
+                                                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                                <span>{name}</span>
+                                                                <span>{data.count} Qs, {data.marks} Marks</span>
+                                                            </div>
+                                                            <Progress value={(data.count / selectedQuestions.length) * 100} />
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
-                                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeQuestion(q.id)}>
-                                                <Trash2 className="h-4 w-4 text-destructive"/>
-                                            </Button>
-                                        </div>
+                                            <div>
+                                                <h4 className="text-sm font-semibold mb-2">By Category</h4>
+                                                <div className="space-y-3">
+                                                    {Object.entries(breakdownByCategory).map(([name, data]) => (
+                                                        <div key={name}>
+                                                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                                <span>{name}</span>
+                                                                <span>{data.count} Qs, {data.marks} Marks</span>
+                                                            </div>
+                                                            <Progress value={(data.count / selectedQuestions.length) * 100} />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </CardContent>
                                     </Card>
-                                )})}
-                                {selectedQuestions.length === 0 && (
-                                    <div className="text-center py-10 text-sm text-muted-foreground">
-                                        No questions selected.
-                                    </div>
-                                )}
-                            </div>
-                        </TabsContent>
-                    </div>
-                </Tabs>
+                                </div>
+                            </TabsContent>
+                            <TabsContent value="review" className="mt-4 px-6 pb-6">
+                            <div className="space-y-3">
+                                    {selectedQuestions.map(q => {
+                                        const CurrencyIcon = currencyIcons[q.currencyType] || Star;
+                                        return (
+                                        <Card key={q.id} className="p-3">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-grow">
+                                                    <p className="text-sm font-semibold">{q.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
+                                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                        {q.gradingMode === 'ai' && (
+                                                            <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
+                                                        )}
+                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
+                                                        <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
+                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>
+                                                    </div>
+                                                </div>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeQuestion(q.id)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive"/>
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    )})}
+                                    {selectedQuestions.length === 0 && (
+                                        <div className="text-center py-10 text-sm text-muted-foreground">
+                                            No questions selected.
+                                        </div>
+                                    )}
+                                </div>
+                            </TabsContent>
+                        </div>
+                    </Tabs>
+                </div>
                 <SheetFooter className="bg-card border-t px-6 py-4 mt-auto">
                     <div className="flex justify-between items-center w-full">
                         <div className="text-sm">
                             <p className="font-semibold">Est. Time: {estimatedTime} mins</p>
-                             <div className="flex gap-2 text-xs text-muted-foreground">
+                            <div className="flex gap-2 text-xs text-muted-foreground">
                                 {Object.entries(totalCost).filter(([,count]) => count > 0).map(([currency, count]) => (
                                     <span key={currency} className="capitalize">{count} {currency}</span>
                                 ))}
