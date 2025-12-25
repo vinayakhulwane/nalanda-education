@@ -4,11 +4,14 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { FilePlus2, ShoppingCart, PlusCircle, Filter, X } from 'lucide-react';
+import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger } from './ui/sheet';
+import { Progress } from './ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 type WorksheetRandomBuilderProps = {
   availableQuestions: Question[];
@@ -59,6 +62,36 @@ export function WorksheetRandomBuilder({
       return acc;
     }, {} as Record<CurrencyType, number>);
   }, [availableQuestions]);
+  
+  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory } = useMemo(() => {
+    let totalMarks = 0;
+    const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
+    const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
+    
+    selectedQuestions.forEach(q => {
+        const marks = q.solutionSteps?.reduce((stepSum, step) => 
+            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
+        totalMarks += marks;
+
+        const unitName = unitMap.get(q.unitId) || 'Uncategorized';
+        if (!breakdownByUnit[unitName]) breakdownByUnit[unitName] = { count: 0, marks: 0 };
+        breakdownByUnit[unitName].count++;
+        breakdownByUnit[unitName].marks += marks;
+        
+        const categoryName = categoryMap.get(q.categoryId) || 'Uncategorized';
+        if (!breakdownByCategory[categoryName]) breakdownByCategory[categoryName] = { count: 0, marks: 0 };
+        breakdownByCategory[categoryName].count++;
+        breakdownByCategory[categoryName].marks += marks;
+    });
+
+    return { 
+        totalMarks, 
+        estimatedTime: totalMarks * 2, // Simple estimation: 2 minutes per mark
+        breakdownByUnit,
+        breakdownByCategory
+    };
+}, [selectedQuestions, unitMap, categoryMap]);
+
 
   const addRandomQuestion = (currency: CurrencyType) => {
     const candidates = availableQuestions.filter(q => 
@@ -70,20 +103,6 @@ export function WorksheetRandomBuilder({
       setSelectedQuestions([...selectedQuestions, candidates[randomIndex]]);
     }
   };
-
-  const { totalMarks, estimatedTime } = useMemo(() => {
-    return selectedQuestions.reduce(
-      (acc, q) => {
-        const marks = q.solutionSteps?.reduce((stepSum, step) => 
-            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
-        acc.totalMarks += marks;
-        // Simple estimation: 2 minutes per mark
-        acc.estimatedTime += marks * 2;
-        return acc;
-      },
-      { totalMarks: 0, estimatedTime: 0 }
-    );
-  }, [selectedQuestions]);
 
   const handleFilterChange = (currency: CurrencyType, isChecked: boolean) => {
     if (isChecked) {
@@ -205,26 +224,118 @@ export function WorksheetRandomBuilder({
           </CardContent>
         </Card>
       </div>
-      
-      {/* Footer Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg flex items-center justify-between ml-[var(--sidebar-width-icon)]">
-            <div className="flex items-center gap-6 text-sm">
+
+      <Card>
+          <CardHeader>
+            <CardTitle>Summary</CardTitle>
+            <CardDescription>Review your worksheet before generating it.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-6">
                 <div><span className="font-semibold">Questions:</span> {selectedQuestions.length}</div>
                 <div><span className="font-semibold">Total Marks:</span> {totalMarks}</div>
                 <div><span className="font-semibold">Est. Time:</span> {estimatedTime} mins</div>
             </div>
-            <div className="flex items-center gap-4">
-                <Button className="w-full" disabled={selectedQuestions.length === 0} onClick={onCreateWorksheet}>
-                    <FilePlus2 className="mr-2 h-4 w-4" /> Generate Worksheet
-                </Button>
-                <div className="fixed bottom-20 right-6">
-                     <Button size="lg" className="rounded-full h-16 w-16 shadow-xl" disabled={selectedQuestions.length === 0}>
+             <Button disabled={selectedQuestions.length === 0} onClick={onCreateWorksheet}>
+                <FilePlus2 className="mr-2 h-4 w-4" /> Generate Worksheet
+            </Button>
+          </CardContent>
+      </Card>
+      
+        <Sheet>
+            <SheetTrigger asChild>
+                <div className="fixed bottom-6 right-6">
+                    <Button size="lg" className="rounded-full h-16 w-16 shadow-xl" disabled={selectedQuestions.length === 0}>
                         <ShoppingCart className="h-6 w-6" />
                         <Badge className="absolute -top-1 -right-1">{selectedQuestions.length}</Badge>
                     </Button>
                 </div>
-            </div>
-      </div>
+            </SheetTrigger>
+            <SheetContent className="w-[400px] sm:w-[540px] flex flex-col">
+                <SheetHeader>
+                    <SheetTitle>Review & Blueprint</SheetTitle>
+                    <SheetDescription>
+                        A detailed summary of your current selections before finalizing the worksheet.
+                    </SheetDescription>
+                </SheetHeader>
+                <Tabs defaultValue="review" className="flex-grow flex flex-col">
+                    <TabsList className="self-start">
+                        <TabsTrigger value="review">Review</TabsTrigger>
+                        <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="review" className="flex-grow mt-4">
+                        <div className="space-y-6">
+                             <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-base">Core Summary</CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex justify-around">
+                                    <div className="text-center">
+                                        <p className="text-2xl font-bold">{selectedQuestions.length}</p>
+                                        <p className="text-xs text-muted-foreground">Total Questions</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-2xl font-bold">{totalMarks}</p>
+                                        <p className="text-xs text-muted-foreground">Total Marks</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">Content Breakdown</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div>
+                                        <h4 className="text-sm font-semibold mb-2">By Unit</h4>
+                                        <div className="space-y-3">
+                                            {Object.entries(breakdownByUnit).map(([name, data]) => (
+                                                <div key={name}>
+                                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                        <span>{name}</span>
+                                                        <span>{data.count} Qs, {data.marks} Marks</span>
+                                                    </div>
+                                                    <Progress value={(data.count / selectedQuestions.length) * 100} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold mb-2">By Category</h4>
+                                        <div className="space-y-3">
+                                             {Object.entries(breakdownByCategory).map(([name, data]) => (
+                                                <div key={name}>
+                                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                                        <span>{name}</span>
+                                                        <span>{data.count} Qs, {data.marks} Marks</span>
+                                                    </div>
+                                                    <Progress value={(data.count / selectedQuestions.length) * 100} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="blueprint" className="flex-grow mt-4">
+                        <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                           Blueprint features coming soon.
+                        </div>
+                    </TabsContent>
+                </Tabs>
+                <SheetFooter className="bg-card border-t -mx-6 px-6 py-4 mt-auto">
+                    <div className="flex justify-between items-center w-full">
+                        <div className="text-sm">
+                            <p className="font-semibold">Est. Time: {estimatedTime} mins</p>
+                            <p className="text-xs text-muted-foreground">Total Cost: N/A</p>
+                        </div>
+                        <Button onClick={onCreateWorksheet}>
+                            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
+                        </Button>
+                    </div>
+                </SheetFooter>
+            </SheetContent>
+        </Sheet>
     </div>
   );
 }
