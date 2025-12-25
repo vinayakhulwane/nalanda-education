@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Suspense, useMemo } from "react";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, where, orderBy, doc } from "firebase/firestore";
+import { collection, query, where, doc } from "firebase/firestore";
 import type { Worksheet } from "@/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -26,17 +26,23 @@ function SavedWorksheetsPageContent() {
   const { toast } = useToast();
 
   const worksheetsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid || !subjectId) return null;
-    
+    if (!firestore || !user?.uid) return null;
     return query(
       collection(firestore, 'worksheets'),
-      where('authorId', '==', user.uid),
-      where('subjectId', '==', subjectId),
-      orderBy('createdAt', 'desc')
+      where('authorId', '==', user.uid)
     );
-  }, [firestore, user?.uid, subjectId]);
+  }, [firestore, user?.uid]);
 
-  const { data: worksheets, isLoading } = useCollection<Worksheet>(worksheetsQuery);
+  const { data: allUserWorksheets, isLoading } = useCollection<Worksheet>(worksheetsQuery);
+
+  const subjectWorksheets = useMemo(() => {
+      if (!allUserWorksheets || !subjectId) return [];
+      // Client-side filter by subject and sort by date
+      return allUserWorksheets
+        .filter(ws => ws.subjectId === subjectId)
+        .sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+  }, [allUserWorksheets, subjectId]);
+
 
   const backUrl = subjectId && classId ? `/worksheets/${classId}/${subjectId}` : '/worksheets';
 
@@ -68,7 +74,7 @@ function SavedWorksheetsPageContent() {
             <div className="flex h-48 items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : worksheets && worksheets.length > 0 ? (
+          ) : subjectWorksheets && subjectWorksheets.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -81,7 +87,7 @@ function SavedWorksheetsPageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {worksheets.map((ws) => (
+                {subjectWorksheets.map((ws) => (
                   <TableRow key={ws.id}>
                     <TableCell className="font-medium">{ws.title}</TableCell>
                     <TableCell>
@@ -105,8 +111,8 @@ function SavedWorksheetsPageContent() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem disabled>
-                            <Eye className="mr-2 h-4 w-4" /> View
+                          <DropdownMenuItem onClick={() => router.push(`/worksheets/preview/${ws.id}`)}>
+                            <Eye className="mr-2 h-4 w-4" /> Preview & Print
                           </DropdownMenuItem>
                           <DropdownMenuItem disabled>
                             <Paperclip className="mr-2 h-4 w-4" /> Assign
