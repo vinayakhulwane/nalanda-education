@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import type { Question, CurrencyType, Unit, Category } from '@/types';

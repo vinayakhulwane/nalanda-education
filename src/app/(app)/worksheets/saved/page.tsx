@@ -26,17 +26,10 @@ function SavedWorksheetsPageContent() {
   const { toast } = useToast();
 
   const worksheetsQuery = useMemoFirebase(() => {
-    // 1. Safety Check: If we don't have all data, STOP. 
-    // This prevents the "partial query" that causes the crash.
     if (!firestore || !user?.uid || !subjectId) {
-      console.log("⚠️ Waiting for IDs...", { uid: user?.uid, subjectId });
       return null;
     }
     
-    // 2. Debug Log: If you see this in console, the Correct Query is running.
-    console.log("✅ Running Correct Query:", { authorId: user.uid, subjectId });
-
-    // 3. The Query: MUST match Index (authorId + subjectId + createdAt)
     return query(
       collection(firestore, 'worksheets'),
       where('authorId', '==', user.uid),
