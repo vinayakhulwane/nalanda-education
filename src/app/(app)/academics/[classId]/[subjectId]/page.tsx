@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableUnitItem } from "@/components/academics/sortable-unit-item";
+import { WorksheetList } from "@/components/academics/worksheet-list";
 
 
 function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
@@ -452,40 +453,7 @@ export default function SubjectWorkspacePage() {
                     <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
                 </TabsContent>
                 <TabsContent value="worksheet">
-                    <Tabs defaultValue="classroomAssign" className="w-full mt-6">
-                        <TabsList>
-                            <TabsTrigger value="classroomAssign">Classroom Assign</TabsTrigger>
-                            {!userIsEditor && <TabsTrigger value="myPracticeZone">My Practice Zone</TabsTrigger>}
-                        </TabsList>
-                        <TabsContent value="classroomAssign">
-                            <Card className="mt-6">
-                                <CardHeader>
-                                    <CardTitle>Classroom Assignments</CardTitle>
-                                    <CardDescription>Manage and assign worksheets to the classroom.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-                                        <p className="text-muted-foreground">Classroom assignment features are coming soon.</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                        {!userIsEditor && (
-                             <TabsContent value="myPracticeZone">
-                                 <Card className="mt-6">
-                                    <CardHeader>
-                                        <CardTitle>My Practice Zone</CardTitle>
-                                        <CardDescription>Review your saved worksheets and practice history.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-                                            <p className="text-muted-foreground">Practice zone features are coming soon.</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        )}
-                    </Tabs>
+                     <WorksheetList subjectId={subjectId} isEnrolled={isEnrolled} userIsEditor={userIsEditor} />
                 </TabsContent>
                 <TabsContent value="archivers">
                      <Card className="mt-6">
