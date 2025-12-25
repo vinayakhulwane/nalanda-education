@@ -144,12 +144,14 @@ export function WorksheetResults({
             
             <div className="space-y-6">
                 <h3 className="text-xl font-semibold text-center">Question Review</h3>
-                 {questions.map((question, qIndex) => (
+                 {questions.map((question, qIndex) => {
+                    const processedMainQuestionText = question.mainQuestionText.replace(/&nbsp;/g, ' ');
+                    return (
                     <div key={question.id}>
                        <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words">
                            <div className="flex gap-2">
                              <span className="font-bold">Q{qIndex + 1}.</span>
-                             <div dangerouslySetInnerHTML={{ __html: question.mainQuestionText }} />
+                             <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText }} />
                            </div>
                         </div>
                         <div className="border border-t-0 rounded-b-lg p-4 space-y-3">
@@ -186,7 +188,7 @@ export function WorksheetResults({
                         })}
                         </div>
                     </div>
-                 ))}
+                 )})}
             </div>
 
             <div className="text-center mt-8">
