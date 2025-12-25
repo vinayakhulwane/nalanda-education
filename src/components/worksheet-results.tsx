@@ -1,12 +1,15 @@
 'use client';
-import type { Question, SubQuestion, Worksheet, CurrencyType } from "@/types";
-import { useMemo } from "react";
+import type { Question, SubQuestion, Worksheet, CurrencyType, User } from "@/types";
+import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { useRouter } from "next/navigation";
-import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home } from "lucide-react";
+import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUser, useFirestore } from "@/firebase";
+import { doc, updateDoc, increment } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 export type AnswerState = { [subQuestionId: string]: { answer: any } };
 export type ResultState = { [subQuestionId: string]: { isCorrect: boolean } };
@@ -79,6 +82,13 @@ export function WorksheetResults({
   timeTaken,
 }: WorksheetResultsProps) {
   const router = useRouter();
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
+  
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [hasClaimed, setHasClaimed] = useState(false);
+
 
   const { totalMarks, score, rewards } = useMemo(() => {
     let totalMarks = 0;
@@ -108,6 +118,41 @@ export function WorksheetResults({
 
     return { totalMarks, score, rewards };
   }, [questions, results]);
+  
+  const handleClaimRewards = async () => {
+    if (!user || !firestore || hasClaimed) return;
+    setIsClaiming(true);
+
+    const userRef = doc(firestore, 'users', user.uid);
+
+    try {
+        const updatePayload: Record<string, any> = {};
+        if (rewards.coin > 0) updatePayload.coins = increment(rewards.coin);
+        if (rewards.gold > 0) updatePayload.gold = increment(rewards.gold);
+        if (rewards.diamond > 0) updatePayload.diamonds = increment(rewards.diamond);
+        
+        if (Object.keys(updatePayload).length > 0) {
+            await updateDoc(userRef, updatePayload);
+        }
+
+        toast({
+            title: "Rewards Claimed!",
+            description: "Your wallet has been updated.",
+        });
+        setHasClaimed(true);
+
+    } catch (error) {
+        console.error("Error claiming rewards:", error);
+        toast({
+            variant: "destructive",
+            title: "Claim Failed",
+            description: "Could not update your wallet. Please try again later.",
+        });
+    } finally {
+        setIsClaiming(false);
+    }
+  }
+
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
@@ -146,6 +191,22 @@ export function WorksheetResults({
                     </div>
                     <p className="text-xs text-muted-foreground">Rewards Earned</p>
                 </div>
+            </div>
+            
+            <div className="mt-8 mb-6">
+                <Button 
+                    className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200"
+                    onClick={handleClaimRewards}
+                    disabled={isClaiming || hasClaimed || Object.values(rewards).every(a => a === 0)}
+                >
+                    {isClaiming ? (
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : hasClaimed ? (
+                        'Rewards Claimed!'
+                    ) : (
+                        'Claim Rewards'
+                    )}
+                </Button>
             </div>
             
             <Separator className="my-8" />
