@@ -10,21 +10,14 @@ interface CompletedSubQuestionSummaryProps {
 
 const getPlainText = (html: string) => {
     if (!html) return 'No question text.';
-    return html
-        .replace(/<\/p>/gi, ' ')
-        .replace(/<br\s*\/?>/gi, ' ')
-        .replace(/<[^>]*>?/gm, '')
-        .replace(/&nbsp;/g, ' ')
-        .trim();
-}
-
-const truncate = (text: string, length = 40) => {
-    if (text.length <= length) return text;
-    return text.substring(0, length) + '...';
+    // A simple approach to get plain text
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || div.innerText || '';
 }
 
 const getAnswerText = (subQuestion: SubQuestion, answer: any) => {
-    if (answer === null || answer === undefined) return 'Not Answered';
+    if (answer === null || answer === undefined || answer === '') return 'Not Answered';
     switch (subQuestion.answerType) {
         case 'numerical':
         case 'text':
@@ -44,20 +37,20 @@ const getAnswerText = (subQuestion: SubQuestion, answer: any) => {
 
 
 export function CompletedSubQuestionSummary({ subQuestion, answer, index }: CompletedSubQuestionSummaryProps) {
-    const questionText = truncate(getPlainText(subQuestion.questionText));
-    const answerText = truncate(getAnswerText(subQuestion, answer), 40);
+    const questionText = getPlainText(subQuestion.questionText);
+    const answerText = getAnswerText(subQuestion, answer);
 
     return (
-        <div className="flex items-center gap-3 p-3 border rounded-lg bg-card text-sm text-muted-foreground runner-summary-card w-full text-left hover:bg-muted/50 cursor-pointer">
-            <div className="flex-shrink-0 font-medium">{index + 1}.</div>
-            <div className="flex-grow truncate">
-                {questionText}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 border rounded-lg bg-card text-sm text-muted-foreground runner-summary-card w-full text-left hover:bg-muted/50 cursor-pointer">
+            <div className="font-medium">{index + 1}.</div>
+            <div className="flex-grow min-w-0">
+                <p className="break-words">{questionText}</p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="font-semibold text-card-foreground truncate" title={getAnswerText(subQuestion, answer)}>{answerText}</span>
+            <div className="flex items-center gap-2">
+                <p className="font-semibold text-card-foreground break-all">{answerText}</p>
             </div>
-             <div className="flex-shrink-0 w-8 text-right">
-                <ChevronsUpDown className="h-4 w-4 ml-auto" />
+             <div className="flex-grow flex justify-end">
+                <ChevronsUpDown className="h-4 w-4" />
             </div>
         </div>
     )
