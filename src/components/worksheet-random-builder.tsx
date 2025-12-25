@@ -199,17 +199,15 @@ export function WorksheetRandomBuilder({
             <CardTitle>By Unit</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-48">
-              <div className="space-y-2">
-                {Object.entries(questionsByUnit).map(([unitName, count]) => (
-                  <div key={unitName} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                    <span>{unitName}</span>
-                    <Badge variant="secondary">{count}</Badge>
-                  </div>
-                ))}
-                 {Object.keys(questionsByUnit).length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No questions for current filters.</p>}
-              </div>
-            </ScrollArea>
+            <div className="space-y-2">
+              {Object.entries(questionsByUnit).map(([unitName, count]) => (
+                <div key={unitName} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
+                  <span>{unitName}</span>
+                  <Badge variant="secondary">{count}</Badge>
+                </div>
+              ))}
+               {Object.keys(questionsByUnit).length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No questions for current filters.</p>}
+            </div>
           </CardContent>
         </Card>
 
@@ -219,17 +217,15 @@ export function WorksheetRandomBuilder({
             <CardTitle>By Category</CardTitle>
           </CardHeader>
           <CardContent>
-             <ScrollArea className="h-48">
-               <div className="space-y-2">
-                {Object.entries(questionsByCategory).map(([catName, count]) => (
-                  <div key={catName} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                    <span>{catName}</span>
-                    <Badge variant="secondary">{count}</Badge>
-                  </div>
-                ))}
-                 {Object.keys(questionsByCategory).length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No questions for current filters.</p>}
-              </div>
-            </ScrollArea>
+             <div className="space-y-2">
+              {Object.entries(questionsByCategory).map(([catName, count]) => (
+                <div key={catName} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
+                  <span>{catName}</span>
+                  <Badge variant="secondary">{count}</Badge>
+                </div>
+              ))}
+               {Object.keys(questionsByCategory).length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No questions for current filters.</p>}
+            </div>
           </CardContent>
         </Card>
 
@@ -367,7 +363,7 @@ export function WorksheetRandomBuilder({
                                                 <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
                                                 <div className="flex items-center gap-2 mt-2 flex-wrap">
                                                     {q.gradingMode === 'ai' && (
-                                                      <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
+                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
                                                     )}
                                                     <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
                                                     <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
