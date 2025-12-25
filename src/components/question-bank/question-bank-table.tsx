@@ -1,5 +1,3 @@
-
-
 'use client';
 import { useState, useMemo } from 'react';
 import type { Question, Unit, Category } from '@/types';
@@ -14,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useFirestore } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { cn } from '@/lib/utils';
 
 interface QuestionBankTableProps {
   questions: Question[];
@@ -27,6 +26,14 @@ const currencyIcons: { [key: string]: React.ElementType } = {
   gold: Crown,
   diamond: Gem,
 };
+
+const currencyColors: { [key: string]: string } = {
+  spark: 'text-gray-400',
+  coin: 'text-yellow-500',
+  gold: 'text-amber-500',
+  diamond: 'text-blue-500',
+}
+
 
 export function QuestionBankTable({ questions, units, categories }: QuestionBankTableProps) {
   const router = useRouter();
@@ -78,6 +85,7 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
             {questions.length > 0 ? (
               questions.map(q => {
                 const CurrencyIcon = currencyIcons[q.currencyType];
+                const currencyColor = currencyColors[q.currencyType];
                 return (
                   <TableRow key={q.id}>
                     <TableCell className="font-medium">
@@ -101,7 +109,7 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
                           )}
                           <Tooltip>
                             <TooltipTrigger>
-                              {CurrencyIcon && <CurrencyIcon className="h-4 w-4 text-muted-foreground" />}
+                              {CurrencyIcon && <CurrencyIcon className={cn("h-4 w-4", currencyColor)} />}
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="capitalize">{q.currencyType}</p>

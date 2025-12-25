@@ -35,6 +35,13 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
     diamond: Gem,
 };
 
+const currencyColors: Record<CurrencyType, string> = {
+  spark: 'text-gray-400',
+  coin: 'text-yellow-500',
+  gold: 'text-amber-500',
+  diamond: 'text-blue-500',
+};
+
 
 export function WorksheetRandomBuilder({
   availableQuestions,
@@ -349,10 +356,11 @@ export function WorksheetRandomBuilder({
               const selectedOfType = selectedQuestionsByCurrency[currency] || 0;
               const remaining = totalOfType - selectedOfType;
               const CurrencyIcon = currencyIcons[currency];
+              const currencyColor = currencyColors[currency];
               return (
                 <div key={currency} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                  <span className="capitalize flex items-center gap-2">
-                    <CurrencyIcon className="h-4 w-4 text-muted-foreground"/>
+                  <span className={cn("capitalize flex items-center gap-2", currencyColor)}>
+                    <CurrencyIcon className="h-4 w-4"/>
                     {currency}
                   </span>
                   <div className="flex items-center gap-2">
@@ -463,6 +471,7 @@ export function WorksheetRandomBuilder({
                             <div className="space-y-3">
                                     {selectedQuestions.map(q => {
                                         const CurrencyIcon = currencyIcons[q.currencyType] || Sparkles;
+                                        const currencyColor = currencyColors[q.currencyType];
                                         return (
                                         <Card key={q.id} className="p-3">
                                             <div className="flex items-start justify-between gap-2">
@@ -477,7 +486,9 @@ export function WorksheetRandomBuilder({
                                                             <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
                                                         )}
                                                         <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
-                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>
+                                                        <Badge variant="outline" className={cn("flex items-center gap-1 text-xs capitalize", currencyColor)}>
+                                                            <CurrencyIcon className="h-3 w-3"/> {q.currencyType}
+                                                        </Badge>
                                                     </div>
                                                 </div>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeQuestion(q.id)}>
@@ -503,8 +514,9 @@ export function WorksheetRandomBuilder({
                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 {Object.entries(totalCost).filter(([,count]) => count > 0).map(([currency, count]) => {
                                     const Icon = currencyIcons[currency as CurrencyType] || Sparkles;
+                                    const color = currencyColors[currency as CurrencyType];
                                     return (
-                                        <span key={currency} className="flex items-center gap-1 capitalize">
+                                        <span key={currency} className={cn("flex items-center gap-1 capitalize", color)}>
                                             <Icon className="h-3 w-3" /> {count}
                                         </span>
                                     )

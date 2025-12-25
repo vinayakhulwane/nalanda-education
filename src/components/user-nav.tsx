@@ -61,7 +61,7 @@ export function UserNav({ user }: { user: User }) {
           {/* Admin Specific Profile Links */}
           {isAdmin ? (
             <DropdownMenuItem asChild>
-              <Link href="/admin/settings">
+              <Link href="/economy-settings">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Economy Settings</span>
               </Link>

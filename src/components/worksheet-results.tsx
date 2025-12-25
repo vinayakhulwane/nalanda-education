@@ -6,6 +6,7 @@ import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { useRouter } from "next/navigation";
 import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type AnswerState = { [subQuestionId: string]: { answer: any } };
 export type ResultState = { [subQuestionId: string]: { isCorrect: boolean } };
@@ -23,6 +24,13 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
   coin: Coins,
   gold: Crown,
   diamond: Gem,
+};
+
+const currencyColors: Record<CurrencyType, string> = {
+    spark: 'text-gray-400',
+    coin: 'text-yellow-500',
+    gold: 'text-amber-500',
+    diamond: 'text-blue-500',
 };
 
 
@@ -118,8 +126,9 @@ export function WorksheetResults({
                         {Object.entries(rewards).map(([currency, amount]) => {
                             if (amount === 0) return null;
                             const Icon = currencyIcons[currency as CurrencyType];
+                            const color = currencyColors[currency as CurrencyType];
                             return (
-                                <div key={currency} className="flex items-center gap-1 font-bold">
+                                <div key={currency} className={cn("flex items-center gap-1 font-bold", color)}>
                                     <Icon className="h-5 w-5" />
                                     <span>{amount}</span>
                                 </div>
@@ -137,7 +146,7 @@ export function WorksheetResults({
                 <h3 className="text-xl font-semibold text-center">Question Review</h3>
                  {questions.map((question, qIndex) => (
                     <div key={question.id}>
-                        <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg">
+                       <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words">
                            <div className="flex gap-2">
                              <span className="font-bold">Q{qIndex + 1}.</span>
                              <div dangerouslySetInnerHTML={{ __html: question.mainQuestionText }} />
