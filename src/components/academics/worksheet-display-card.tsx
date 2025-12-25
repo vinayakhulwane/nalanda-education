@@ -96,7 +96,7 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
                 <CardFooter className="pt-6 pr-6">
                      <Button 
                         variant="secondary"
-                        onClick={() => router.push(`/solve/${worksheet.id}`)}
+                        onClick={() => router.push(`/worksheets/preview/${worksheet.id}`)}
                     >
                         <BookOpen className="mr-2 h-4 w-4"/>
                         Review
