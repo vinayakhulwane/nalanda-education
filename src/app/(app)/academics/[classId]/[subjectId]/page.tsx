@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import type { Subject, Unit, Category, CustomTab } from "@/types";
@@ -453,7 +453,43 @@ export default function SubjectWorkspacePage() {
                     <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
                 </TabsContent>
                 <TabsContent value="worksheet">
-                     <WorksheetList subjectId={subjectId} isEnrolled={isEnrolled} userIsEditor={userIsEditor} />
+                    <Tabs defaultValue="assignments" className="mt-4">
+                        <TabsList>
+                            <TabsTrigger value="assignments"><BookCopy className="mr-2 h-4 w-4"/> Classroom Assignments</TabsTrigger>
+                            <TabsTrigger value="practice"><FilePlus className="mr-2 h-4 w-4"/> My Practice Zone</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="assignments">
+                            <WorksheetList subjectId={subjectId} isEnrolled={isEnrolled} userIsEditor={userIsEditor} />
+                        </TabsContent>
+                        <TabsContent value="practice">
+                            <Card className="mt-6">
+                                <CardHeader>
+                                    <CardTitle>My Practice Zone</CardTitle>
+                                    <CardDescription>Create your own worksheets, view saved ones, and check your attempt history.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="p-6 border rounded-lg flex flex-col items-center text-center">
+                                        <FilePlus className="h-10 w-10 text-muted-foreground mb-4"/>
+                                        <h3 className="font-semibold">Create New Worksheet</h3>
+                                        <p className="text-sm text-muted-foreground mb-4">Build a worksheet tailored to your needs.</p>
+                                        <Button disabled>Start Building</Button>
+                                    </div>
+                                    <div className="p-6 border rounded-lg flex flex-col items-center text-center">
+                                        <BookCopy className="h-10 w-10 text-muted-foreground mb-4"/>
+                                        <h3 className="font-semibold">My Saved Worksheets</h3>
+                                        <p className="text-sm text-muted-foreground mb-4">Review and retake worksheets you've created.</p>
+                                        <Button disabled>View Saved</Button>
+                                    </div>
+                                    <div className="p-6 border rounded-lg flex flex-col items-center text-center">
+                                        <History className="h-10 w-10 text-muted-foreground mb-4"/>
+                                        <h3 className="font-semibold">Attempt History</h3>
+                                        <p className="text-sm text-muted-foreground mb-4">See your scores and review past attempts.</p>
+                                        <Button disabled>View History</Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    </Tabs>
                 </TabsContent>
                 <TabsContent value="archivers">
                      <Card className="mt-6">

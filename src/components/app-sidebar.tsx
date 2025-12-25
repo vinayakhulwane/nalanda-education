@@ -8,7 +8,7 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { mockStudent, mockTeacher } from "@/lib/data";
-import { BookOpen, LayoutDashboard, BarChart3, FilePlus2, BookPlus, Settings, LogOut, Users, Wallet, Home, Building2, Briefcase } from "lucide-react";
+import { BookOpen, LayoutDashboard, BarChart3, FilePlus2, BookPlus, Settings, LogOut, Users, Wallet, Home, Building2, Briefcase, BookCopy, History } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "./logo";
 import { useDoc, useFirestore, useUser } from "@/firebase";
