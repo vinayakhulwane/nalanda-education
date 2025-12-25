@@ -11,6 +11,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Edit, Trash, Sparkles, Coins, Gem, Diamond, Eye } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { useFirestore } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { deleteDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 interface QuestionBankTableProps {
   questions: Question[];
@@ -27,6 +30,7 @@ const currencyIcons: { [key: string]: React.ElementType } = {
 
 export function QuestionBankTable({ questions, units, categories }: QuestionBankTableProps) {
   const router = useRouter();
+  const firestore = useFirestore();
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
@@ -42,9 +46,9 @@ export function QuestionBankTable({ questions, units, categories }: QuestionBank
   }
 
   const confirmDelete = () => {
-    if (selectedQuestion) {
-      // Add deletion logic here
-      console.log('Deleting question:', selectedQuestion.id);
+    if (selectedQuestion && firestore) {
+      const questionRef = doc(firestore, 'questions', selectedQuestion.id);
+      deleteDocumentNonBlocking(questionRef);
       setDeleteDialogOpen(false);
       setSelectedQuestion(null);
     }
