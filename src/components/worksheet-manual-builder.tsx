@@ -1,6 +1,6 @@
 'use client';
 import type { Question, Unit, Category, CurrencyType, Worksheet } from '@/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X } from 'lucide-react';
 import { Badge } from './ui/badge';
