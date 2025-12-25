@@ -124,8 +124,7 @@ service cloud.firestore {
     }
 
     match /worksheets/{worksheetId} {
-      allow get: if isOwner(resource.data.authorId) || isAdmin();
-      allow list: if request.query.where.authorId == request.auth.uid;
+      allow read: if isOwner(resource.data.authorId) || isAdmin();
       allow write: if isTeacher() || isAdmin();
     }
   }
