@@ -236,9 +236,13 @@ export function WorksheetRandomBuilder({
               const totalOfType = questionsByCurrency[currency] || 0;
               const selectedOfType = selectedQuestionsByCurrency[currency] || 0;
               const remaining = totalOfType - selectedOfType;
+              const CurrencyIcon = currencyIcons[currency];
               return (
                 <div key={currency} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                  <span className="capitalize">{currency}</span>
+                  <span className="capitalize flex items-center gap-2">
+                    <CurrencyIcon className="h-4 w-4 text-muted-foreground"/>
+                    {currency}
+                  </span>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">
                       {remaining} available
