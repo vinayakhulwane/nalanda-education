@@ -66,7 +66,7 @@ function AddQuestionsPageContent() {
     const backUrl = subjectId && classId ? `/worksheets/new?classId=${classId}&subjectId=${subjectId}` : '/worksheets';
     const isLoading = isSubjectLoading || areQuestionsLoading || areUnitsLoading || areCategoriesLoading;
 
-    const handleCreateWorksheet = async (worksheetType: 'classroom' | 'sample' | 'practice') => {
+    const handleCreateWorksheet = async (worksheetTypeParam: 'classroom' | 'sample' | 'practice') => {
         if (!user || !firestore || !classId || !subjectId || !title) {
             toast({
                 variant: 'destructive',
@@ -76,12 +76,15 @@ function AddQuestionsPageContent() {
             return;
         }
 
+        // Correctly determine worksheet type based on the source of creation
+        const finalWorksheetType = source === 'practice' ? 'practice' : worksheetTypeParam;
+
         const newWorksheet: Omit<Worksheet, 'id'> = {
             title,
             classId,
             subjectId,
             mode,
-            worksheetType,
+            worksheetType: finalWorksheetType,
             questions: selectedQuestions.map(q => q.id),
             authorId: user.uid,
             status: 'draft', // Or 'published' depending on desired flow
