@@ -1,3 +1,4 @@
+
 'use client';
 import { useMemo, useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -81,9 +82,14 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
       return units.filter(u => u.name.toLowerCase().includes(searchTerms.unit.toLowerCase()));
     }, [units, searchTerms.unit]);
     
+    const availableCategories = useMemo(() => {
+        if (filters.unit.length === 0) return categories;
+        return categories.filter(c => filters.unit.includes(c.unitId));
+    }, [categories, filters.unit]);
+
     const filteredCategories = useMemo(() => {
-        return categories.filter(c => c.name.toLowerCase().includes(searchTerms.category.toLowerCase()));
-    }, [categories, searchTerms.category]);
+        return availableCategories.filter(c => c.name.toLowerCase().includes(searchTerms.category.toLowerCase()));
+    }, [availableCategories, searchTerms.category]);
 
   const removeFilter = (type: 'unit' | 'category' | 'status' | 'currency' | 'search', value: string) => {
     switch (type) {
@@ -131,7 +137,7 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
              <Tabs defaultValue="unit" className="w-full">
                 <TabsList className="grid w-full grid-cols-4 bg-muted/50 p-1 rounded-lg">
                     <TabsTrigger value="unit" className="text-xs uppercase tracking-wider">Unit</TabsTrigger>
-                    <TabsTrigger value="category" className="text-xs uppercase tracking-wider" disabled={filters.unit.length > 0 && categories.length === 0}>Category</TabsTrigger>
+                    <TabsTrigger value="category" className="text-xs uppercase tracking-wider" disabled={filters.unit.length > 0 && availableCategories.length === 0}>Category</TabsTrigger>
                     <TabsTrigger value="status" className="text-xs uppercase tracking-wider">Status</TabsTrigger>
                     <TabsTrigger value="currency" className="text-xs uppercase tracking-wider">Currency</TabsTrigger>
                 </TabsList>
@@ -194,7 +200,8 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
                                 <Badge variant="secondary" className="bg-muted text-[10px] font-bold px-1.5 h-5 min-w-[20px] justify-center">{questionCounts.categories[c.id] || 0}</Badge>
                             </label>
                         ))}
-                         {categories.length === 0 && <p className="text-center text-xs text-muted-foreground py-4">No categories found for the selected unit(s).</p>}
+                         {filters.unit.length > 0 && availableCategories.length === 0 && <p className="text-center text-xs text-muted-foreground py-4">No categories found for the selected unit(s).</p>}
+                         {filters.unit.length === 0 && <p className="text-center text-xs text-muted-foreground py-4">Please select a unit to see categories.</p>}
                     </div>
                   </ScrollArea>
                 </TabsContent>

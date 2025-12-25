@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
@@ -50,6 +50,17 @@ export function WorksheetRandomBuilder({
 
   const unitMap = useMemo(() => new Map(units.map(u => [u.id, u.name])), [units]);
   const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
+  
+  // When unit filter changes, reset category filter
+  useEffect(() => {
+    setFilters(prev => ({...prev, categories: []}));
+  }, [filters.units]);
+
+  const availableCategories = useMemo(() => {
+    if (filters.units.length === 0) return categories;
+    return categories.filter(c => filters.units.includes(c.unitId));
+  }, [categories, filters.units]);
+
 
   const filteredQuestions = useMemo(() => {
     return availableQuestions.filter(q => {
@@ -198,7 +209,7 @@ export function WorksheetRandomBuilder({
              <Tabs defaultValue="unit" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="unit">Unit</TabsTrigger>
-                    <TabsTrigger value="category">Category</TabsTrigger>
+                    <TabsTrigger value="category" disabled={filters.units.length === 0}>Category</TabsTrigger>
                     <TabsTrigger value="currency">Currency</TabsTrigger>
                 </TabsList>
                 <TabsContent value="unit" className="mt-2">
@@ -217,7 +228,7 @@ export function WorksheetRandomBuilder({
                 </TabsContent>
                  <TabsContent value="category" className="mt-2">
                   <div className="space-y-2">
-                    {categories.map(cat => (
+                    {availableCategories.map(cat => (
                       <div key={cat.id} className="flex items-center space-x-2">
                         <Checkbox
                           id={`filter-cat-${cat.id}`}
@@ -227,7 +238,8 @@ export function WorksheetRandomBuilder({
                         <Label htmlFor={`filter-cat-${cat.id}`} className="capitalize">{cat.name}</Label>
                       </div>
                     ))}
-                     {categories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories found for the selected subject/unit.</p>}
+                     {filters.units.length > 0 && availableCategories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories found for the selected unit(s).</p>}
+                     {filters.units.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Please select a unit first.</p>}
                   </div>
                 </TabsContent>
                 <TabsContent value="currency" className="mt-2">
@@ -460,3 +472,4 @@ export function WorksheetRandomBuilder({
     </div>
   );
 }
+

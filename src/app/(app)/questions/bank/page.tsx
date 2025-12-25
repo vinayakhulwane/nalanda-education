@@ -37,12 +37,11 @@ function QuestionBankPageContent() {
 
   const categoriesQuery = useMemoFirebase(() => {
       if (!firestore || !units || units.length === 0) return null;
-      // Fetch categories for all selected units, or all units if none are selected.
-      const relevantUnitIds = unitFilter.length > 0 ? unitFilter : units.map(u => u.id);
-      if (relevantUnitIds.length === 0) return null;
-      // Firestore 'in' query is limited to 30 items. Slice to prevent errors.
-      return query(collection(firestore, 'categories'), where('unitId', 'in', relevantUnitIds.slice(0, 30)));
-  }, [firestore, units, unitFilter]);
+      const unitIds = units.map(u => u.id);
+      if (unitIds.length === 0) return null;
+      // Fetch all categories for the subject to be filtered on the client.
+      return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
+  }, [firestore, units]);
   const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);
 
 
