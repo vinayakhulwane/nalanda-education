@@ -24,7 +24,7 @@ export default function SolveWorksheetPage() {
   const params = useParams();
   const worksheetId = params.worksheetId as string;
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, userProfile } = useUser();
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
@@ -43,6 +43,13 @@ export default function SolveWorksheetPage() {
   }, [firestore, worksheet?.questions]);
   const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
   
+  useEffect(() => {
+      // If the user has already completed this worksheet, show the results immediately.
+      if (userProfile?.completedWorksheets?.includes(worksheetId)) {
+          setIsFinished(true);
+      }
+  }, [userProfile, worksheetId]);
+
   const orderedQuestions = useMemo(() => {
     if (!worksheet?.questions || !questions) return [];
     const questionsMap = new Map(questions.map(q => [q.id, q]));
