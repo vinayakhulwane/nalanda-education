@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/firebase";
+import { WorksheetRandomBuilder } from "@/components/worksheet-random-builder";
 
 function AddQuestionsPageContent() {
     const router = useRouter();
@@ -119,11 +120,19 @@ function AddQuestionsPageContent() {
                 title={title || "Add Questions"}
                 description={`Building worksheet for ${subject?.name || 'subject'}. Select questions for your assignment.`}
             />
-            <Tabs defaultValue="manual">
+            <Tabs defaultValue="random">
                 <TabsList>
+                    <TabsTrigger value="random">Random Selection</TabsTrigger>
                     <TabsTrigger value="manual">Manual Selection</TabsTrigger>
-                    <TabsTrigger value="random" disabled>Random Selection</TabsTrigger>
                 </TabsList>
+                <TabsContent value="random">
+                     <WorksheetRandomBuilder 
+                        availableQuestions={questions || []}
+                        selectedQuestions={selectedQuestions}
+                        setSelectedQuestions={setSelectedQuestions}
+                        onCreateWorksheet={handleCreateWorksheet}
+                    />
+                </TabsContent>
                 <TabsContent value="manual">
                     <WorksheetBuilder 
                         availableQuestions={questions || []}
@@ -131,19 +140,6 @@ function AddQuestionsPageContent() {
                         setSelectedQuestions={setSelectedQuestions}
                         onCreateWorksheet={handleCreateWorksheet}
                     />
-                </TabsContent>
-                <TabsContent value="random">
-                     <Card className="mt-4">
-                        <CardHeader>
-                            <CardTitle>Random Selection</CardTitle>
-                            <CardDescription>Automatically generate a worksheet based on criteria.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                             <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-                                <p className="text-muted-foreground">Random selection feature is coming soon.</p>
-                            </div>
-                        </CardContent>
-                    </Card>
                 </TabsContent>
             </Tabs>
         </div>
