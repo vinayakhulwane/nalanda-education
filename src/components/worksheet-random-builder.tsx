@@ -4,7 +4,7 @@ import type { Question, CurrencyType, Unit, Category } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight } from 'lucide-react';
+import { FilePlus2, ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Droplet, Star } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
@@ -21,6 +21,14 @@ type WorksheetRandomBuilderProps = {
   setSelectedQuestions: (questions: Question[]) => void;
   onCreateWorksheet: () => void;
 };
+
+const currencyIcons = {
+    spark: Droplet,
+    coin: Star,
+    gold: Star,
+    diamond: Star,
+};
+
 
 export function WorksheetRandomBuilder({
   availableQuestions,
@@ -63,11 +71,14 @@ export function WorksheetRandomBuilder({
     }, {} as Record<CurrencyType, number>);
   }, [availableQuestions]);
   
-  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory } = useMemo(() => {
+  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, totalCost } = useMemo(() => {
     let totalMarks = 0;
     const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
     const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
     
+    // For now, let's assume cost is 1 per question of its currency type. This can be refined.
+    const costMap: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
+
     selectedQuestions.forEach(q => {
         const marks = q.solutionSteps?.reduce((stepSum, step) => 
             stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
@@ -82,13 +93,16 @@ export function WorksheetRandomBuilder({
         if (!breakdownByCategory[categoryName]) breakdownByCategory[categoryName] = { count: 0, marks: 0 };
         breakdownByCategory[categoryName].count++;
         breakdownByCategory[categoryName].marks += marks;
+
+        costMap[q.currencyType]++;
     });
 
     return { 
         totalMarks, 
         estimatedTime: totalMarks * 2, // Simple estimation: 2 minutes per mark
         breakdownByUnit,
-        breakdownByCategory
+        breakdownByCategory,
+        totalCost: costMap,
     };
 }, [selectedQuestions, unitMap, categoryMap]);
 
@@ -103,6 +117,11 @@ export function WorksheetRandomBuilder({
       setSelectedQuestions([...selectedQuestions, candidates[randomIndex]]);
     }
   };
+  
+  const removeQuestion = (questionId: string) => {
+    setSelectedQuestions(selectedQuestions.filter(q => q.id !== questionId));
+  };
+
 
   const handleFilterChange = (currency: CurrencyType, isChecked: boolean) => {
     if (isChecked) {
@@ -113,6 +132,11 @@ export function WorksheetRandomBuilder({
   }
 
   const allCurrencyTypes: CurrencyType[] = ['spark', 'coin', 'gold', 'diamond'];
+  
+  const getQuestionMarks = (question: Question): number => {
+      return question.solutionSteps?.reduce((stepSum, step) => 
+            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
+  }
 
   return (
     <div className="space-y-6 mt-4">
@@ -251,26 +275,26 @@ export function WorksheetRandomBuilder({
                     </Button>
                 </div>
             </SheetTrigger>
-            <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
+             <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
                 <SheetHeader className="p-6 pb-0">
                     <SheetTitle>Review &amp; Blueprint</SheetTitle>
                     <SheetDescription>
                         A detailed summary of your current selections before finalizing the worksheet.
                     </SheetDescription>
                 </SheetHeader>
-                <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
+                <Tabs defaultValue="review" className="flex-grow flex flex-col mt-4 overflow-hidden">
                     <TabsList className="mx-6">
                         <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
                         <TabsTrigger value="review">Review</TabsTrigger>
                     </TabsList>
-                    <div className="flex-grow overflow-y-auto px-6">
-                         <TabsContent value="blueprint" className="mt-4">
+                    <div className="flex-grow overflow-y-auto">
+                        <TabsContent value="blueprint" className="mt-4 px-6">
                             <div className="flex h-full items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg min-h-[200px]">
                                 Blueprint features coming soon.
                             </div>
                         </TabsContent>
-                        <TabsContent value="review" className="mt-4">
-                            <div className="space-y-6">
+                        <TabsContent value="review" className="mt-4 px-6">
+                           <div className="space-y-6">
                                 <Card>
                                     <CardHeader className="pb-2">
                                         <CardTitle className="text-base">Core Summary</CardTitle>
@@ -286,6 +310,31 @@ export function WorksheetRandomBuilder({
                                         </div>
                                     </CardContent>
                                 </Card>
+
+                                <div className="space-y-3">
+                                    {selectedQuestions.map(q => {
+                                        const CurrencyIcon = currencyIcons[q.currencyType] || Star;
+                                        return (
+                                        <Card key={q.id} className="p-3">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex-grow">
+                                                    <p className="text-sm font-semibold">{q.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
+                                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
+                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
+                                                        <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
+                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs capitalize"><CurrencyIcon className="h-3 w-3"/> {q.currencyType}</Badge>
+                                                    </div>
+                                                </div>
+                                                 <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeQuestion(q.id)}>
+                                                    <Trash2 className="h-4 w-4 text-destructive"/>
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    )})}
+                                </div>
+                                
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="text-base">Content Breakdown</CardTitle>
@@ -329,7 +378,11 @@ export function WorksheetRandomBuilder({
                     <div className="flex justify-between items-center w-full">
                         <div className="text-sm">
                             <p className="font-semibold">Est. Time: {estimatedTime} mins</p>
-                            <p className="text-xs text-muted-foreground">Total Cost: N/A</p>
+                             <div className="flex gap-2 text-xs text-muted-foreground">
+                                {Object.entries(totalCost).filter(([,count]) => count > 0).map(([currency, count]) => (
+                                    <span key={currency} className="capitalize">{count} {currency}</span>
+                                ))}
+                            </div>
                         </div>
                         <Button onClick={onCreateWorksheet}>
                             Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
