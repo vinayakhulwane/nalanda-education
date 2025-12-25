@@ -17,6 +17,7 @@ interface WorksheetDisplayCardProps {
     isPractice?: boolean;
     completedAttempts?: string[];
     view?: 'card' | 'list';
+    attemptId?: string;
 }
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
@@ -34,7 +35,7 @@ const currencyColors: Record<CurrencyType, string> = {
 };
 
 
-export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [], view = 'card' }: WorksheetDisplayCardProps) {
+export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [], view = 'card', attemptId }: WorksheetDisplayCardProps) {
     const router = useRouter();
     const firestore = useFirestore();
 
@@ -71,6 +72,15 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
 
     const isCompleted = isPractice ? completedAttempts.includes(worksheet.id) : false;
 
+    const handleReviewClick = () => {
+        if (attemptId) {
+            router.push(`/worksheets/review/${attemptId}`);
+        } else {
+            // Fallback for classroom assignments or if attemptId is not available
+            router.push(`/worksheets/preview/${worksheet.id}`);
+        }
+    };
+
     // --- LIST VIEW (This is where the Review button lives) ---
     if (view === 'list') {
         return (
@@ -97,8 +107,7 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
                 <CardFooter className="pt-6 pr-6">
                      <Button 
                         variant="secondary"
-                        // ✅ FIXED: Points to PREVIEW page now
-                        onClick={() => router.push(`/worksheets/preview/${worksheet.id}`)}
+                        onClick={handleReviewClick}
                     >
                         <BookOpen className="mr-2 h-4 w-4"/>
                         Review

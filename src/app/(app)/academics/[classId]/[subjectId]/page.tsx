@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch, documentId } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch, documentId, getDocs, limit, orderBy } from "firebase/firestore";
 import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, use } from "react";
-import type { Subject, Unit, Category, CustomTab, Worksheet } from "@/types";
+import type { Subject, Unit, Category, CustomTab, Worksheet, WorksheetAttempt } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -229,8 +229,9 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     const router = useRouter();
     const firestore = useFirestore();
     const { user, userProfile } = useUser();
+    const [attempts, setAttempts] = useState<WorksheetAttempt[]>([]);
+    const [areAttemptsLoading, setAttemptsLoading] = useState(true);
 
-    // Query for practice worksheets created by the user
     const practiceWorksheetsQuery = useMemoFirebase(() => {
         if (!firestore || !user?.uid || !subjectId) return null;
         return query(
@@ -241,7 +242,53 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
         );
     }, [firestore, user, subjectId]);
     
-    const { data: practiceWorksheets, isLoading } = useCollection<Worksheet>(practiceWorksheetsQuery);
+    const { data: practiceWorksheets, isLoading: areWorksheetsLoading } = useCollection<Worksheet>(practiceWorksheetsQuery);
+
+    useEffect(() => {
+        const fetchAttempts = async () => {
+            if (!firestore || !user?.uid || !practiceWorksheets) {
+                setAttemptsLoading(false);
+                return;
+            }
+            
+            const completedIds = practiceWorksheets.filter(ws => userProfile?.completedWorksheets?.includes(ws.id)).map(ws => ws.id);
+
+            if (completedIds.length === 0) {
+                setAttempts([]);
+                setAttemptsLoading(false);
+                return;
+            }
+
+            try {
+                // Fetch the latest attempt for each completed worksheet
+                const attemptPromises = completedIds.map(worksheetId => {
+                    const q = query(
+                        collection(firestore, 'attempts'),
+                        where('userId', '==', user.uid),
+                        where('worksheetId', '==', worksheetId),
+                        orderBy('attemptedAt', 'desc'),
+                        limit(1)
+                    );
+                    return getDocs(q);
+                });
+                
+                const attemptSnapshots = await Promise.all(attemptPromises);
+                const fetchedAttempts = attemptSnapshots.flatMap(snapshot => 
+                    snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+                ) as WorksheetAttempt[];
+                
+                setAttempts(fetchedAttempts);
+
+            } catch (error) {
+                console.error("Error fetching attempts:", error);
+            } finally {
+                setAttemptsLoading(false);
+            }
+        };
+
+        fetchAttempts();
+    }, [firestore, user?.uid, practiceWorksheets, userProfile?.completedWorksheets]);
+
 
     const { completed, notCompleted } = useMemo(() => {
         const completedIds = userProfile?.completedWorksheets || [];
@@ -249,6 +296,10 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
         const notCompleted = practiceWorksheets?.filter(ws => !completedIds.includes(ws.id)) || [];
         return { completed, notCompleted };
     }, [practiceWorksheets, userProfile?.completedWorksheets]);
+    
+    const attemptsMap = useMemo(() => new Map(attempts.map(a => [a.worksheetId, a.id])), [attempts]);
+
+    const isLoading = areWorksheetsLoading || areAttemptsLoading;
 
     const createWorksheetUrl = `/worksheets/new?classId=${classId}&subjectId=${subjectId}&source=practice`;
     
@@ -312,6 +363,7 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                                         isPractice={true}
                                         completedAttempts={userProfile?.completedWorksheets || []}
                                         view="list"
+                                        attemptId={attemptsMap.get(ws.id)}
                                     />
                                 ))
                             )}
