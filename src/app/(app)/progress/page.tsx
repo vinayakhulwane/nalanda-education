@@ -252,7 +252,7 @@ export default function ProgressPage() {
                                     <span className="text-muted-foreground">Academic Health</span>
                                     <span className="font-bold">{health}%</span>
                                 </div>
-                                <Progress value={health} className={cn("h-2 [&>div]:transition-all [&>div]:duration-500", health > 0 && healthColor)} />
+                                <Progress value={health} className={cn("h-2 [&>div]:transition-all [&>div]:duration-500")} indicatorClassName={healthColor} />
                             </div>
                           </CardContent>
                           <CardFooter>
