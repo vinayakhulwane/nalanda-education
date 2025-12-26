@@ -22,7 +22,7 @@ export function CurrencySwap({ userProfile }: { userProfile: User | null | undef
   const [receiveCurrency, setReceiveCurrency] = useState<CurrencyType>("gold");
   const [isSwapping, setIsSwapping] = useState(false);
 
-  // --- NEW: Fetch dynamic rates from Admin Settings ---
+  // --- Fetch dynamic rates from Admin Settings ---
   const economySettingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
   const { data: economySettings, isLoading: isSettingsLoading } = useDoc<EconomySettings>(economySettingsRef);
 
@@ -37,11 +37,11 @@ export function CurrencySwap({ userProfile }: { userProfile: User | null | undef
     if (payCurrency === "coin" && receiveCurrency === "gold") return 1 / coinsPerGold;
     if (payCurrency === "gold" && receiveCurrency === "diamond") return 1 / goldPerDiamond;
     
-    // Reverse conversions (usually same rate or slightly less for "sell back")
+    // Reverse conversions
     if (payCurrency === "gold" && receiveCurrency === "coin") return coinsPerGold;
     if (payCurrency === "diamond" && receiveCurrency === "gold") return goldPerDiamond;
 
-    return 0;
+    return 0; // Invalid swap pair
   }, [economySettings, payCurrency, receiveCurrency]);
 
   const receiveAmount = useMemo(() => {
@@ -82,7 +82,7 @@ export function CurrencySwap({ userProfile }: { userProfile: User | null | undef
 
       toast({ 
         title: "Swap Successful!", 
-        description: `Exchanged ${amountToPay} ${payCurrency}s for ${amountToReceive} ${receiveCurrency}s.` 
+        description: `Exchanged ${amountToPay} ${payCurrency} for ${amountToReceive} ${receiveCurrency}.` 
       });
       setPayAmount("");
     } catch (error) {
@@ -93,6 +93,26 @@ export function CurrencySwap({ userProfile }: { userProfile: User | null | undef
     }
   };
 
+  const getRateDescription = () => {
+    if (!economySettings || currentRate <= 0) return "Select different currencies to see a rate.";
+    
+    if (payCurrency === 'coin' && receiveCurrency === 'gold') {
+      return `Current Rate: ${economySettings.coinsPerGold} coins = 1 gold`;
+    }
+    if (payCurrency === 'gold' && receiveCurrency === 'coin') {
+      return `Current Rate: 1 gold = ${economySettings.coinsPerGold} coins`;
+    }
+    if (payCurrency === 'gold' && receiveCurrency === 'diamond') {
+      return `Current Rate: ${economySettings.goldPerDiamond} gold = 1 diamond`;
+    }
+    if (payCurrency === 'diamond' && receiveCurrency === 'gold') {
+      return `Current Rate: 1 diamond = ${economySettings.goldPerDiamond} gold`;
+    }
+
+    return "Invalid currency pair for direct swap.";
+  };
+
+
   if (isSettingsLoading) {
     return (
       <Card className="max-w-4xl mx-auto flex items-center justify-center h-48">
@@ -100,16 +120,6 @@ export function CurrencySwap({ userProfile }: { userProfile: User | null | undef
       </Card>
     );
   }
-
-  const getRateDescription = () => {
-    if (payCurrency === receiveCurrency || currentRate <= 0) return "Select different currencies to see a rate.";
-
-    if (currentRate < 1) {
-        return `1 ${receiveCurrency} = ${1 / currentRate} ${payCurrency}s`
-    }
-    return `1 ${payCurrency} = ${currentRate} ${receiveCurrency}s`
-  }
-
 
   return (
     <Card className="max-w-4xl mx-auto">
@@ -147,7 +157,7 @@ export function CurrencySwap({ userProfile }: { userProfile: User | null | undef
                 </SelectContent>
               </Select>
             </div>
-            <span className="text-sm font-medium text-muted-foreground">Balance: {userBalance} {payCurrency}s</span>
+            <span className="text-sm font-medium text-muted-foreground">Balance: {userBalance} {payCurrency}</span>
           </div>
 
           <div className="z-10 bg-background rounded-full p-2 border shadow-sm">
