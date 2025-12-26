@@ -1,6 +1,6 @@
 'use client';
 
-import type { Question, WalletTransaction, CurrencyType, ResultState } from '@/types';
+import type { Question, WalletTransaction, CurrencyType, ResultState, Worksheet } from '@/types';
 
 
 /**
@@ -46,19 +46,34 @@ export function calculateWorksheetCost(
 
 
 /**
- * Calculates the total reward for a given worksheet attempt based on marks obtained.
- * - Spark questions reward 50% of obtained marks (rounded down) as Coins.
- * - Other questions reward 100% of obtained marks in their respective currency.
+ * Calculates the total reward for a given worksheet attempt based on marks obtained and worksheet type.
+ * - Applies a multiplier based on the worksheet type.
+ * - Spark questions reward a percentage of obtained marks as Coins.
+ * - Other questions reward a percentage of obtained marks in their respective currency.
  *
+ * @param worksheet - The worksheet document.
  * @param questions - The full question objects included in the worksheet.
  * @param results - The results object mapping sub-question IDs to their correctness.
+ * @param userId - The ID of the user who made the attempt.
  * @returns A WalletTransaction object with the total reward per currency.
  */
 export function calculateAttemptRewards(
+  worksheet: Worksheet,
   questions: Question[],
-  results: ResultState
+  results: ResultState,
+  userId: string
 ): Partial<WalletTransaction> {
   const rewardTotals: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
+
+  // Determine reward multiplier based on worksheet type
+  let multiplier = 0;
+  if (worksheet.worksheetType === 'practice') {
+      multiplier = 1.0; // Student-created practice tests
+  } else if (worksheet.worksheetType === 'classroom') {
+      multiplier = 0.5; // Teacher-assigned classroom work
+  }
+  // For 'sample' worksheets, multiplier remains 0.
+
 
   for (const question of questions) {
     let obtainedMarksForQuestion = 0;
@@ -76,12 +91,12 @@ export function calculateAttemptRewards(
 
     // Apply reward logic based on currency type
     if (question.currencyType === 'spark') {
-      // Reward is 50% of obtained marks, rounded DOWN, paid in Coins.
-      const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5);
+      // Reward is 50% of obtained marks, adjusted by multiplier, rounded DOWN, paid in Coins.
+      const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5 * multiplier);
       rewardTotals.coins += rewardValue;
     } else {
-      // Reward is 100% of obtained marks for other currencies.
-      const rewardValue = obtainedMarksForQuestion;
+      // Reward is 100% of obtained marks, adjusted by multiplier, rounded DOWN.
+      const rewardValue = Math.floor(obtainedMarksForQuestion * 1.0 * multiplier);
       if (question.currencyType === 'coin') {
           rewardTotals.coins += rewardValue;
       } else if (question.currencyType === 'gold') {

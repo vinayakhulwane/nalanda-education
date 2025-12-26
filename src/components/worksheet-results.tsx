@@ -107,10 +107,10 @@ export function WorksheetResults({
         });
     });
 
-    const calculatedRewards = calculateAttemptRewards(questions, results);
+    const calculatedRewards = user?.uid ? calculateAttemptRewards(worksheet, questions, results, user.uid) : {};
 
     return { totalMarks, score, calculatedRewards };
-  }, [questions, results]);
+  }, [questions, results, worksheet, user?.uid]);
   
   const handleClaimRewards = async () => {
     if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id || !calculatedRewards) return;
