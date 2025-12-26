@@ -185,7 +185,6 @@ export function WorksheetRandomBuilder({
   }
   
   const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
-  const isFilterActive = activeFilterCount > 0;
   
   const handleCreateClick = () => {
     if (userIsEditor) {
@@ -206,8 +205,7 @@ export function WorksheetRandomBuilder({
 
   return (
     <div className="space-y-6 mt-4">
-      <div className="flex justify-between items-start">
-         <h3 className="text-xl font-semibold">{filteredQuestions.length} Questions Available</h3>
+      <div className="flex justify-end items-start">
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline">
@@ -271,30 +269,6 @@ export function WorksheetRandomBuilder({
           </PopoverContent>
         </Popover>
       </div>
-
-       {isFilterActive && (
-        <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold">Active:</span>
-            {filters.units.map(id => (
-              <Badge key={id} variant="outline" className="pl-2 capitalize">
-                {unitMap.get(id) || id}
-                <button onClick={() => handleFilterChange('units', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-              </Badge>
-            ))}
-            {filters.categories.map(id => (
-              <Badge key={id} variant="outline" className="pl-2 capitalize">
-                {categoryMap.get(id) || id}
-                <button onClick={() => handleFilterChange('categories', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-              </Badge>
-            ))}
-            {filters.currencies.map(c => (
-              <Badge key={c} variant="outline" className="pl-2 capitalize">
-                {c}
-                <button onClick={() => handleFilterChange('currencies', c, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
-              </Badge>
-            ))}
-        </div>
-      )}
 
       <Card>
         <CardContent className="p-6 text-center">
