@@ -191,7 +191,8 @@ export default function SolveWorksheetPage() {
             answers={answers}
             results={results}
             timeTaken={timeTaken}
-            attemptId={attemptId}
+            // We don't pass isReview={true} here because usually,
+            // when you just finish solving, you WANT to claim rewards.
         />
     )
   }

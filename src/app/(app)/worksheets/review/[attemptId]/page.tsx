@@ -64,8 +64,7 @@ export default function ReviewAttemptPage() {
       answers={attempt.answers}
       results={attempt.results}
       timeTaken={attempt.timeTaken}
-      attemptId={attempt.id}
-      initialRewardsClaimed={attempt.rewardsClaimed}
+      isReview={true} // ✅ DISABLED CLAIMING HERE
     />
   );
 }

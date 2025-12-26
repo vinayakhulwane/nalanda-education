@@ -1,0 +1,66 @@
+'use client';
+
+import { PageHeader } from "@/components/page-header";
+import { WalletBalances } from "@/components/wallet/wallet-balances";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useUser } from "@/firebase";
+import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+export default function WalletPage() {
+  const { userProfile, isUserProfileLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+      if (!isUserProfileLoading && userProfile?.role !== 'student') {
+          router.push('/dashboard');
+      }
+  }, [userProfile, isUserProfileLoading, router]);
+
+  if (isUserProfileLoading || !userProfile) {
+    return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+  
+  if (userProfile.role !== 'student') {
+      return null;
+  }
+
+  return (
+    <div className="container mx-auto py-6 space-y-8">
+      <PageHeader
+        title="My Wallet"
+        description="View your balances, exchange currencies, and see your transaction history."
+      />
+
+      <Tabs defaultValue="balances" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="balances">My Balances</TabsTrigger>
+          {/* These tabs are placeholders for future features */}
+          <TabsTrigger value="swap" disabled>Currency Swap</TabsTrigger>
+          <TabsTrigger value="history" disabled>Transaction History</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="balances" className="mt-6">
+          {/* This is the new component we will create */}
+          <WalletBalances userProfile={userProfile} />
+        </TabsContent>
+        
+        <TabsContent value="swap">
+          <Card>
+            <CardHeader><CardTitle>Currency Swap</CardTitle></CardHeader>
+            <CardContent><p>Coming soon!</p></CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="history">
+           <Card>
+            <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
+            <CardContent><p>Coming soon!</p></CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

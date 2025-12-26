@@ -40,7 +40,7 @@ export function AppSidebar() {
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/courses", icon: BookOpen, label: "My Courses" },
     { href: "/progress", icon: BarChart3, label: "My Progress" },
-    { href: "#", icon: Wallet, label: "My Wallet" },
+    { href: "/wallet", icon: Wallet, label: "My Wallet" },
   ];
 
   const adminMenu = [

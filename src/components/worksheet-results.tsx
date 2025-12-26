@@ -1,5 +1,5 @@
 'use client';
-import type { Question, SubQuestion, Worksheet, CurrencyType, User } from "@/types";
+import type { Question, SubQuestion, Worksheet, CurrencyType } from "@/types";
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Separator } from "./ui/separator";
@@ -20,8 +20,7 @@ interface WorksheetResultsProps {
   answers: AnswerState;
   results: ResultState;
   timeTaken: number;
-  attemptId: string | null;
-  initialRewardsClaimed?: boolean;
+  isReview?: boolean; // <--- NEW PROP
 }
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
@@ -37,7 +36,6 @@ const currencyColors: Record<CurrencyType, string> = {
     gold: 'text-amber-500',
     diamond: 'text-blue-500',
 };
-
 
 const getAnswerText = (subQuestion: SubQuestion, answer: any) => {
     if (answer === null || answer === undefined || answer === '') return 'Not Answered';
@@ -82,8 +80,7 @@ export function WorksheetResults({
   answers,
   results,
   timeTaken,
-  attemptId,
-  initialRewardsClaimed = false,
+  isReview = false // Default to false (active claiming)
 }: WorksheetResultsProps) {
   const router = useRouter();
   const firestore = useFirestore();
@@ -91,9 +88,8 @@ export function WorksheetResults({
   const { toast } = useToast();
   
   const [isClaiming, setIsClaiming] = useState(false);
-  const [hasClaimed, setHasClaimed] = useState(initialRewardsClaimed);
+  const [hasClaimed, setHasClaimed] = useState(false);
   const [isBlasting, setIsBlasting] = useState(false);
-
 
   const { totalMarks, score, rewards } = useMemo(() => {
     let totalMarks = 0;
@@ -112,10 +108,9 @@ export function WorksheetResults({
             })
         });
 
-        // This logic is now aligned with the detailed business rules
         if (q.currencyType === 'spark') {
             const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5);
-            rewards.coin += rewardValue; // Spark rewards are always paid in Coins
+            rewards.coin += rewardValue;
         } else {
             const rewardValue = obtainedMarksForQuestion;
             rewards[q.currencyType] = (rewards[q.currencyType] || 0) + rewardValue;
@@ -126,14 +121,12 @@ export function WorksheetResults({
   }, [questions, results]);
   
   const handleClaimRewards = async () => {
-    if (!user || !firestore || hasClaimed || isClaiming || !attemptId) return;
+    if (!user || !firestore || hasClaimed || isClaiming || isReview) return;
     setIsClaiming(true);
 
     const userRef = doc(firestore, 'users', user.uid);
-    const attemptRef = doc(firestore, 'worksheet_attempts', attemptId);
 
     try {
-        // Update user's wallet
         const updatePayload: Record<string, any> = {};
         if (rewards.coin > 0) updatePayload.coins = increment(rewards.coin);
         if (rewards.gold > 0) updatePayload.gold = increment(rewards.gold);
@@ -142,12 +135,9 @@ export function WorksheetResults({
         if (Object.keys(updatePayload).length > 0) {
             await updateDoc(userRef, updatePayload);
         }
-
-        // Mark rewards as claimed on the attempt document
-        await updateDoc(attemptRef, { rewardsClaimed: true });
         
         setIsBlasting(true);
-        setTimeout(() => setIsBlasting(false), 600); // Duration of the animation
+        setTimeout(() => setIsBlasting(false), 600);
 
         toast({
             title: "Rewards Claimed!",
@@ -177,7 +167,7 @@ export function WorksheetResults({
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl md:text-3xl text-center">Worksheet Complete!</CardTitle>
+          <CardTitle className="text-2xl md:text-3xl text-center">{isReview ? 'Worksheet Review' : 'Worksheet Complete!'}</CardTitle>
           <CardDescription className="text-center">{worksheet.title}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -223,15 +213,17 @@ export function WorksheetResults({
                         }}
                     />
                 ))}
+                
+                {/* --- BUTTON UPDATE --- */}
                 <Button 
-                    className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200"
+                    className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
                     onClick={handleClaimRewards}
-                    disabled={isClaiming || hasClaimed || Object.values(rewards).every(a => a === 0)}
+                    disabled={isClaiming || hasClaimed || isReview || Object.values(rewards).every(a => a === 0)}
                 >
                     {isClaiming ? (
                         <Loader2 className="h-6 w-6 animate-spin" />
-                    ) : hasClaimed ? (
-                        'Rewards Claimed!'
+                    ) : isReview || hasClaimed ? (
+                        'Rewards Claimed'
                     ) : (
                         'Claim Rewards'
                     )}
@@ -278,7 +270,7 @@ export function WorksheetResults({
                                             <div>
                                                 Correct Answer: <span className="font-semibold">{getCorrectAnswerText(subQ)}</span>
                                             </div>
-                                        )}
+                                            )}
                                     </div>
                                 </div>
                             )
