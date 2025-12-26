@@ -247,7 +247,7 @@ export function WorksheetRandomBuilder({
                         <Label htmlFor={`filter-cat-${cat.id}`} className="capitalize">{cat.name}</Label>
                       </div>
                     ))}
-                     {filters.units.length > 0 && availableCategories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories found for the selected unit(s).</p>}
+                     {filters.units.length > 0 && availableCategories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories for selected unit(s).</p>}
                      {filters.units.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Please select a unit first.</p>}
                   </div>
                 </TabsContent>
