@@ -114,7 +114,8 @@ export function CurrencySwap({ userProfile }: { userProfile: User | null | undef
   };
 
   const getRateDescription = () => {
-    if (!economySettings || currentRate <= 0) return "Select different currencies to see a rate.";
+    if (!economySettings || isSettingsLoading) return "Loading rates...";
+    if (currentRate <= 0) return "Select different currencies to see a rate.";
     
     if (payCurrency === 'coin' && receiveCurrency === 'gold') {
       return `Current Rate: ${economySettings.coinsPerGold} coins = 1 gold`;

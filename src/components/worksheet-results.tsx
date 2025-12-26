@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore } from "@/firebase";
-import { doc, updateDoc, increment } from "firebase/firestore";
+import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 export type AnswerState = { [subQuestionId: string]: { answer: any } };
@@ -88,7 +88,7 @@ export function WorksheetResults({
   const { toast } = useToast();
   
   const [isClaiming, setIsClaiming] = useState(false);
-  const [hasClaimed, setHasClaimed] = useState(false);
+  const [hasClaimed, setHasClaimed] = useState(isReview);
   const [isBlasting, setIsBlasting] = useState(false);
 
   const { totalMarks, score, rewards } = useMemo(() => {
