@@ -177,6 +177,7 @@ export interface WorksheetAttempt {
     results: Record<string, { isCorrect: boolean }>;
     timeTaken: number;
     attemptedAt: any; // Firestore ServerTimestamp
+    rewardsClaimed?: boolean;
 }
 
 

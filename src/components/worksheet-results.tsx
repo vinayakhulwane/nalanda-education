@@ -20,6 +20,8 @@ interface WorksheetResultsProps {
   answers: AnswerState;
   results: ResultState;
   timeTaken: number;
+  attemptId: string | null;
+  initialRewardsClaimed?: boolean;
 }
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
@@ -80,6 +82,8 @@ export function WorksheetResults({
   answers,
   results,
   timeTaken,
+  attemptId,
+  initialRewardsClaimed = false,
 }: WorksheetResultsProps) {
   const router = useRouter();
   const firestore = useFirestore();
@@ -87,7 +91,7 @@ export function WorksheetResults({
   const { toast } = useToast();
   
   const [isClaiming, setIsClaiming] = useState(false);
-  const [hasClaimed, setHasClaimed] = useState(false);
+  const [hasClaimed, setHasClaimed] = useState(initialRewardsClaimed);
   const [isBlasting, setIsBlasting] = useState(false);
 
 
@@ -122,12 +126,14 @@ export function WorksheetResults({
   }, [questions, results]);
   
   const handleClaimRewards = async () => {
-    if (!user || !firestore || hasClaimed || isClaiming) return;
+    if (!user || !firestore || hasClaimed || isClaiming || !attemptId) return;
     setIsClaiming(true);
 
     const userRef = doc(firestore, 'users', user.uid);
+    const attemptRef = doc(firestore, 'worksheet_attempts', attemptId);
 
     try {
+        // Update user's wallet
         const updatePayload: Record<string, any> = {};
         if (rewards.coin > 0) updatePayload.coins = increment(rewards.coin);
         if (rewards.gold > 0) updatePayload.gold = increment(rewards.gold);
@@ -136,6 +142,9 @@ export function WorksheetResults({
         if (Object.keys(updatePayload).length > 0) {
             await updateDoc(userRef, updatePayload);
         }
+
+        // Mark rewards as claimed on the attempt document
+        await updateDoc(attemptRef, { rewardsClaimed: true });
         
         setIsBlasting(true);
         setTimeout(() => setIsBlasting(false), 600); // Duration of the animation
