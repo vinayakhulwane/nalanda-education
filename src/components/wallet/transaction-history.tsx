@@ -99,8 +99,9 @@ export function TransactionHistory() {
                         <span>{isEarned ? '+' : '-'}{tx.amount}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {tx.createdAt ? format(tx.createdAt.toDate(), 'dd MMM, yyyy') : '...'}
+                    <TableCell className="text-right">
+                      <div>{tx.createdAt ? format(tx.createdAt.toDate(), 'dd MMM, yyyy') : '...'}</div>
+                      <div className="text-xs text-muted-foreground">{tx.createdAt ? format(tx.createdAt.toDate(), 'p') : ''}</div>
                     </TableCell>
                   </TableRow>
                 );
