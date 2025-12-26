@@ -1,102 +1,90 @@
 
+'use client';
 
-import type { Question } from '@/types';
+import type { Question, Worksheet, WalletTransaction, CurrencyType } from '@/types';
 
-// Define the structure for wallet transactions (cost and reward)
-export type WalletTransaction = {
-  coins: number;
-  gold: number;
-  diamonds: number;
-};
-
-// Define a simplified worksheet structure for the function's purpose
-interface Worksheet {
-  worksheetType: 'sample' | 'practice' | 'classroom';
-  questions: Question[];
-}
 
 /**
- * Calculates the total cost for creating a worksheet.
- * This is different from attempt cost/reward.
- * For now, we'll say creating a practice worksheet costs a flat fee per question.
+ * Calculates the total cost for creating a worksheet based on its questions.
+ * - Spark questions are free.
+ * - Other questions cost 50% of their total marks, rounded up.
  *
- * @param questions - An array of questions included in the worksheet.
- * @returns An object containing the totalCost broken down by currency type.
+ * @param questions - An array of questions to be included in the worksheet.
+ * @returns A WalletTransaction object with the total cost per currency.
  */
 export function calculateWorksheetCost(
     questions: Question[]
 ): WalletTransaction {
     const totalCost: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
-    const COST_PER_QUESTION = 1; // 1 coin per question
 
-    totalCost.coins = questions.length * COST_PER_QUESTION;
+    for (const question of questions) {
+        if (question.currencyType === 'spark') {
+            continue; // Spark questions are free to add
+        }
+
+        const totalMarks =
+            question.solutionSteps?.reduce(
+                (stepSum, step) =>
+                    stepSum +
+                    step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0),
+                0
+            ) || 0;
+        
+        // Cost is 50% of total marks, rounded UP
+        const costValue = Math.ceil(totalMarks * 0.5);
+
+        if (question.currencyType === 'coin') totalCost.coins += costValue;
+        if (question.currencyType === 'gold') totalCost.gold += costValue;
+        if (question.currencyType === 'diamond') totalCost.diamonds += costValue;
+    }
 
     return totalCost;
 }
 
 
 /**
- * Calculates the total cost and reward for a given worksheet attempt based on a set of business rules.
+ * Calculates the total reward for a given worksheet attempt based on marks obtained.
+ * - Spark questions reward 50% of obtained marks (rounded down) as Coins.
+ * - Other questions reward 100% of obtained marks in their respective currency.
  *
- * @param worksheet - The worksheet object, containing its type and an array of questions.
- * @param attempt - An object mapping question IDs to the marks obtained by the student.
- * @returns An object containing the totalCost and totalReward, each broken down by currency type.
+ * @param worksheet - The worksheet object.
+ * @param questions - The full question objects included in the worksheet.
+ * @param results - The results object mapping sub-question IDs to their correctness.
+ * @returns A WalletTransaction object with the total reward per currency.
  */
-export function calculateWalletTransaction(
-  worksheet: Worksheet,
-  attempt: { [questionId: string]: { obtainedMarks: number; }; }
-): {
-  totalCost: WalletTransaction;
-  totalReward: WalletTransaction;
-} {
-  const totalCost: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
+export function calculateAttemptRewards(
+  questions: Question[],
+  results: { [subQuestionId: string]: { isCorrect: boolean } }
+): WalletTransaction {
   const totalReward: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
 
-  // Rule 1: "Sample" Worksheet has no cost or reward.
-  if (worksheet.worksheetType === 'sample') {
-    return { totalCost, totalReward };
-  }
+  for (const question of questions) {
+    let obtainedMarksForQuestion = 0;
+    
+    // Calculate marks obtained for this specific question
+    question.solutionSteps?.forEach(step => {
+        step.subQuestions.forEach(subQ => {
+            if (results[subQ.id]?.isCorrect) {
+                obtainedMarksForQuestion += subQ.marks;
+            }
+        });
+    });
 
-  // Rule 2: Iterate through questions for non-sample worksheets.
-  for (const question of worksheet.questions) {
-    const questionId = question.id;
-    const obtainedMarks = attempt[questionId]?.obtainedMarks ?? 0;
-    const totalMarks =
-      question.solutionSteps?.reduce(
-        (stepSum, step) =>
-          stepSum +
-          step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0),
-        0
-      ) || 0;
+    if (obtainedMarksForQuestion === 0) continue;
 
-    // Logic for "Spark" questions
+    // Apply reward logic based on currency type
     if (question.currencyType === 'spark') {
-      // Cost is 0.
-      // Reward is 50% of obtained marks, always in Coins.
-      const rewardValue = Math.floor(obtainedMarks * 0.5);
+      // Reward is 50% of obtained marks, rounded DOWN, paid in Coins.
+      const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5);
       totalReward.coins += rewardValue;
-    }
-    // Logic for "Standard" questions (Coins, Gold, Diamonds)
-    else {
-      const currency = question.currencyType; // 'coin', 'gold', or 'diamond'
-
-      // Calculate Cost: 50% of totalMarks, rounded up.
-      const costValue = Math.ceil(totalMarks * 0.5);
-
-      // Assign cost to the correct currency.
-      if (currency === 'coin') totalCost.coins += costValue;
-      if (currency === 'gold') totalCost.gold += costValue;
-      if (currency === 'diamond') totalCost.diamonds += costValue;
-
-      // Calculate Reward: 100% of obtainedMarks.
-      const rewardValue = obtainedMarks;
-
-      // Assign reward to the correct currency.
-      if (currency === 'coin') totalReward.coins += rewardValue;
-      if (currency === 'gold') totalReward.gold += rewardValue;
-      if (currency === 'diamond') totalReward.diamonds += rewardValue;
+    } else {
+      // Reward is 100% of obtained marks for other currencies.
+      const rewardValue = obtainedMarksForQuestion;
+      if (question.currencyType === 'coin') totalReward.coins += rewardValue;
+      if (question.currencyType === 'gold') totalReward.gold += rewardValue;
+      if (question.currencyType === 'diamond') totalReward.diamonds += rewardValue;
     }
   }
 
-  return { totalCost, totalReward };
+  return totalReward;
 }

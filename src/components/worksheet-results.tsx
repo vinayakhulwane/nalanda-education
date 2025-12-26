@@ -1,3 +1,4 @@
+
 'use client';
 import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt } from "@/types";
 import { useMemo, useState } from "react";
@@ -11,6 +12,7 @@ import { useUser, useFirestore } from "@/firebase";
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { calculateAttemptRewards } from "@/lib/wallet";
 
 export type AnswerState = { [subQuestionId: string]: { answer: any } };
 export type ResultState = { [subQuestionId: string]: { isCorrect: boolean } };
@@ -97,32 +99,21 @@ export function WorksheetResults({
   const { totalMarks, score, rewards } = useMemo(() => {
     let totalMarks = 0;
     let score = 0;
-    const rewards: Record<CurrencyType, number> = { spark: 0, coin: 0, gold: 0, diamond: 0 };
     
     questions.forEach(q => {
-        let obtainedMarksForQuestion = 0;
         q.solutionSteps.forEach(step => {
             step.subQuestions.forEach(subQ => {
                 totalMarks += subQ.marks;
                 if(results[subQ.id]?.isCorrect) {
                     score += subQ.marks;
-                    obtainedMarksForQuestion += subQ.marks;
                 }
             })
         });
+    });
 
-        // For "spark" questions, the reward is 50% of obtained marks, given as Coins.
-        if (q.currencyType === 'spark') {
-            const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5);
-            rewards.coin += rewardValue;
-        } else {
-            // For standard questions, reward is 100% of obtained marks in the question's currency type.
-            const rewardValue = obtainedMarksForQuestion;
-            rewards[q.currencyType] = (rewards[q.currencyType] || 0) + rewardValue;
-        }
-    })
+    const calculatedRewards = calculateAttemptRewards(questions, results);
 
-    return { totalMarks, score, rewards };
+    return { totalMarks, score, rewards: calculatedRewards };
   }, [questions, results]);
   
   const handleClaimRewards = async () => {

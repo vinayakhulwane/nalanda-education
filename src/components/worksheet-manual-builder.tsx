@@ -1,5 +1,6 @@
+
 'use client';
-import type { Question, Unit, Category, CurrencyType, Worksheet } from '@/types';
+import type { Question, Unit, Category, CurrencyType, Worksheet, WalletTransaction } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle } from 'lucide-react';
@@ -109,6 +110,14 @@ export function WorksheetManualBuilder({
             onCreateWorksheet('practice');
         }
     }
+
+    const canAfford = useMemo(() => {
+        if (userIsEditor) return true;
+        if (!userProfile) return false;
+        return (userProfile.coins >= creationCost.coins) &&
+               (userProfile.gold >= creationCost.gold) &&
+               (userProfile.diamonds >= creationCost.diamonds);
+    }, [userProfile, creationCost, userIsEditor]);
 
 
     return (
@@ -309,14 +318,18 @@ export function WorksheetManualBuilder({
                     <div className="flex justify-between items-center w-full">
                         <div className="text-sm font-semibold">
                             <p>Est. Time: {estimatedTime} mins</p>
-                            {!userIsEditor && creationCost.coins > 0 && (
-                                <p className="flex items-center text-yellow-600 dark:text-yellow-400">
-                                    <Coins className="mr-1 h-4 w-4" /> Cost: {creationCost.coins}
-                                </p>
+                            {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0) && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <p>Cost:</p>
+                                    {creationCost.coins > 0 && <span className="flex items-center text-yellow-600 dark:text-yellow-400"><Coins className="mr-1 h-4 w-4" />{creationCost.coins}</span>}
+                                    {creationCost.gold > 0 && <span className="flex items-center text-amber-600 dark:text-amber-400"><Crown className="mr-1 h-4 w-4" />{creationCost.gold}</span>}
+                                    {creationCost.diamonds > 0 && <span className="flex items-center text-blue-600 dark:text-blue-400"><Gem className="mr-1 h-4 w-4" />{creationCost.diamonds}</span>}
+                                </div>
                             )}
                         </div>
-                        <Button onClick={handleCreateClick}>
-                            Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
+                        <Button onClick={handleCreateClick} disabled={!canAfford}>
+                           {!canAfford ? 'Insufficient Funds' : 'Create Worksheet'}
+                            <ArrowRight className="ml-2 h-4 w-4"/>
                         </Button>
                     </div>
                 </SheetFooter>
