@@ -1,18 +1,12 @@
 
+
 import type { Question } from '@/types';
 
 // Define the structure for wallet transactions (cost and reward)
-type WalletTransaction = {
+export type WalletTransaction = {
   coins: number;
   gold: number;
   diamonds: number;
-};
-
-// Define the structure for a student's attempt
-type StudentAttempt = {
-  [questionId: string]: {
-    obtainedMarks: number;
-  };
 };
 
 // Define a simplified worksheet structure for the function's purpose
@@ -20,6 +14,26 @@ interface Worksheet {
   worksheetType: 'sample' | 'practice' | 'classroom';
   questions: Question[];
 }
+
+/**
+ * Calculates the total cost for creating a worksheet.
+ * This is different from attempt cost/reward.
+ * For now, we'll say creating a practice worksheet costs a flat fee per question.
+ *
+ * @param questions - An array of questions included in the worksheet.
+ * @returns An object containing the totalCost broken down by currency type.
+ */
+export function calculateWorksheetCost(
+    questions: Question[]
+): WalletTransaction {
+    const totalCost: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
+    const COST_PER_QUESTION = 1; // 1 coin per question
+
+    totalCost.coins = questions.length * COST_PER_QUESTION;
+
+    return totalCost;
+}
+
 
 /**
  * Calculates the total cost and reward for a given worksheet attempt based on a set of business rules.
@@ -30,7 +44,7 @@ interface Worksheet {
  */
 export function calculateWalletTransaction(
   worksheet: Worksheet,
-  attempt: StudentAttempt
+  attempt: { [questionId: string]: { obtainedMarks: number; }; }
 ): {
   totalCost: WalletTransaction;
   totalReward: WalletTransaction;

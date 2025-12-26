@@ -2,8 +2,8 @@
 import { PageHeader } from "@/components/page-header";
 import { WorksheetRandomBuilder } from "@/components/worksheet-random-builder";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
-import type { Question, Subject, Worksheet, Unit, Category } from "@/types";
-import { collection, query, where, doc, addDoc, serverTimestamp } from "firebase/firestore";
+import type { Question, Subject, Worksheet, Unit, Category, WalletTransaction } from "@/types";
+import { collection, query, where, doc, addDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, useMemo } from 'react';
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorksheetManualBuilder } from "@/components/worksheet-manual-builder";
+import { calculateWorksheetCost } from "@/lib/wallet";
 
 // Add a source property to track where the question came from
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
@@ -77,10 +78,35 @@ function AddQuestionsPageContent() {
         }
 
         const isEditor = userProfile.role === 'admin' || userProfile.role === 'teacher';
-
-        // THE FIX: Force 'practice' type for students
         const finalWorksheetType = isEditor ? worksheetTypeParam : 'practice';
-
+        
+        // --- Cost Calculation for Students creating Practice worksheets ---
+        if (finalWorksheetType === 'practice') {
+            const cost = calculateWorksheetCost(selectedQuestions);
+            const canAfford = (userProfile.coins ?? 0) >= cost.coins;
+            
+            if (!canAfford) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Insufficient Funds',
+                    description: `You need ${cost.coins} coins to create this worksheet, but you only have ${userProfile.coins ?? 0}.`
+                });
+                return;
+            }
+            
+            // Deduct cost and log transaction
+            const userRef = doc(firestore, 'users', user.uid);
+            await updateDoc(userRef, { coins: increment(-cost.coins) });
+            await addDoc(collection(firestore, 'transactions'), {
+                userId: user.uid,
+                type: 'spent',
+                description: `Created practice worksheet: ${title}`,
+                amount: cost.coins,
+                currency: 'coin',
+                createdAt: serverTimestamp()
+            });
+        }
+        
         const newWorksheet: Omit<Worksheet, 'id'> = {
             title,
             classId,
