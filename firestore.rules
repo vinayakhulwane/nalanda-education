@@ -156,7 +156,7 @@ service cloud.firestore {
     match /transactions/{transactionId} {
       // A user can create their own transactions (e.g. through a server-side function)
       // For now, let's restrict client-side creation for safety
-      allow create: if false;
+      allow create: if isOwner(request.resource.data.userId);
       
       // A user can only list/read their own transactions.
       allow get: if isOwner(resource.data.userId) || isAdmin();

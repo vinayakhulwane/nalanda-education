@@ -95,7 +95,7 @@ export function TransactionHistory() {
                         "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted border font-bold",
                         color
                       )}>
-                        <Icon className="h-4 w-4" />
+                        {Icon && <Icon className="h-4 w-4" />}
                         <span>{isEarned ? '+' : '-'}{tx.amount}</span>
                       </div>
                     </TableCell>
