@@ -32,9 +32,13 @@ export function calculateWorksheetCost(
         // Cost is 50% of total marks, rounded UP
         const costValue = Math.ceil(totalMarks * 0.5);
 
-        if (question.currencyType === 'coin') totalCost.coins += costValue;
-        if (question.currencyType === 'gold') totalCost.gold += costValue;
-        if (question.currencyType === 'diamond') totalCost.diamonds += costValue;
+        if (question.currencyType === 'coin') {
+            totalCost.coins += costValue;
+        } else if (question.currencyType === 'gold') {
+            totalCost.gold += costValue;
+        } else if (question.currencyType === 'diamond') {
+            totalCost.diamonds += costValue;
+        }
     }
 
     return totalCost;
@@ -78,9 +82,13 @@ export function calculateAttemptRewards(
     } else {
       // Reward is 100% of obtained marks for other currencies.
       const rewardValue = obtainedMarksForQuestion;
-      if (question.currencyType === 'coin') rewardTotals.coins += rewardValue;
-      if (question.currencyType === 'gold') rewardTotals.gold += rewardValue;
-      if (question.currencyType === 'diamond') rewardTotals.diamonds += rewardValue;
+      if (question.currencyType === 'coin') {
+          rewardTotals.coins += rewardValue;
+      } else if (question.currencyType === 'gold') {
+          rewardTotals.gold += rewardValue;
+      } else if (question.currencyType === 'diamond') {
+          rewardTotals.diamonds += rewardValue;
+      }
     }
   }
 

@@ -1,4 +1,3 @@
-
 'use client';
 import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, ResultState, AnswerState } from "@/types";
 import { useMemo, useState } from "react";
@@ -28,6 +27,7 @@ const currencyIcons: Record<string, React.ElementType> = {
   coin: Coins,
   gold: Crown,
   diamond: Gem,
+  spark: Sparkles,
 };
 
 const currencyColors: Record<string, string> = {
@@ -218,20 +218,20 @@ export function WorksheetResults({
                     <Award className="h-6 w-6 mx-auto text-muted-foreground" />
                     <div className="flex justify-center items-center gap-3 mt-2">
                         {calculatedRewards && Object.keys(calculatedRewards).length > 0 ? (
-                          Object.entries(calculatedRewards).map(([currency, amount]) => {
-                            if (!amount || amount === 0) return null;
-                            const Icon = currencyIcons[currency];
-                            const color = currencyColors[currency];
-                            if (!Icon) return null;
-                            return (
-                                <div key={currency} className={cn("flex items-center gap-1 font-bold", color)}>
-                                    <Icon className="h-5 w-5" />
-                                    <span>{amount}</span>
-                                </div>
-                            )
-                          })
+                            Object.entries(calculatedRewards).map(([currency, amount]) => {
+                                if (!amount || amount === 0) return null;
+                                const Icon = currencyIcons[currency];
+                                const color = currencyColors[currency];
+                                if (!Icon) return null;
+                                return (
+                                    <div key={currency} className={cn("flex items-center gap-1 font-bold", color)}>
+                                        <Icon className="h-5 w-5" />
+                                        <span>{amount}</span>
+                                    </div>
+                                );
+                            })
                         ) : (
-                          <p className="text-2xl font-bold">0</p>
+                            <p className="text-2xl font-bold">0</p>
                         )}
                     </div>
                     <p className="text-xs text-muted-foreground">Rewards Earned</p>
