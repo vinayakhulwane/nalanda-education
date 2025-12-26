@@ -36,7 +36,7 @@ export default function AcademicsPage() {
     const { data: classes, isLoading: areClassesLoading } = useCollection<Class>(classesCollectionRef);
 
     useEffect(() => {
-        if (!isUserProfileLoading && userProfile?.role !== 'admin') {
+        if (!isUserProfileLoading && userProfile?.role !== 'admin' && userProfile?.role !== 'teacher') {
             router.push('/dashboard');
         }
     }, [userProfile, isUserProfileLoading, router]);
@@ -84,7 +84,7 @@ export default function AcademicsPage() {
     };
 
 
-    if (isUserProfileLoading || userProfile?.role !== 'admin') {
+    if (isUserProfileLoading || (userProfile?.role !== 'admin' && userProfile?.role !== 'teacher')) {
         return (
             <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin" />
