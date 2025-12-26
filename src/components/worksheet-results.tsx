@@ -190,6 +190,12 @@ export function WorksheetResults({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+        <div className="mb-4">
+             <Button variant="outline" onClick={() => router.push(`/academics/${worksheet.classId}/${worksheet.subjectId}`)}>
+                <Home className="mr-2 h-4 w-4" />
+                Back to Subject
+            </Button>
+        </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl md:text-3xl text-center">{isReview ? 'Worksheet Review' : 'Worksheet Complete!'}</CardTitle>
