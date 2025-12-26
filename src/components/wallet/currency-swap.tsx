@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeftRight, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { doc, updateDoc, increment } from "firebase/firestore";
+import { doc, updateDoc, increment, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import type { User, CurrencyType, EconomySettings } from "@/types";
 
@@ -79,6 +79,26 @@ export function CurrencySwap({ userProfile }: { userProfile: User | null | undef
       updatePayload[fieldMap[receiveCurrency]] = increment(amountToReceive);
 
       await updateDoc(userRef, updatePayload);
+
+      // Log the two sides of the transaction
+        await addDoc(collection(firestore, 'transactions'), {
+          userId: user.uid,
+          type: 'spent',
+          description: `Exchanged ${amountToPay} ${payCurrency} for ${amountToReceive} ${receiveCurrency}`,
+          amount: amountToPay,
+          currency: payCurrency,
+          createdAt: serverTimestamp()
+        });
+
+        await addDoc(collection(firestore, 'transactions'), {
+          userId: user.uid,
+          type: 'earned',
+          description: `Currency received from swap`,
+          amount: amountToReceive,
+          currency: receiveCurrency,
+          createdAt: serverTimestamp()
+        });
+
 
       toast({ 
         title: "Swap Successful!", 
