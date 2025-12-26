@@ -9,7 +9,11 @@ import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { WorksheetResults, type AnswerState, type ResultState } from '@/components/worksheet-results';
+// 1. Import ResultState from the global types file
+import type { ResultState } from "@/types";
+
+// 2. Import the component and its local AnswerState type
+import { WorksheetResults, type AnswerState } from '@/components/worksheet-results';
 
 function formatTime(seconds: number) {
   const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -240,7 +244,8 @@ export default function SolveWorksheetPage() {
                             key={activeQuestion.id} 
                             question={activeQuestion}
                             onAnswerSubmit={(subQuestionId, answer) => setAnswers(prev => ({...prev, [subQuestionId]: { answer }}))}
-                            onResultCalculated={(subQuestionId, isCorrect) => setResults(prev => ({...prev, [subQuestionId]: { isCorrect }}))}
+                            // Add ': ResultState' to the prev parameter
+onResultCalculated={(subQuestionId, isCorrect) => setResults((prev: ResultState) => ({...prev, [subQuestionId]: { isCorrect }}))}
                             initialAnswers={answers}
                         />
                     </CardContent>

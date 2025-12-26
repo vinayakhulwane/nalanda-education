@@ -71,7 +71,6 @@ export function TransactionHistory() {
             <TableBody>
               {transactions?.map((tx) => {
                 const Icon = currencyIcons[tx.currency];
-                const color = currencyColors[tx.currency];
                 const isEarned = tx.type === 'earned';
 
                 return (
@@ -93,7 +92,7 @@ export function TransactionHistory() {
                     <TableCell className="text-center">
                       <div className={cn(
                         "inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted border font-bold",
-                        color
+                        isEarned ? "text-green-600" : "text-red-600"
                       )}>
                         {Icon && <Icon className="h-4 w-4" />}
                         <span>{isEarned ? '+' : '-'}{tx.amount}</span>
