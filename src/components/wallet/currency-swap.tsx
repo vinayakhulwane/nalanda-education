@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowRight, AlertTriangle, Loader2, ArrowRightLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { EconomySettings } from '@/types';
+import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 
 type Currency = 'coins' | 'gold' | 'diamonds';
 
@@ -141,13 +142,13 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
       <CardContent className="space-y-6">
         
         {/* Info Banner */}
-        <div className="bg-muted/50 border p-4 rounded-md flex justify-between items-center text-sm">
-           <div className="flex gap-2 items-center">
-             <AlertTriangle className="h-4 w-4 text-amber-500" />
-             <span>Current Exchange Rate:</span>
-           </div>
-           <span className="font-bold">{exchangeRateText}</span>
-        </div>
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Dynamic Rates!</AlertTitle>
+          <AlertDescription>
+            Currency exchange rates may fluctuate. The current rate is: <span className="font-bold">{exchangeRateText}</span>
+          </AlertDescription>
+        </Alert>
 
         <div className="flex flex-col md:flex-row items-center gap-4">
           

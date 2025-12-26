@@ -1,6 +1,6 @@
 'use client';
 
-import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, ResultState, EconomySettings } from "@/types"; // ✅ Added EconomySettings
+import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, ResultState, EconomySettings } from "@/types";
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Separator } from "./ui/separator";
@@ -8,16 +8,17 @@ import { Button } from "./ui/button";
 import { useRouter } from "next/navigation";
 import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase"; // ✅ Added Hooks
+import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { calculateAttemptRewards } from "@/lib/wallet";
+import confetti from "canvas-confetti"; // ✅ Import Confetti
 
-// ✅ Explicitly export AnswerState so 'solve/page.tsx' can import it
+// Explicitly export AnswerState so 'solve/page.tsx' can import it
 export type AnswerState = {
   [subQuestionId: string]: {
-    answer: any; // Using 'any' to support text, number, or array (MCQ)
+    answer: any;
   };
 };
 
@@ -97,9 +98,8 @@ export function WorksheetResults({
 
   const [isClaiming, setIsClaiming] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
-  const [isBlasting, setIsBlasting] = useState(false);
 
-  // ✅ 1. FETCH REAL SETTINGS
+  // 1. FETCH REAL SETTINGS
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
   const { data: settings } = useDoc<EconomySettings>(settingsRef);
 
@@ -118,14 +118,36 @@ export function WorksheetResults({
       });
     });
 
-    // ✅ 2. PASS SETTINGS TO CALCULATOR
-    // We pass 'settings ?? undefined' to safely handle the loading state
     const calculatedRewards = user?.uid 
         ? calculateAttemptRewards(worksheet, questions, results, user.uid, settings ?? undefined) 
         : {};
 
     return { totalMarks, score, calculatedRewards };
-  }, [questions, results, worksheet, user?.uid, settings]); // ✅ Added settings dependency
+  }, [questions, results, worksheet, user?.uid, settings]);
+
+  // ✅ New "Energetic" Confetti Trigger
+  const triggerCelebration = () => {
+    const count = 200;
+    const defaults = {
+      origin: { y: 0.7 },
+      zIndex: 1000,
+    };
+
+    function fire(particleRatio: number, opts: any) {
+      confetti({
+        ...defaults,
+        ...opts,
+        particleCount: Math.floor(count * particleRatio)
+      });
+    }
+
+    // Fire 5 distinct bursts for a "Realistic" explosion effect
+    fire(0.25, { spread: 26, startVelocity: 55 });
+    fire(0.2, { spread: 60 });
+    fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+    fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+    fire(0.1, { spread: 120, startVelocity: 45 });
+  };
 
   const handleClaimRewards = async () => {
     if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id || !calculatedRewards) return;
@@ -144,14 +166,12 @@ export function WorksheetResults({
         const amount = calculatedRewards[key as keyof typeof calculatedRewards];
         
         if (amount && amount > 0) {
-          // Map singular key (coin) to DB plural field (coins)
           const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds' };
           
           if (fieldMap[currency]) {
             updatePayload[fieldMap[currency]] = increment(amount);
           }
 
-          // Add a transaction log
           transactionPromises.push(addDoc(transactionsColRef, {
             userId: user.uid,
             type: 'earned',
@@ -167,14 +187,11 @@ export function WorksheetResults({
         await updateDoc(userRef, updatePayload);
       }
 
-      // Mark the attempt as claimed
       await updateDoc(attemptRef, { rewardsClaimed: true });
-
-      // Execute all transaction logging promises
       await Promise.all(transactionPromises);
 
-      setIsBlasting(true);
-      setTimeout(() => setIsBlasting(false), 600);
+      // ✅ Fire the new celebration!
+      triggerCelebration();
 
       toast({
         title: "Rewards Claimed!",
@@ -256,17 +273,8 @@ export function WorksheetResults({
           </div>
 
           <div className="mt-8 mb-6 relative flex justify-center">
-            {isBlasting && Array.from({ length: 12 }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute w-2 h-2 bg-yellow-400 rounded-full animate-blast pointer-events-none"
-                style={{
-                  transform: `rotate(${(i / 12) * 360}deg) translateX(60px)`,
-                  animationDelay: `${Math.random() * 0.1}s`,
-                }}
-              />
-            ))}
-
+            {/* ✅ Removed the old <div> confetti loop. The canvas library handles it now. */}
+            
             <Button
               className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
               onClick={handleClaimRewards}
