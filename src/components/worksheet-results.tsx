@@ -108,10 +108,12 @@ export function WorksheetResults({
             })
         });
 
+        // For "spark" questions, the reward is 50% of obtained marks, given as Coins.
         if (q.currencyType === 'spark') {
             const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5);
             rewards.coin += rewardValue;
         } else {
+            // For standard questions, reward is 100% of obtained marks in the question's currency type.
             const rewardValue = obtainedMarksForQuestion;
             rewards[q.currencyType] = (rewards[q.currencyType] || 0) + rewardValue;
         }
@@ -125,16 +127,39 @@ export function WorksheetResults({
     setIsClaiming(true);
 
     const userRef = doc(firestore, 'users', user.uid);
+    const transactionsColRef = collection(firestore, 'transactions');
+    const transactionPromises: Promise<any>[] = [];
 
     try {
         const updatePayload: Record<string, any> = {};
-        if (rewards.coin > 0) updatePayload.coins = increment(rewards.coin);
-        if (rewards.gold > 0) updatePayload.gold = increment(rewards.gold);
-        if (rewards.diamond > 0) updatePayload.diamonds = increment(rewards.diamond);
+        
+        for (const key in rewards) {
+            const currency = key as CurrencyType;
+            const amount = rewards[currency];
+            if (amount > 0) {
+                 const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds' };
+                 if (fieldMap[currency]) {
+                    updatePayload[fieldMap[currency]] = increment(amount);
+                 }
+                
+                // Add a transaction log for this currency reward
+                transactionPromises.push(addDoc(transactionsColRef, {
+                    userId: user.uid,
+                    type: 'earned',
+                    description: `Reward from worksheet: ${worksheet.title}`,
+                    amount: amount,
+                    currency: currency,
+                    createdAt: serverTimestamp()
+                }));
+            }
+        }
         
         if (Object.keys(updatePayload).length > 0) {
             await updateDoc(userRef, updatePayload);
         }
+
+        // Execute all transaction logging promises
+        await Promise.all(transactionPromises);
         
         setIsBlasting(true);
         setTimeout(() => setIsBlasting(false), 600);
@@ -214,7 +239,6 @@ export function WorksheetResults({
                     />
                 ))}
                 
-                {/* --- BUTTON UPDATE --- */}
                 <Button 
                     className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
                     onClick={handleClaimRewards}
