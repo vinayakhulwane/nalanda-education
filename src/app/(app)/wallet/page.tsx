@@ -8,6 +8,7 @@ import { useUser } from "@/firebase";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { CurrencySwap } from "@/components/wallet/currency-swap";
 
 export default function WalletPage() {
   const { userProfile, isUserProfileLoading } = useUser();
@@ -37,21 +38,16 @@ export default function WalletPage() {
       <Tabs defaultValue="balances" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="balances">My Balances</TabsTrigger>
-          {/* These tabs are placeholders for future features */}
-          <TabsTrigger value="swap" disabled>Currency Swap</TabsTrigger>
+          <TabsTrigger value="swap">Currency Swap</TabsTrigger>
           <TabsTrigger value="history" disabled>Transaction History</TabsTrigger>
         </TabsList>
         
         <TabsContent value="balances" className="mt-6">
-          {/* This is the new component we will create */}
           <WalletBalances userProfile={userProfile} />
         </TabsContent>
         
-        <TabsContent value="swap">
-          <Card>
-            <CardHeader><CardTitle>Currency Swap</CardTitle></CardHeader>
-            <CardContent><p>Coming soon!</p></CardContent>
-          </Card>
+        <TabsContent value="swap" className="mt-6">
+          <CurrencySwap userProfile={userProfile} />
         </TabsContent>
         
         <TabsContent value="history">
