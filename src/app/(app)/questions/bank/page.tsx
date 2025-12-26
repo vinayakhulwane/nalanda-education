@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, Suspense, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -37,9 +38,9 @@ function QuestionBankPageContent() {
 
   const categoriesQuery = useMemoFirebase(() => {
       if (!firestore || !units || units.length === 0) return null;
+      // Fetch all categories for the subject once, as filtering happens client-side.
       const unitIds = units.map(u => u.id);
       if (unitIds.length === 0) return null;
-      // Fetch all categories for the subject to be filtered on the client.
       return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
   }, [firestore, units]);
   const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);

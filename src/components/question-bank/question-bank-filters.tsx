@@ -1,6 +1,6 @@
 
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -83,13 +83,29 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
     }, [units, searchTerms.unit]);
     
     const availableCategories = useMemo(() => {
-        if (filters.unit.length === 0) return categories;
+        if (filters.unit.length === 0) return [];
         return categories.filter(c => filters.unit.includes(c.unitId));
     }, [categories, filters.unit]);
 
     const filteredCategories = useMemo(() => {
         return availableCategories.filter(c => c.name.toLowerCase().includes(searchTerms.category.toLowerCase()));
     }, [availableCategories, searchTerms.category]);
+
+    // Effect to clean up category filter when unit filter changes
+    useEffect(() => {
+        if (filters.unit.length > 0) {
+            const availableCategoryIds = new Set(availableCategories.map(c => c.id));
+            const newCategoryFilter = filters.category.filter(catId => availableCategoryIds.has(catId));
+            if (newCategoryFilter.length !== filters.category.length) {
+                setFilters.setCategory(newCategoryFilter);
+            }
+        } else if (filters.category.length > 0) {
+            // If all units are deselected, clear the category filter completely
+            setFilters.setCategory([]);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters.unit, categories]);
+
 
   const removeFilter = (type: 'unit' | 'category' | 'status' | 'currency' | 'search', value: string) => {
     switch (type) {
@@ -137,7 +153,7 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
              <Tabs defaultValue="unit" className="w-full">
                 <TabsList className="grid w-full grid-cols-4 bg-muted/50 p-1 rounded-lg">
                     <TabsTrigger value="unit" className="text-xs uppercase tracking-wider">Unit</TabsTrigger>
-                    <TabsTrigger value="category" className="text-xs uppercase tracking-wider" disabled={filters.unit.length > 0 && availableCategories.length === 0}>Category</TabsTrigger>
+                    <TabsTrigger value="category" className="text-xs uppercase tracking-wider" disabled={filters.unit.length === 0}>Category</TabsTrigger>
                     <TabsTrigger value="status" className="text-xs uppercase tracking-wider">Status</TabsTrigger>
                     <TabsTrigger value="currency" className="text-xs uppercase tracking-wider">Currency</TabsTrigger>
                 </TabsList>
@@ -174,36 +190,45 @@ export function QuestionBankFilters({ units, categories, questions, filters, set
                 </TabsContent>
                 
                 <TabsContent value="category" className="mt-2 space-y-3 outline-none">
-                  <div className="relative px-2">
-                    <Search className="absolute left-4 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search categories..." className="pl-9 h-9 bg-muted/50 border-none" value={searchTerms.category} onChange={e => setSearchTerms({...searchTerms, category: e.target.value})} />
-                  </div>
-                  <ScrollArea className="max-h-72">
-                    <div className="space-y-1 px-1">
-                        {filteredCategories.map(c => (
-                             <label
-                                key={c.id}
-                                className={cn(
-                                "flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors cursor-pointer hover:bg-muted/50",
-                                (questionCounts.categories[c.id] || 0) === 0 && "opacity-50"
-                                )}
-                            >
-                                <div className="flex items-center space-x-3">
-                                <Checkbox 
-                                    id={`cat-${c.id}`} 
-                                    checked={filters.category.includes(c.id)}
-                                    onCheckedChange={(checked) => handleMultiSelectChange(setFilters.setCategory, filters.category, c.id, !!checked)}
-                                    className="h-5 w-5 border-2 rounded-md" 
-                                />
-                                <span className="text-sm font-medium leading-none tracking-tight">{c.name}</span>
+                    {filters.unit.length === 0 ? (
+                         <div className="flex items-center justify-center h-72">
+                            <p className="text-center text-sm text-muted-foreground">Please select a Unit first<br/>to view Categories.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="relative px-2">
+                                <Search className="absolute left-4 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input placeholder="Search categories..." className="pl-9 h-9 bg-muted/50 border-none" value={searchTerms.category} onChange={e => setSearchTerms({...searchTerms, category: e.target.value})} />
+                            </div>
+                            <ScrollArea className="max-h-72">
+                                <div className="space-y-1 px-1">
+                                    {filteredCategories.map(c => (
+                                        <label
+                                            key={c.id}
+                                            className={cn(
+                                            "flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors cursor-pointer hover:bg-muted/50",
+                                            (questionCounts.categories[c.id] || 0) === 0 && "opacity-50"
+                                            )}
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                            <Checkbox 
+                                                id={`cat-${c.id}`} 
+                                                checked={filters.category.includes(c.id)}
+                                                onCheckedChange={(checked) => handleMultiSelectChange(setFilters.setCategory, filters.category, c.id, !!checked)}
+                                                className="h-5 w-5 border-2 rounded-md" 
+                                            />
+                                            <span className="text-sm font-medium leading-none tracking-tight">{c.name}</span>
+                                            </div>
+                                            <Badge variant="secondary" className="bg-muted text-[10px] font-bold px-1.5 h-5 min-w-[20px] justify-center">{questionCounts.categories[c.id] || 0}</Badge>
+                                        </label>
+                                    ))}
+                                    {filteredCategories.length === 0 && (
+                                         <p className="text-center text-xs text-muted-foreground py-4">No categories found for the selected criteria.</p>
+                                    )}
                                 </div>
-                                <Badge variant="secondary" className="bg-muted text-[10px] font-bold px-1.5 h-5 min-w-[20px] justify-center">{questionCounts.categories[c.id] || 0}</Badge>
-                            </label>
-                        ))}
-                         {filters.unit.length > 0 && availableCategories.length === 0 && <p className="text-center text-xs text-muted-foreground py-4">No categories found for the selected unit(s).</p>}
-                         {filters.unit.length === 0 && <p className="text-center text-xs text-muted-foreground py-4">Please select a unit to see categories.</p>}
-                    </div>
-                  </ScrollArea>
+                            </ScrollArea>
+                        </>
+                    )}
                 </TabsContent>
                 
                  <TabsContent value="status" className="mt-2 space-y-3 outline-none">
