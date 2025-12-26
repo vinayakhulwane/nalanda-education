@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { CurrencySwap } from "@/components/wallet/currency-swap";
+import { TransactionHistory } from "@/components/wallet/transaction-history";
 
 export default function WalletPage() {
   const { userProfile, isUserProfileLoading } = useUser();
@@ -39,7 +40,7 @@ export default function WalletPage() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="balances">My Balances</TabsTrigger>
           <TabsTrigger value="swap">Currency Swap</TabsTrigger>
-          <TabsTrigger value="history" disabled>Transaction History</TabsTrigger>
+          <TabsTrigger value="history">Transaction History</TabsTrigger>
         </TabsList>
         
         <TabsContent value="balances" className="mt-6">
@@ -50,11 +51,8 @@ export default function WalletPage() {
           <CurrencySwap userProfile={userProfile} />
         </TabsContent>
         
-        <TabsContent value="history">
-           <Card>
-            <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
-            <CardContent><p>Coming soon!</p></CardContent>
-          </Card>
+        <TabsContent value="history" className="mt-6">
+          <TransactionHistory />
         </TabsContent>
       </Tabs>
     </div>

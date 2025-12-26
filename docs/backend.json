@@ -242,6 +242,21 @@
         }
       },
       "required": ["coinsPerGold", "goldPerDiamond"]
+    },
+    "Transaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Transaction",
+      "description": "Represents a currency transaction for a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["earned", "spent"] },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["coin", "gold", "diamond"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "description", "amount", "currency", "createdAt"]
     }
   },
   "auth": {
@@ -351,6 +366,16 @@
             "$ref": "#/backend/entities/EconomySettings"
           },
           "description": "A single document to store global economy settings."
+        }
+      },
+      {
+        "path": "/transactions/{transactionId}",
+        "definition": {
+          "entityName": "Transaction",
+          "schema": {
+            "$ref": "#/backend/entities/Transaction"
+          },
+          "description": "Stores all currency transactions for all users."
         }
       }
     ]

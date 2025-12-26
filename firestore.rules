@@ -135,9 +135,36 @@ service cloud.firestore {
       allow write: if isTeacher() || isAdmin();
     }
 
+    match /attempts/{attemptId} {
+      // A user can create their own attempt.
+      allow create: if isOwner(request.resource.data.userId);
+      
+      // A user can read their own attempts, but only if they query by their own userId
+      allow list: if request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) &&
+                   request.query.userId == request.auth.uid;
+      allow get: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
+
+      // No one can update or delete attempts to preserve history.
+      allow update, delete: if false;
+    }
+
     match /settings/{settingId} {
         allow read: if isSignedIn();
         allow write: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      // A user can create their own transactions (e.g. through a server-side function)
+      // For now, let's restrict client-side creation for safety
+      allow create: if false;
+      
+      // A user can only list/read their own transactions.
+      allow get: if isOwner(resource.data.userId) || isAdmin();
+      allow list: if request.query.keys().hasOnly(['userId', 'orderBy']) &&
+                   request.query.userId == request.auth.uid;
+
+      // Transactions are immutable.
+      allow update, delete: if false;
     }
   }
 }

@@ -185,3 +185,13 @@ export interface EconomySettings {
     coinsPerGold: number;
     goldPerDiamond: number;
 }
+
+export interface Transaction {
+  id: string;
+  userId: string;
+  type: 'earned' | 'spent';
+  description: string;
+  amount: number;
+  currency: CurrencyType;
+  createdAt: any; // Firestore ServerTimestamp
+}
