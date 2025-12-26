@@ -65,6 +65,7 @@ export default function ReviewAttemptPage() {
       results={attempt.results}
       timeTaken={attempt.timeTaken}
       isReview={true} // ✅ DISABLED CLAIMING HERE
+      attempt={attempt}
     />
   );
 }

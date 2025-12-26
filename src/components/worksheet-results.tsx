@@ -1,5 +1,5 @@
 'use client';
-import type { Question, SubQuestion, Worksheet, CurrencyType } from "@/types";
+import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt } from "@/types";
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Separator } from "./ui/separator";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useUser, useFirestore } from "@/firebase";
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export type AnswerState = { [subQuestionId: string]: { answer: any } };
 export type ResultState = { [subQuestionId: string]: { isCorrect: boolean } };
@@ -20,7 +21,8 @@ interface WorksheetResultsProps {
   answers: AnswerState;
   results: ResultState;
   timeTaken: number;
-  isReview?: boolean; // <--- NEW PROP
+  isReview?: boolean;
+  attempt?: WorksheetAttempt;
 }
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
@@ -80,7 +82,8 @@ export function WorksheetResults({
   answers,
   results,
   timeTaken,
-  isReview = false // Default to false (active claiming)
+  isReview = false, // Default to false (active claiming)
+  attempt,
 }: WorksheetResultsProps) {
   const router = useRouter();
   const firestore = useFirestore();
@@ -88,7 +91,7 @@ export function WorksheetResults({
   const { toast } = useToast();
   
   const [isClaiming, setIsClaiming] = useState(false);
-  const [hasClaimed, setHasClaimed] = useState(isReview);
+  const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
   const [isBlasting, setIsBlasting] = useState(false);
 
   const { totalMarks, score, rewards } = useMemo(() => {
@@ -123,10 +126,11 @@ export function WorksheetResults({
   }, [questions, results]);
   
   const handleClaimRewards = async () => {
-    if (!user || !firestore || hasClaimed || isClaiming || isReview) return;
+    if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id) return;
     setIsClaiming(true);
 
     const userRef = doc(firestore, 'users', user.uid);
+    const attemptRef = doc(firestore, 'worksheet_attempts', attempt.id);
     const transactionsColRef = collection(firestore, 'transactions');
     const transactionPromises: Promise<any>[] = [];
 
@@ -157,6 +161,9 @@ export function WorksheetResults({
         if (Object.keys(updatePayload).length > 0) {
             await updateDoc(userRef, updatePayload);
         }
+
+        // Mark the attempt as claimed
+        await updateDoc(attemptRef, { rewardsClaimed: true });
 
         // Execute all transaction logging promises
         await Promise.all(transactionPromises);
@@ -199,7 +206,14 @@ export function WorksheetResults({
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl md:text-3xl text-center">{isReview ? 'Worksheet Review' : 'Worksheet Complete!'}</CardTitle>
-          <CardDescription className="text-center">{worksheet.title}</CardDescription>
+          <CardDescription className="text-center">
+            {worksheet.title}
+             {attempt?.attemptedAt && (
+              <span className="block text-xs mt-1">
+                Attempted on: {format(attempt.attemptedAt.toDate(), 'PPpp')}
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
             <div className="grid grid-cols-3 gap-4 text-center my-6">
@@ -248,11 +262,11 @@ export function WorksheetResults({
                 <Button 
                     className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
                     onClick={handleClaimRewards}
-                    disabled={isClaiming || hasClaimed || isReview || Object.values(rewards).every(a => a === 0)}
+                    disabled={isClaiming || hasClaimed || Object.values(rewards).every(a => a === 0)}
                 >
                     {isClaiming ? (
                         <Loader2 className="h-6 w-6 animate-spin" />
-                    ) : isReview || hasClaimed ? (
+                    ) : hasClaimed ? (
                         'Rewards Claimed'
                     ) : (
                         'Claim Rewards'

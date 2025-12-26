@@ -31,7 +31,7 @@ export default function SolveWorksheetPage() {
   const [answers, setAnswers] = useState<AnswerState>({});
   const [results, setResults] = useState<ResultState>({});
   const [timeTaken, setTimeTaken] = useState(0);
-  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState<WorksheetAttempt | null>(null);
 
   // Fetch worksheet
   const worksheetRef = useMemoFirebase(() => (firestore && worksheetId ? doc(firestore, 'worksheets', worksheetId) : null), [firestore, worksheetId]);
@@ -65,7 +65,7 @@ export default function SolveWorksheetPage() {
                     setAnswers(lastAttempt.answers);
                     setResults(lastAttempt.results);
                     setTimeTaken(lastAttempt.timeTaken);
-                    setAttemptId(lastAttempt.id);
+                    setAttempt(lastAttempt);
                     setIsFinished(true);
                 }
             } catch (error) {
@@ -150,6 +150,7 @@ export default function SolveWorksheetPage() {
             });
         }
         
+        const attemptedAt = serverTimestamp();
         // Save the attempt
         const attemptData: Omit<WorksheetAttempt, 'id'> = {
             userId: user.uid,
@@ -157,12 +158,12 @@ export default function SolveWorksheetPage() {
             answers,
             results,
             timeTaken: finalTimeTaken,
-            attemptedAt: serverTimestamp() as any, // Cast if type mismatch occurs
+            attemptedAt: attemptedAt,
             rewardsClaimed: false, // Initialize as not claimed
         };
 
         const attemptRef = await addDoc(collection(firestore, 'worksheet_attempts'), attemptData);
-        setAttemptId(attemptRef.id);
+        setAttempt({ ...attemptData, id: attemptRef.id, attemptedAt: new Date() });
     }
   }
 
@@ -191,8 +192,7 @@ export default function SolveWorksheetPage() {
             answers={answers}
             results={results}
             timeTaken={timeTaken}
-            // We don't pass isReview={true} here because usually,
-            // when you just finish solving, you WANT to claim rewards.
+            attempt={attempt ?? undefined}
         />
     )
   }
