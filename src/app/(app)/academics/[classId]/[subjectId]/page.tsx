@@ -260,22 +260,15 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
             }
 
             try {
-                // Fetch the latest attempt for each completed worksheet
-                const attemptPromises = completedIds.map(worksheetId => {
-                    const q = query(
-                        collection(firestore, 'attempts'),
-                        where('userId', '==', user.uid),
-                        where('worksheetId', '==', worksheetId),
-                        orderBy('attemptedAt', 'desc'),
-                        limit(1)
-                    );
-                    return getDocs(q);
-                });
+                // Fetch all attempts for the completed worksheets
+                const attemptsQuery = query(
+                    collection(firestore, 'worksheet_attempts'), 
+                    where('userId', '==', user.uid),
+                    where('worksheetId', 'in', completedIds.slice(0,30)) // 'in' query limit
+                );
                 
-                const attemptSnapshots = await Promise.all(attemptPromises);
-                const fetchedAttempts = attemptSnapshots.flatMap(snapshot => 
-                    snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
-                ) as WorksheetAttempt[];
+                const attemptSnapshots = await getDocs(attemptsQuery);
+                const fetchedAttempts = attemptSnapshots.docs.map(d => ({ id: d.id, ...d.data() })) as WorksheetAttempt[];
                 
                 setAttempts(fetchedAttempts);
 
@@ -290,18 +283,37 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     }, [firestore, user?.uid, practiceWorksheets, userProfile?.completedWorksheets]);
 
 
-    const { completed, notCompleted } = useMemo(() => {
-        const completedIds = userProfile?.completedWorksheets || [];
-        const completed = practiceWorksheets?.filter(ws => completedIds.includes(ws.id)) || [];
-        const notCompleted = practiceWorksheets?.filter(ws => !completedIds.includes(ws.id)) || [];
-        return { completed, notCompleted };
-    }, [practiceWorksheets, userProfile?.completedWorksheets]);
+    const { completed, notCompleted, attemptsMap } = useMemo(() => {
+        if (!practiceWorksheets) return { completed: [], notCompleted: [], attemptsMap: new Map() };
+        
+        const completedIds = new Set(userProfile?.completedWorksheets || []);
+        const completedWorksheets = practiceWorksheets.filter(ws => completedIds.has(ws.id));
+        const notCompletedWorksheets = practiceWorksheets.filter(ws => !completedIds.has(ws.id));
+        
+        const latestAttemptsMap = new Map<string, WorksheetAttempt>();
+        attempts.forEach(attempt => {
+            const existing = latestAttemptsMap.get(attempt.worksheetId);
+            if (!existing || (attempt.attemptedAt && existing.attemptedAt && attempt.attemptedAt.toMillis() > existing.attemptedAt.toMillis())) {
+                latestAttemptsMap.set(attempt.worksheetId, attempt);
+            }
+        });
+
+        completedWorksheets.sort((a, b) => {
+            const attemptA = latestAttemptsMap.get(a.id);
+            const attemptB = latestAttemptsMap.get(b.id);
+            const timeA = attemptA?.attemptedAt?.toMillis() || 0;
+            const timeB = attemptB?.attemptedAt?.toMillis() || 0;
+            return timeB - timeA;
+        });
+        
+        const finalAttemptsMap = new Map<string, string>();
+        latestAttemptsMap.forEach((attempt, worksheetId) => {
+            finalAttemptsMap.set(worksheetId, attempt.id);
+        });
+
+        return { completed: completedWorksheets, notCompleted: notCompletedWorksheets, attemptsMap: finalAttemptsMap };
+    }, [practiceWorksheets, userProfile?.completedWorksheets, attempts]);
     
-    const attemptsMap = useMemo(() => {
-        const map = new Map();
-        attempts.forEach(a => map.set(a.worksheetId, a.id));
-        return map;
-    }, [attempts]);
 
     const isLoading = areWorksheetsLoading || areAttemptsLoading;
 
@@ -753,3 +765,5 @@ export default function SubjectWorkspacePage({
 
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
+
+    

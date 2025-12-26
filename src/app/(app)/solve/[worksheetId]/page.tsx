@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDoc, serverTimestamp, getDocs, limit, orderBy } from 'firebase/firestore';
+import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import type { Worksheet, Question, WorksheetAttempt } from '@/types';
 import { Loader2, ArrowLeft, ArrowRight, CheckCircle, Timer, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -43,23 +43,40 @@ export default function SolveWorksheetPage() {
   }, [firestore, worksheet?.questions]);
   const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
   
+  // --- FIX 1: Robust Check for Existing Attempts ---
   useEffect(() => {
     const checkExistingAttempt = async () => {
         if (user && firestore && userProfile?.completedWorksheets?.includes(worksheetId)) {
+            // ✅ FIX: Use 'worksheet_attempts' to match rules
+            // ✅ FIX: Removed orderBy to prevent index errors
             const attemptsQuery = query(
-                collection(firestore, 'attempts'),
+                collection(firestore, 'worksheet_attempts'), 
                 where('userId', '==', user.uid),
-                where('worksheetId', '==', worksheetId),
-                orderBy('attemptedAt', 'desc'),
-                limit(1)
+                where('worksheetId', '==', worksheetId)
             );
-            const querySnapshot = await getDocs(attemptsQuery);
-            if (!querySnapshot.empty) {
-                const lastAttempt = querySnapshot.docs[0].data() as WorksheetAttempt;
-                setAnswers(lastAttempt.answers);
-                setResults(lastAttempt.results);
-                setTimeTaken(lastAttempt.timeTaken);
-                setIsFinished(true);
+            
+            try {
+                const querySnapshot = await getDocs(attemptsQuery);
+                
+                if (!querySnapshot.empty) {
+                    const allAttempts = querySnapshot.docs.map(d => d.data() as WorksheetAttempt);
+                    
+                    // ✅ FIX: Cast to 'any' to safely check createdAt without TS errors
+                    allAttempts.sort((a, b) => {
+                        const dateA = a.attemptedAt?.toMillis() || (a as any).createdAt?.toMillis() || 0;
+                        const dateB = b.attemptedAt?.toMillis() || (b as any).createdAt?.toMillis() || 0;
+                        return dateB - dateA; // Descending
+                    });
+
+                    const lastAttempt = allAttempts[0];
+
+                    setAnswers(lastAttempt.answers);
+                    setResults(lastAttempt.results);
+                    setTimeTaken(lastAttempt.timeTaken);
+                    setIsFinished(true);
+                }
+            } catch (error) {
+                console.error("Error fetching past attempt:", error);
             }
         }
     };
@@ -147,9 +164,11 @@ export default function SolveWorksheetPage() {
             answers,
             results,
             timeTaken: finalTimeTaken,
-            attemptedAt: serverTimestamp()
+            attemptedAt: serverTimestamp() as any // Cast if type mismatch occurs
         };
-        await addDoc(collection(firestore, 'attempts'), attemptData);
+
+        // ✅ FIX: Use 'worksheet_attempts' to match rules
+        await addDoc(collection(firestore, 'worksheet_attempts'), attemptData);
     }
   }
 

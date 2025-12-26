@@ -107,7 +107,7 @@ function WorksheetPreviewContent() {
             <div className="flex justify-between text-sm mt-4 text-gray-700">
                 <span><strong>Class:</strong> {classData?.name || '...'}</span>
                 <span><strong>Subject:</strong> {subjectData?.name || '...'}</span>
-                <span><strong>Date:</strong> {worksheet.startTime ? format(worksheet.startTime.toDate(), 'PP') : format(new Date(), 'PP')}</span>
+                <span><strong>Date:</strong> {worksheet.startTime ? format(worksheet.startTime, 'PP') : format(new Date(), 'PP')}</span>
             </div>
              <div className="flex justify-between text-sm mt-2 text-gray-700">
                 <span><strong>Name:</strong> _________________________</span>

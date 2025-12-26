@@ -16,7 +16,8 @@ export default function ReviewAttemptPage() {
   const firestore = useFirestore();
 
   // 1. Fetch the Attempt Document
-  const attemptRef = useMemoFirebase(() => (firestore && attemptId ? doc(firestore, 'attempts', attemptId) : null), [firestore, attemptId]);
+  // ✅ FIX: Read from the correct collection
+const attemptRef = useMemoFirebase(() => (firestore && attemptId ? doc(firestore, 'worksheet_attempts', attemptId) : null), [firestore, attemptId]);
   const { data: attempt, isLoading: isAttemptLoading } = useDoc<WorksheetAttempt>(attemptRef);
 
   // 2. Fetch the Worksheet Document using the ID from the attempt
