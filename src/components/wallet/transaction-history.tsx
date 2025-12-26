@@ -32,7 +32,7 @@ export function TransactionHistory() {
     if (!firestore || !user?.uid) return null;
     return query(
       collection(firestore, 'transactions'),
-      where('userId', '==', user.uid),
+      where('userId', '==', user.uid),  // <--- CRITICAL LINE
       orderBy('createdAt', 'desc')
     );
   }, [firestore, user?.uid]);

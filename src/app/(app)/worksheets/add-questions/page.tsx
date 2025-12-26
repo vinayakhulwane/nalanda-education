@@ -83,28 +83,61 @@ function AddQuestionsPageContent() {
         // --- Cost Calculation for Students creating Practice worksheets ---
         if (finalWorksheetType === 'practice') {
             const cost = calculateWorksheetCost(selectedQuestions);
-            const canAfford = (userProfile.coins ?? 0) >= cost.coins;
+            const canAfford = (userProfile.coins ?? 0) >= cost.coins && (userProfile.gold ?? 0) >= cost.gold && (userProfile.diamonds ?? 0) >= cost.diamonds;
             
             if (!canAfford) {
                 toast({
                     variant: 'destructive',
                     title: 'Insufficient Funds',
-                    description: `You need ${cost.coins} coins to create this worksheet, but you only have ${userProfile.coins ?? 0}.`
+                    description: `You do not have enough currency to create this worksheet.`
                 });
                 return;
             }
             
-            // Deduct cost and log transaction
+            // --- Atomic Wallet Deduction and Transaction Logging ---
             const userRef = doc(firestore, 'users', user.uid);
-            await updateDoc(userRef, { coins: increment(-cost.coins) });
-            await addDoc(collection(firestore, 'transactions'), {
-                userId: user.uid,
-                type: 'spent',
-                description: `Created practice worksheet: ${title}`,
-                amount: cost.coins,
-                currency: 'coin',
-                createdAt: serverTimestamp()
-            });
+            const updatePayload: Record<string, any> = {};
+            const transactionLogs: Promise<any>[] = [];
+            const transactionDescription = `Practice Fee: ${title}`;
+
+            if (cost.coins > 0) {
+                updatePayload['coins'] = increment(-cost.coins);
+                transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
+                    userId: user.uid,
+                    type: 'spent',
+                    description: transactionDescription,
+                    amount: cost.coins,
+                    currency: 'coin',
+                    createdAt: serverTimestamp()
+                }));
+            }
+            if (cost.gold > 0) {
+                updatePayload['gold'] = increment(-cost.gold);
+                 transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
+                    userId: user.uid,
+                    type: 'spent',
+                    description: transactionDescription,
+                    amount: cost.gold,
+                    currency: 'gold',
+                    createdAt: serverTimestamp()
+                }));
+            }
+            if (cost.diamonds > 0) {
+                updatePayload['diamonds'] = increment(-cost.diamonds);
+                 transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
+                    userId: user.uid,
+                    type: 'spent',
+                    description: transactionDescription,
+                    amount: cost.diamonds,
+                    currency: 'diamond',
+                    createdAt: serverTimestamp()
+                }));
+            }
+
+            if (Object.keys(updatePayload).length > 0) {
+                await updateDoc(userRef, updatePayload);
+                await Promise.all(transactionLogs);
+            }
         }
         
         const newWorksheet: Omit<Worksheet, 'id'> = {
