@@ -163,7 +163,7 @@ export function WorksheetManualBuilder({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
             <div className="lg:col-span-2 space-y-4">
                 <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-semibold">Available Questions</h3>
+                    <h3 className="text-xl font-semibold">{filteredQuestions.length} Questions Available</h3>
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline">
