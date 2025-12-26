@@ -110,7 +110,7 @@ export function WorksheetResults({
 
     const calculatedRewards = calculateAttemptRewards(questions, results);
 
-    return { totalMarks, score, rewards };
+    return { totalMarks, score, rewards: calculatedRewards };
   }, [questions, results]);
   
   const handleClaimRewards = async () => {
