@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
+import { calculateWorksheetCost } from '@/lib/wallet';
+
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
 
@@ -117,7 +119,7 @@ export function WorksheetRandomBuilder({
     }, {} as Record<CurrencyType, number>);
   }, [selectedQuestions]);
 
-  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory } = useMemo(() => {
+  const { totalMarks, estimatedTime, breakdownByUnit, breakdownByCategory, creationCost } = useMemo(() => {
     let totalMarks = 0;
     const breakdownByUnit: Record<string, { count: number; marks: number }> = {};
     const breakdownByCategory: Record<string, { count: number; marks: number }> = {};
@@ -136,11 +138,13 @@ export function WorksheetRandomBuilder({
       breakdownByCategory[categoryName].count++;
       breakdownByCategory[categoryName].marks += marks;
     });
+    const creationCost = calculateWorksheetCost(selectedQuestions);
     return { 
       totalMarks, 
       estimatedTime: Math.ceil((totalMarks * 20) / 60),
       breakdownByUnit,
-      breakdownByCategory
+      breakdownByCategory,
+      creationCost,
     };
   }, [selectedQuestions, unitMap, categoryMap]);
 
@@ -478,7 +482,14 @@ export function WorksheetRandomBuilder({
                 </div>
                 <SheetFooter className="bg-card border-t px-6 py-4 mt-auto">
                     <div className="flex justify-between items-center w-full">
-                        <p className="text-sm font-semibold">Est. Time: {estimatedTime} mins</p>
+                         <div className="text-sm font-semibold">
+                            <p>Est. Time: {estimatedTime} mins</p>
+                            {!userIsEditor && creationCost.coins > 0 && (
+                                <p className="flex items-center text-yellow-600 dark:text-yellow-400">
+                                    <Coins className="mr-1 h-4 w-4" /> Cost: {creationCost.coins}
+                                </p>
+                            )}
+                        </div>
                          <Button onClick={handleCreateClick}>
                             Create Worksheet <ArrowRight className="ml-2 h-4 w-4"/>
                         </Button>
