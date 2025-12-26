@@ -93,7 +93,7 @@ export function WorksheetResults({
   const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
   const [isBlasting, setIsBlasting] = useState(false);
 
-  const { totalMarks, score, rewards } = useMemo(() => {
+  const { totalMarks, score, calculatedRewards } = useMemo(() => {
     let totalMarks = 0;
     let score = 0;
     
@@ -110,11 +110,11 @@ export function WorksheetResults({
 
     const calculatedRewards = calculateAttemptRewards(questions, results);
 
-    return { totalMarks, score, rewards: calculatedRewards };
+    return { totalMarks, score, calculatedRewards };
   }, [questions, results]);
   
   const handleClaimRewards = async () => {
-    if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id || !rewards) return;
+    if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id || !calculatedRewards) return;
     setIsClaiming(true);
 
     const userRef = doc(firestore, 'users', user.uid);
@@ -125,9 +125,9 @@ export function WorksheetResults({
     try {
         const updatePayload: Record<string, any> = {};
         
-        for (const key in rewards) {
+        for (const key in calculatedRewards) {
             const currency = key as CurrencyType;
-            const amount = rewards[currency as keyof typeof rewards];
+            const amount = calculatedRewards[currency as keyof typeof calculatedRewards];
             if (amount && amount > 0) {
                  const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds' };
                  if (fieldMap[currency]) {
@@ -218,11 +218,12 @@ export function WorksheetResults({
                  <div className="p-4 bg-muted/50 rounded-lg">
                     <Award className="h-6 w-6 mx-auto text-muted-foreground" />
                     <div className="flex justify-center items-center gap-3 mt-2">
-                        {rewards && Object.keys(rewards).length > 0 ? (
-                          Object.entries(rewards).map(([currency, amount]) => {
+                        {calculatedRewards && Object.keys(calculatedRewards).length > 0 ? (
+                          Object.entries(calculatedRewards).map(([currency, amount]) => {
                             if (!amount || amount === 0) return null;
                             const Icon = currencyIcons[currency];
                             const color = currencyColors[currency];
+                            if (!Icon) return null; // This is the fix
                             return (
                                 <div key={currency} className={cn("flex items-center gap-1 font-bold", color)}>
                                     <Icon className="h-5 w-5" />
@@ -253,7 +254,7 @@ export function WorksheetResults({
                 <Button 
                     className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
                     onClick={handleClaimRewards}
-                    disabled={isClaiming || hasClaimed || !rewards || Object.values(rewards).every(a => a === 0)}
+                    disabled={isClaiming || hasClaimed || !calculatedRewards || Object.values(calculatedRewards).every(a => a === 0)}
                 >
                     {isClaiming ? (
                         <Loader2 className="h-6 w-6 animate-spin" />
