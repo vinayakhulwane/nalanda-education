@@ -239,7 +239,7 @@ export default function ProgressPage() {
                   {subjects.map((subject) => {
                      const stats = subjectStats[subject.id];
                      const health = stats?.health ?? 0;
-                     const healthColor = health > 75 ? "bg-green-500" : health > 50 ? "bg-yellow-500" : "bg-red-500";
+                     const healthColor = health > 75 ? "bg-green-500" : health > 50 ? "bg-yellow-500" : "bg-primary";
                      return (
                         <Card key={subject.id}>
                           <CardHeader>
