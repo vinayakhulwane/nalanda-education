@@ -218,19 +218,21 @@ export function WorksheetResults({
                  <div className="p-4 bg-muted/50 rounded-lg">
                     <Award className="h-6 w-6 mx-auto text-muted-foreground" />
                     <div className="flex justify-center items-center gap-3 mt-2">
-                        {rewards && Object.entries(rewards).map(([currency, amount]) => {
+                        {rewards && Object.keys(rewards).length > 0 ? (
+                          Object.entries(rewards).map(([currency, amount]) => {
                             if (!amount || amount === 0) return null;
                             const Icon = currencyIcons[currency];
                             const color = currencyColors[currency];
-                            if (!Icon) return null; // Prevent rendering if icon is not found
                             return (
                                 <div key={currency} className={cn("flex items-center gap-1 font-bold", color)}>
                                     <Icon className="h-5 w-5" />
                                     <span>{amount}</span>
                                 </div>
                             )
-                        })}
-                         {(!rewards || Object.values(rewards).every(a => a === 0)) && <p className="text-2xl font-bold">0</p>}
+                          })
+                        ) : (
+                          <p className="text-2xl font-bold">0</p>
+                        )}
                     </div>
                     <p className="text-xs text-muted-foreground">Rewards Earned</p>
                 </div>
