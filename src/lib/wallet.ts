@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Question, WalletTransaction, CurrencyType, ResultState } from '@/types';
@@ -47,7 +46,6 @@ export function calculateWorksheetCost(
  * - Spark questions reward 50% of obtained marks (rounded down) as Coins.
  * - Other questions reward 100% of obtained marks in their respective currency.
  *
- * @param worksheet - The worksheet object.
  * @param questions - The full question objects included in the worksheet.
  * @param results - The results object mapping sub-question IDs to their correctness.
  * @returns A WalletTransaction object with the total reward per currency.

@@ -25,7 +25,6 @@ interface WorksheetResultsProps {
 }
 
 const currencyIcons: Record<string, React.ElementType> = {
-  spark: Sparkles,
   coin: Coins,
   gold: Crown,
   diamond: Gem,
@@ -223,7 +222,7 @@ export function WorksheetResults({
                             if (!amount || amount === 0) return null;
                             const Icon = currencyIcons[currency];
                             const color = currencyColors[currency];
-                            if (!Icon) return null; // This is the fix
+                            if (!Icon) return null;
                             return (
                                 <div key={currency} className={cn("flex items-center gap-1 font-bold", color)}>
                                     <Icon className="h-5 w-5" />
