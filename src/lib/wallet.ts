@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Question, Worksheet, WalletTransaction, CurrencyType } from '@/types';
+import type { Question, WalletTransaction, CurrencyType, ResultState } from '@/types';
 
 
 /**
@@ -54,9 +54,9 @@ export function calculateWorksheetCost(
  */
 export function calculateAttemptRewards(
   questions: Question[],
-  results: { [subQuestionId: string]: { isCorrect: boolean } }
-): WalletTransaction {
-  const totalReward: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
+  results: ResultState
+): Partial<WalletTransaction> {
+  const rewardTotals: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
 
   for (const question of questions) {
     let obtainedMarksForQuestion = 0;
@@ -76,15 +76,24 @@ export function calculateAttemptRewards(
     if (question.currencyType === 'spark') {
       // Reward is 50% of obtained marks, rounded DOWN, paid in Coins.
       const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5);
-      totalReward.coins += rewardValue;
+      rewardTotals.coins += rewardValue;
     } else {
       // Reward is 100% of obtained marks for other currencies.
       const rewardValue = obtainedMarksForQuestion;
-      if (question.currencyType === 'coin') totalReward.coins += rewardValue;
-      if (question.currencyType === 'gold') totalReward.gold += rewardValue;
-      if (question.currencyType === 'diamond') totalReward.diamonds += rewardValue;
+      if (question.currencyType === 'coin') rewardTotals.coins += rewardValue;
+      if (question.currencyType === 'gold') rewardTotals.gold += rewardValue;
+      if (question.currencyType === 'diamond') rewardTotals.diamonds += rewardValue;
     }
   }
 
-  return totalReward;
+  // Filter out any currency types with a zero balance
+  const finalRewards: Partial<WalletTransaction> = {};
+  for (const key in rewardTotals) {
+      const currency = key as keyof WalletTransaction;
+      if (rewardTotals[currency] > 0) {
+          finalRewards[currency] = rewardTotals[currency];
+      }
+  }
+
+  return finalRewards;
 }

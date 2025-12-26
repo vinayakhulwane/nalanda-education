@@ -1,6 +1,6 @@
 
 'use client';
-import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt } from "@/types";
+import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, ResultState, AnswerState } from "@/types";
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Separator } from "./ui/separator";
@@ -14,9 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { calculateAttemptRewards } from "@/lib/wallet";
 
-export type AnswerState = { [subQuestionId: string]: { answer: any } };
-export type ResultState = { [subQuestionId: string]: { isCorrect: boolean } };
-
 interface WorksheetResultsProps {
   worksheet: Worksheet;
   questions: Question[];
@@ -27,14 +24,14 @@ interface WorksheetResultsProps {
   attempt?: WorksheetAttempt;
 }
 
-const currencyIcons: Record<CurrencyType, React.ElementType> = {
+const currencyIcons: Record<string, React.ElementType> = {
   spark: Sparkles,
   coin: Coins,
   gold: Crown,
   diamond: Gem,
 };
 
-const currencyColors: Record<CurrencyType, string> = {
+const currencyColors: Record<string, string> = {
     spark: 'text-gray-400',
     coin: 'text-yellow-500',
     gold: 'text-amber-500',
@@ -113,11 +110,11 @@ export function WorksheetResults({
 
     const calculatedRewards = calculateAttemptRewards(questions, results);
 
-    return { totalMarks, score, rewards: calculatedRewards };
+    return { totalMarks, score, rewards };
   }, [questions, results]);
   
   const handleClaimRewards = async () => {
-    if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id) return;
+    if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id || !rewards) return;
     setIsClaiming(true);
 
     const userRef = doc(firestore, 'users', user.uid);
@@ -130,8 +127,8 @@ export function WorksheetResults({
         
         for (const key in rewards) {
             const currency = key as CurrencyType;
-            const amount = rewards[currency];
-            if (amount > 0) {
+            const amount = rewards[currency as keyof typeof rewards];
+            if (amount && amount > 0) {
                  const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds' };
                  if (fieldMap[currency]) {
                     updatePayload[fieldMap[currency]] = increment(amount);
@@ -199,7 +196,7 @@ export function WorksheetResults({
           <CardTitle className="text-2xl md:text-3xl text-center">{isReview ? 'Worksheet Review' : 'Worksheet Complete!'}</CardTitle>
           <CardDescription className="text-center">
             {worksheet.title}
-             {attempt?.attemptedAt && (
+             {attempt?.attemptedAt?.toDate && (
               <span className="block text-xs mt-1">
                 Attempted on: {format(attempt.attemptedAt.toDate(), 'PPpp')}
               </span>
@@ -221,10 +218,11 @@ export function WorksheetResults({
                  <div className="p-4 bg-muted/50 rounded-lg">
                     <Award className="h-6 w-6 mx-auto text-muted-foreground" />
                     <div className="flex justify-center items-center gap-3 mt-2">
-                        {Object.entries(rewards).map(([currency, amount]) => {
-                            if (amount === 0) return null;
-                            const Icon = currencyIcons[currency as CurrencyType];
-                            const color = currencyColors[currency as CurrencyType];
+                        {rewards && Object.entries(rewards).map(([currency, amount]) => {
+                            if (!amount || amount === 0) return null;
+                            const Icon = currencyIcons[currency];
+                            const color = currencyColors[currency];
+                            if (!Icon) return null; // Prevent rendering if icon is not found
                             return (
                                 <div key={currency} className={cn("flex items-center gap-1 font-bold", color)}>
                                     <Icon className="h-5 w-5" />
@@ -232,7 +230,7 @@ export function WorksheetResults({
                                 </div>
                             )
                         })}
-                         {Object.values(rewards).every(a => a === 0) && <p className="text-2xl font-bold">0</p>}
+                         {(!rewards || Object.values(rewards).every(a => a === 0)) && <p className="text-2xl font-bold">0</p>}
                     </div>
                     <p className="text-xs text-muted-foreground">Rewards Earned</p>
                 </div>
@@ -253,7 +251,7 @@ export function WorksheetResults({
                 <Button 
                     className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
                     onClick={handleClaimRewards}
-                    disabled={isClaiming || hasClaimed || Object.values(rewards).every(a => a === 0)}
+                    disabled={isClaiming || hasClaimed || !rewards || Object.values(rewards).every(a => a === 0)}
                 >
                     {isClaiming ? (
                         <Loader2 className="h-6 w-6 animate-spin" />

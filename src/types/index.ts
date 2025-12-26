@@ -169,12 +169,16 @@ export interface Worksheet {
     updatedAt: any; // Firestore ServerTimestamp
 }
 
+export type AnswerState = { [subQuestionId: string]: { answer: any } };
+export type ResultState = { [subQuestionId: string]: { isCorrect: boolean } };
+
+
 export interface WorksheetAttempt {
     id: string;
     userId: string;
     worksheetId: string;
-    answers: Record<string, { answer: any }>;
-    results: Record<string, { isCorrect: boolean }>;
+    answers: AnswerState;
+    results: ResultState;
     timeTaken: number;
     attemptedAt: any; // Firestore ServerTimestamp
     rewardsClaimed?: boolean;
@@ -194,4 +198,10 @@ export interface Transaction {
   amount: number;
   currency: CurrencyType;
   createdAt: any; // Firestore ServerTimestamp
+}
+
+export interface WalletTransaction {
+    coins: number;
+    gold: number;
+    diamonds: number;
 }
