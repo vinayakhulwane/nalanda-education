@@ -1,87 +1,79 @@
 'use client';
 
-import type { Question, WalletTransaction, ResultState, Worksheet, CurrencyType } from '@/types';
+import type { Question, WalletTransaction, ResultState, Worksheet, EconomySettings } from '@/types';
+
+// DEFAULTS (Used if settings fail to load)
+const DEFAULT_SETTINGS: EconomySettings = {
+    coinToGold: 10, goldToDiamond: 10, // Unused here but part of type
+    costPerMark: 0.5,
+    rewardPractice: 1.0,
+    rewardClassroom: 0.5,
+    rewardSpark: 0.5
+};
 
 /**
- * Calculates the total cost for creating a worksheet.
- * Returns standard WalletTransaction (Plural keys: coins, diamonds).
+ * Calculates Cost. Now accepts optional 'settings'.
  */
 export function calculateWorksheetCost(
-    questions: Question[]
+    questions: Question[],
+    settings: EconomySettings = DEFAULT_SETTINGS
 ): WalletTransaction {
     const totalCost: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
+    const multiplier = settings.costPerMark;
 
     for (const question of questions) {
-        if (question.currencyType === 'spark') {
-            continue; // Spark questions are free
-        }
+        if (question.currencyType === 'spark') continue; 
 
-        const totalMarks =
-            question.solutionSteps?.reduce(
-                (stepSum, step) =>
-                    stepSum +
-                    step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0),
-                0
-            ) || 0;
+        const totalMarks = question.solutionSteps?.reduce(
+            (stepSum, step) => stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0),
+            0
+        ) || 0;
         
-        // Cost is 50% of total marks, rounded UP
-        const costValue = Math.ceil(totalMarks * 0.5);
+        // Use the Dynamic Multiplier
+        const costValue = Math.ceil(totalMarks * multiplier);
 
-        if (question.currencyType === 'coin') {
-            totalCost.coins += costValue;
-        } else if (question.currencyType === 'gold') {
-            totalCost.gold += costValue;
-        } else if (question.currencyType === 'diamond') {
-            totalCost.diamonds += costValue;
-        }
+        if (question.currencyType === 'coin') totalCost.coins += costValue;
+        else if (question.currencyType === 'gold') totalCost.gold += costValue;
+        else if (question.currencyType === 'diamond') totalCost.diamonds += costValue;
     }
 
     return totalCost;
 }
 
-
 /**
- * Calculates the total reward for a worksheet attempt.
- * ✅ FIXED: Returns SINGULAR keys (coin, diamond) to match the UI icons.
- * ✅ FIXED: Uses 'worksheetType' to resolve TypeScript error.
+ * Calculates Rewards. Now accepts optional 'settings'.
  */
 export function calculateAttemptRewards(
   worksheet: Worksheet,
   questions: Question[],
   results: ResultState,
-  userId: string
+  userId: string,
+  settings: EconomySettings = DEFAULT_SETTINGS
 ): Record<string, number> { 
   
-  // Use singular keys here to match CurrencyType and UI Icons
   const rewardTotals: Record<string, number> = { coin: 0, gold: 0, diamond: 0 };
 
-  // 1. Determine Multiplier based on Worksheet Type
+  // 1. Determine Multiplier from Settings
   let multiplier = 0;
   
   if (worksheet.worksheetType === 'practice') {
-      multiplier = 1.0; // Student-created (Paid) -> 100% Reward
+      multiplier = settings.rewardPractice;
   } else if (worksheet.worksheetType === 'classroom') {
-      multiplier = 0.5; // Teacher-assigned (Free) -> 50% Reward
+      multiplier = settings.rewardClassroom;
   } else if (worksheet.authorId === userId) {
-      // Fallback: If type is missing, assume practice if user is author
-      multiplier = 1.0;
+      multiplier = settings.rewardPractice;
   } else if (worksheet.authorId !== userId) {
-      // Fallback: If type is missing, assume classroom if user is NOT author
-      multiplier = 0.5;
+      multiplier = settings.rewardClassroom;
   }
   
-  // Safety: If it's a sample, multiplier is 0
-  // ✅ FIX: Changed 'type' to 'worksheetType'
   if (worksheet.worksheetType === 'sample' || worksheet.title?.toLowerCase().includes('sample')) {
       multiplier = 0;
   }
-
 
   // 2. Calculate Rewards
   for (const question of questions) {
     let obtainedMarksForQuestion = 0;
     
-    // Calculate marks
     question.solutionSteps?.forEach(step => {
         step.subQuestions.forEach(subQ => {
             if (results[subQ.id]?.isCorrect) {
@@ -92,15 +84,12 @@ export function calculateAttemptRewards(
 
     if (obtainedMarksForQuestion === 0) continue;
 
-    // Apply logic
     if (question.currencyType === 'spark') {
-      // Spark marks convert to COINS at 50% value
-      const rewardValue = Math.floor(obtainedMarksForQuestion * 0.5 * multiplier);
+      // Use Dynamic Spark Rate
+      const rewardValue = Math.floor(obtainedMarksForQuestion * settings.rewardSpark * multiplier);
       rewardTotals['coin'] += rewardValue; 
     } else {
-      // Standard marks (Coin/Gold/Diamond) at 100% value
       const rewardValue = Math.floor(obtainedMarksForQuestion * 1.0 * multiplier);
-      
       const type = question.currencyType || 'coin';
       if (rewardTotals[type] !== undefined) {
           rewardTotals[type] += rewardValue;
@@ -108,12 +97,9 @@ export function calculateAttemptRewards(
     }
   }
 
-  // 3. Filter out zero balances
   const finalRewards: Record<string, number> = {};
   for (const key in rewardTotals) {
-      if (rewardTotals[key] > 0) {
-          finalRewards[key] = rewardTotals[key];
-      }
+      if (rewardTotals[key] > 0) finalRewards[key] = rewardTotals[key];
   }
 
   return finalRewards;

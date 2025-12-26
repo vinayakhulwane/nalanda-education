@@ -1,6 +1,6 @@
 'use client';
 
-import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, ResultState } from "@/types";
+import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, ResultState, EconomySettings } from "@/types"; // ✅ Added EconomySettings
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Separator } from "./ui/separator";
@@ -8,13 +8,13 @@ import { Button } from "./ui/button";
 import { useRouter } from "next/navigation";
 import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUser, useFirestore } from "@/firebase";
+import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase"; // ✅ Added Hooks
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { calculateAttemptRewards } from "@/lib/wallet";
 
-// ✅ 1. Explicitly export AnswerState so 'solve/page.tsx' can import it
+// ✅ Explicitly export AnswerState so 'solve/page.tsx' can import it
 export type AnswerState = {
   [subQuestionId: string]: {
     answer: any; // Using 'any' to support text, number, or array (MCQ)
@@ -87,7 +87,7 @@ export function WorksheetResults({
   answers,
   results,
   timeTaken,
-  isReview = false, // Default to false (active claiming)
+  isReview = false,
   attempt,
 }: WorksheetResultsProps) {
   const router = useRouter();
@@ -98,6 +98,10 @@ export function WorksheetResults({
   const [isClaiming, setIsClaiming] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
   const [isBlasting, setIsBlasting] = useState(false);
+
+  // ✅ 1. FETCH REAL SETTINGS
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
+  const { data: settings } = useDoc<EconomySettings>(settingsRef);
 
   const { totalMarks, score, calculatedRewards } = useMemo(() => {
     let totalMarks = 0;
@@ -114,10 +118,14 @@ export function WorksheetResults({
       });
     });
 
-    const calculatedRewards = user?.uid ? calculateAttemptRewards(worksheet, questions, results, user.uid) : {};
+    // ✅ 2. PASS SETTINGS TO CALCULATOR
+    // We pass 'settings ?? undefined' to safely handle the loading state
+    const calculatedRewards = user?.uid 
+        ? calculateAttemptRewards(worksheet, questions, results, user.uid, settings ?? undefined) 
+        : {};
 
     return { totalMarks, score, calculatedRewards };
-  }, [questions, results, worksheet, user?.uid]);
+  }, [questions, results, worksheet, user?.uid, settings]); // ✅ Added settings dependency
 
   const handleClaimRewards = async () => {
     if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id || !calculatedRewards) return;
@@ -133,14 +141,17 @@ export function WorksheetResults({
 
       for (const key in calculatedRewards) {
         const currency = key as CurrencyType;
-        const amount = calculatedRewards[currency as keyof typeof calculatedRewards];
+        const amount = calculatedRewards[key as keyof typeof calculatedRewards];
+        
         if (amount && amount > 0) {
+          // Map singular key (coin) to DB plural field (coins)
           const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds' };
+          
           if (fieldMap[currency]) {
             updatePayload[fieldMap[currency]] = increment(amount);
           }
 
-          // Add a transaction log for this currency reward
+          // Add a transaction log
           transactionPromises.push(addDoc(transactionsColRef, {
             userId: user.uid,
             type: 'earned',

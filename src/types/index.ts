@@ -186,8 +186,17 @@ export interface WorksheetAttempt {
 
 
 export interface EconomySettings {
-    coinsPerGold: number;
-    goldPerDiamond: number;
+  // Exchange Rates
+  coinToGold: number;      // Renamed from 'coinsPerGold' to match new code
+  goldToDiamond: number;   // Renamed from 'goldPerDiamond' to match new code
+
+  // Creation Costs
+  costPerMark: number;     // NEW: Controls the 50% cost rule
+
+  // Reward Multipliers
+  rewardPractice: number;   // NEW: Controls 100% reward for own tests
+  rewardClassroom: number;  // NEW: Controls 50% reward for assignments
+  rewardSpark: number;      // NEW: Controls Spark conversion rate
 }
 
 export interface Transaction {

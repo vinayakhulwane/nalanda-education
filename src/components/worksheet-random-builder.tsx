@@ -1,7 +1,6 @@
-
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import type { Question, CurrencyType, Unit, Category, WalletTransaction } from '@/types';
+import type { Question, CurrencyType, Unit, Category, WalletTransaction, EconomySettings } from '@/types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Badge } from './ui/badge';
@@ -14,7 +13,8 @@ import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
-import { useUser } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase'; // ✅ Added hooks
+import { doc } from 'firebase/firestore'; // ✅ Added doc
 import { calculateWorksheetCost } from '@/lib/wallet';
 
 
@@ -65,11 +65,15 @@ export function WorksheetRandomBuilder({
   });
   const [worksheetType, setWorksheetType] = useState<'classroom' | 'sample'>('classroom');
   const { userProfile } = useUser();
+  const firestore = useFirestore(); 
   const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
   const unitMap = useMemo(() => new Map(units.map(u => [u.id, u.name])), [units]);
   const categoryMap = useMemo(() => new Map(categories.map(c => [c.id, c.name])), [categories]);
   
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
+  const { data: settings } = useDoc<EconomySettings>(settingsRef);
+
   // When unit filter changes, reset category filter
   useEffect(() => {
     setFilters(prev => ({...prev, categories: []}));
@@ -139,7 +143,9 @@ export function WorksheetRandomBuilder({
       breakdownByCategory[categoryName].count++;
       breakdownByCategory[categoryName].marks += marks;
     });
-    const creationCost = calculateWorksheetCost(selectedQuestions);
+    
+    const creationCost = calculateWorksheetCost(selectedQuestions, settings ?? undefined);
+
     return { 
       totalMarks, 
       estimatedTime: Math.ceil((totalMarks * 20) / 60),
@@ -147,7 +153,7 @@ export function WorksheetRandomBuilder({
       breakdownByCategory,
       creationCost,
     };
-  }, [selectedQuestions, unitMap, categoryMap]);
+  }, [selectedQuestions, unitMap, categoryMap, settings]); 
 
   const addRandomQuestion = (currency: CurrencyType) => {
     const candidates = availableQuestions.filter(q => 
@@ -362,10 +368,11 @@ export function WorksheetRandomBuilder({
       
         <Sheet>
             <SheetTrigger asChild>
-                <div className="fixed bottom-6 right-6">
-                    <Button size="lg" className="rounded-full h-16 w-16 shadow-xl" disabled={selectedQuestions.length === 0}>
-                        <ShoppingCart className="h-6 w-6" />
-                        <Badge className="absolute -top-1 -right-1">{selectedQuestions.length}</Badge>
+                <div className="fixed bottom-6 right-6 lg:relative lg:bottom-auto lg:right-auto">
+                    <Button size="lg" className="rounded-full h-16 w-16 shadow-xl lg:w-full lg:h-auto lg:rounded-md" disabled={selectedQuestions.length === 0}>
+                        <ShoppingCart className="h-6 w-6 lg:mr-2" />
+                        <span className="hidden lg:inline">Review & Create</span>
+                        <Badge className="absolute -top-1 -right-1 lg:static lg:ml-auto">{selectedQuestions.length}</Badge>
                     </Button>
                 </div>
             </SheetTrigger>

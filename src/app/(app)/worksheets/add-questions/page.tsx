@@ -2,11 +2,11 @@
 import { PageHeader } from "@/components/page-header";
 import { WorksheetRandomBuilder } from "@/components/worksheet-random-builder";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
-import type { Question, Subject, Worksheet, Unit, Category, WalletTransaction } from "@/types";
-import { collection, query, where, doc, addDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
+import type { Question, Subject, Worksheet, Unit, Category, EconomySettings } from "@/types"; 
+import { collection, query, where, doc, addDoc, serverTimestamp, updateDoc, increment, getDoc } from "firebase/firestore"; // ✅ Added getDoc
 import { Loader2, ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState, useMemo } from 'react';
+import { Suspense, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/firebase";
@@ -32,9 +32,9 @@ function AddQuestionsPageContent() {
     const mode = searchParams.get('mode') as 'practice' | 'exam';
     const examDate = searchParams.get('examDate');
     const startTime = searchParams.get('startTime');
-    const source = searchParams.get('source');
 
     const [selectedQuestions, setSelectedQuestions] = useState<QuestionWithSource[]>([]);
+    const [isCreating, setIsCreating] = useState(false);
 
     const subjectDocRef = useMemoFirebase(() => (firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null), [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
@@ -59,7 +59,6 @@ function AddQuestionsPageContent() {
     const allCategoriesQuery = useMemoFirebase(() => {
         if (!firestore || !allUnits || allUnits.length === 0) return null;
         const unitIds = allUnits.map(u => u.id);
-        // Firestore 'in' query limited to 30 items. This might need pagination for subjects with many units.
         return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
     }, [firestore, allUnits]);
     const { data: allCategories, isLoading: areCategoriesLoading } = useCollection<Category>(allCategoriesQuery);
@@ -77,109 +76,121 @@ function AddQuestionsPageContent() {
             return;
         }
 
-        const isEditor = userProfile.role === 'admin' || userProfile.role === 'teacher';
-        const finalWorksheetType = isEditor ? worksheetTypeParam : 'practice';
-        
-        // --- Cost Calculation for Students creating Practice worksheets ---
-        if (finalWorksheetType === 'practice') {
-            const cost = calculateWorksheetCost(selectedQuestions);
-            const canAfford = (userProfile.coins ?? 0) >= cost.coins && (userProfile.gold ?? 0) >= cost.gold && (userProfile.diamonds ?? 0) >= cost.diamonds;
-            
-            if (!canAfford) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Insufficient Funds',
-                    description: `You do not have enough currency to create this worksheet.`
-                });
-                return;
-            }
-            
-            // --- Atomic Wallet Deduction and Transaction Logging ---
-            const userRef = doc(firestore, 'users', user.uid);
-            const updatePayload: Record<string, any> = {};
-            const transactionLogs: Promise<any>[] = [];
-            const transactionDescription = `Practice Fee: ${title}`;
-
-            if (cost.coins > 0) {
-                updatePayload['coins'] = increment(-cost.coins);
-                transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
-                    userId: user.uid,
-                    type: 'spent',
-                    description: transactionDescription,
-                    amount: cost.coins,
-                    currency: 'coin',
-                    createdAt: serverTimestamp()
-                }));
-            }
-            if (cost.gold > 0) {
-                updatePayload['gold'] = increment(-cost.gold);
-                 transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
-                    userId: user.uid,
-                    type: 'spent',
-                    description: transactionDescription,
-                    amount: cost.gold,
-                    currency: 'gold',
-                    createdAt: serverTimestamp()
-                }));
-            }
-            if (cost.diamonds > 0) {
-                updatePayload['diamonds'] = increment(-cost.diamonds);
-                 transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
-                    userId: user.uid,
-                    type: 'spent',
-                    description: transactionDescription,
-                    amount: cost.diamonds,
-                    currency: 'diamond',
-                    createdAt: serverTimestamp()
-                }));
-            }
-
-            if (Object.keys(updatePayload).length > 0) {
-                await updateDoc(userRef, updatePayload);
-                await Promise.all(transactionLogs);
-            }
-        }
-        
-        const newWorksheet: Omit<Worksheet, 'id'> = {
-            title,
-            classId,
-            subjectId,
-            mode,
-            worksheetType: finalWorksheetType,
-            questions: selectedQuestions.map(q => q.id),
-            authorId: user.uid,
-            status: 'draft',
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        };
-
-        if (unitId) {
-            newWorksheet.unitId = unitId;
-        }
-
-        if (mode === 'exam' && examDate) {
-            const date = new Date(examDate);
-            if (startTime) {
-                const [hours, minutes] = startTime.split(':');
-                date.setHours(parseInt(hours), parseInt(minutes));
-            }
-            newWorksheet.startTime = date;
-        }
+        setIsCreating(true);
 
         try {
+            const isEditor = userProfile.role === 'admin' || userProfile.role === 'teacher';
+            const finalWorksheetType = isEditor ? worksheetTypeParam : 'practice';
+            
+            // --- Cost Calculation (Fixed: Fetch Fresh Settings) ---
+            if (finalWorksheetType === 'practice') {
+                // 1. Fetch the absolute latest settings from DB right now
+                // This prevents "undefined" or stale data from React state
+                const settingsSnap = await getDoc(doc(firestore, 'settings', 'economy'));
+                const latestSettings = settingsSnap.exists() ? (settingsSnap.data() as EconomySettings) : undefined;
+
+                // 2. Calculate using these fresh settings
+                const cost = calculateWorksheetCost(selectedQuestions, latestSettings);
+                
+                // 3. Check Balance
+                const canAfford = (userProfile.coins ?? 0) >= cost.coins && 
+                                  (userProfile.gold ?? 0) >= cost.gold && 
+                                  (userProfile.diamonds ?? 0) >= cost.diamonds;
+                
+                if (!canAfford) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Insufficient Funds',
+                        description: `You do not have enough currency to create this worksheet.`
+                    });
+                    setIsCreating(false);
+                    return;
+                }
+                
+                // 4. Atomic Wallet Deduction
+                const userRef = doc(firestore, 'users', user.uid);
+                const updatePayload: Record<string, any> = {};
+                const transactionLogs: Promise<any>[] = [];
+                const transactionDescription = `Practice Fee: ${title}`;
+
+                if (cost.coins > 0) {
+                    updatePayload['coins'] = increment(-cost.coins);
+                    transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
+                        userId: user.uid,
+                        type: 'spent',
+                        description: transactionDescription,
+                        amount: cost.coins,
+                        currency: 'coin',
+                        createdAt: serverTimestamp()
+                    }));
+                }
+                if (cost.gold > 0) {
+                    updatePayload['gold'] = increment(-cost.gold);
+                    transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
+                        userId: user.uid,
+                        type: 'spent',
+                        description: transactionDescription,
+                        amount: cost.gold,
+                        currency: 'gold',
+                        createdAt: serverTimestamp()
+                    }));
+                }
+                if (cost.diamonds > 0) {
+                    updatePayload['diamonds'] = increment(-cost.diamonds);
+                    transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
+                        userId: user.uid,
+                        type: 'spent',
+                        description: transactionDescription,
+                        amount: cost.diamonds,
+                        currency: 'diamond',
+                        createdAt: serverTimestamp()
+                    }));
+                }
+
+                if (Object.keys(updatePayload).length > 0) {
+                    await updateDoc(userRef, updatePayload);
+                    await Promise.all(transactionLogs);
+                }
+            }
+            
+            const newWorksheet: Omit<Worksheet, 'id'> = {
+                title,
+                classId,
+                subjectId,
+                mode,
+                worksheetType: finalWorksheetType,
+                questions: selectedQuestions.map(q => q.id),
+                authorId: user.uid,
+                status: 'draft',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            };
+
+            if (unitId) {
+                newWorksheet.unitId = unitId;
+            }
+
+            if (mode === 'exam' && examDate) {
+                const date = new Date(examDate);
+                if (startTime) {
+                    const [hours, minutes] = startTime.split(':');
+                    date.setHours(parseInt(hours), parseInt(minutes));
+                }
+                newWorksheet.startTime = date;
+            }
+
             await addDoc(collection(firestore, 'worksheets'), newWorksheet);
             toast({
                 title: 'Worksheet Created',
                 description: `"${title}" has been saved.`
             });
             
-            // Navigate based on where the user started the flow
             if (finalWorksheetType === 'practice' && classId && subjectId) {
-                 router.push(`/academics/${classId}/${subjectId}`);
+                    router.push(`/academics/${classId}/${subjectId}`);
             } else if (classId && subjectId) {
                 router.push(`/worksheets/saved?classId=${classId}&subjectId=${subjectId}`);
             } else {
-                 router.push(`/dashboard`);
+                    router.push(`/dashboard`);
             }
 
         } catch (error) {
@@ -189,6 +200,8 @@ function AddQuestionsPageContent() {
                 title: 'Failed to create worksheet',
                 description: 'An error occurred while saving the worksheet.'
             });
+        } finally {
+            setIsCreating(false);
         }
     };
     
@@ -249,11 +262,9 @@ function AddQuestionsPageContent() {
                     />
                 </TabsContent>
             </Tabs>
-
         </div>
     );
 }
-
 
 export default function AddQuestionsPage() {
     return (

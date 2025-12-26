@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, AlertTriangle, Save } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -21,14 +21,20 @@ export default function EconomySettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  // Updated state to include ALL settings (Exchange, Costs, Rewards)
   const [settings, setSettings] = useState<Partial<EconomySettings>>({
-    coinsPerGold: 10,
-    goldPerDiamond: 10,
+    coinToGold: 10,
+    goldToDiamond: 10,
+    costPerMark: 0.5,
+    rewardPractice: 1.0,
+    rewardClassroom: 0.5,
+    rewardSpark: 0.5,
   });
 
+  // Updated path to match where your app likely stores global settings
   const settingsDocRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    return doc(firestore, 'settings', 'economy');
+    return doc(firestore, 'settings', 'economy'); // Keeping your existing path
   }, [firestore]);
 
   const { data: remoteSettings, isLoading: areSettingsLoading } = useDoc<EconomySettings>(settingsDocRef);
@@ -72,51 +78,135 @@ export default function EconomySettingsPage() {
     <div>
       <PageHeader
         title="Economy Settings"
-        description="Configure the virtual currency exchange rates for the entire application."
+        description="Configure the virtual currency exchange rates, costs, and rewards for the entire application."
       />
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Currency Exchange Rates</CardTitle>
-          <CardDescription>
-            Define how students can exchange lower-tier currency for higher-tier ones.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Global Impact Warning</AlertTitle>
-            <AlertDescription>
-              Changes made on this page are global and will affect all users immediately. Proceed with caution.
-            </AlertDescription>
-          </Alert>
-          <div className="space-y-2">
-            <Label htmlFor="coins-per-gold">Coins required for 1 Gold</Label>
-            <Input
-              id="coins-per-gold"
-              type="number"
-              value={settings.coinsPerGold || ''}
-              onChange={(e) => setSettings({ ...settings, coinsPerGold: parseInt(e.target.value, 10) || 0 })}
-              placeholder="e.g., 10"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="gold-per-diamond">Gold required for 1 Diamond</Label>
-            <Input
-              id="gold-per-diamond"
-              type="number"
-              value={settings.goldPerDiamond || ''}
-              onChange={(e) => setSettings({ ...settings, goldPerDiamond: parseInt(e.target.value, 10) || 0 })}
-              placeholder="e.g., 10"
-            />
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleSave}>
-            <Save className="mr-2" />
-            Save Settings
-          </Button>
-        </CardFooter>
-      </Card>
+      
+      <div className="space-y-6 max-w-4xl mt-6">
+        
+        {/* Warning Alert */}
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Global Impact Warning</AlertTitle>
+          <AlertDescription>
+            Changes made on this page are global and will affect all users immediately. Proceed with caution.
+          </AlertDescription>
+        </Alert>
+
+        {/* SECTION 1: EXCHANGE RATES */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-primary" />
+              <CardTitle>Currency Exchange Rates</CardTitle>
+            </div>
+            <CardDescription>Define how much lower-tier currency is needed for higher-tier ones.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="coinToGold">Coins required for 1 Gold</Label>
+                <Input
+                  id="coinToGold"
+                  type="number"
+                  value={settings.coinToGold || ''}
+                  onChange={(e) => setSettings({ ...settings, coinToGold: parseFloat(e.target.value) || 0 })}
+                  placeholder="e.g., 10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="goldToDiamond">Gold required for 1 Diamond</Label>
+                <Input
+                  id="goldToDiamond"
+                  type="number"
+                  value={settings.goldToDiamond || ''}
+                  onChange={(e) => setSettings({ ...settings, goldToDiamond: parseFloat(e.target.value) || 0 })}
+                  placeholder="e.g., 10"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* SECTION 2: CREATION COSTS */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <ScrollText className="h-5 w-5 text-primary" />
+              <CardTitle>Worksheet Creation Costs</CardTitle>
+            </div>
+            <CardDescription>Control how much students pay to build practice tests.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <div className="space-y-2">
+                <Label htmlFor="costPerMark">Cost Multiplier (per Mark)</Label>
+                <div className="flex gap-4 items-center">
+                  <Input 
+                    id="costPerMark"
+                    className="max-w-[150px]"
+                    type="number" 
+                    step="0.1"
+                    value={settings.costPerMark ?? 0.5} 
+                    onChange={(e) => setSettings({...settings, costPerMark: parseFloat(e.target.value)})} 
+                  />
+                  <span className="text-sm text-muted-foreground">
+                      Example: <strong>0.5</strong> means a 10-mark question costs 5 Currency.
+                  </span>
+                </div>
+              </div>
+          </CardContent>
+        </Card>
+
+        {/* SECTION 3: REWARD RULES */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+              <CardTitle>Reward Rules</CardTitle>
+            </div>
+            <CardDescription>Set the percentage of rewards students earn for different activities.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="rewardPractice">Practice Test Reward (Multiplier)</Label>
+                <Input 
+                  id="rewardPractice"
+                  type="number" step="0.1"
+                  value={settings.rewardPractice ?? 1.0} 
+                  onChange={(e) => setSettings({...settings, rewardPractice: parseFloat(e.target.value)})} 
+                />
+                <p className="text-xs text-muted-foreground">Default: 1.0 (100% Rewards)</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rewardClassroom">Classroom Assignment Reward (Multiplier)</Label>
+                <Input 
+                  id="rewardClassroom"
+                  type="number" step="0.1"
+                  value={settings.rewardClassroom ?? 0.5} 
+                  onChange={(e) => setSettings({...settings, rewardClassroom: parseFloat(e.target.value)})} 
+                />
+                <p className="text-xs text-muted-foreground">Default: 0.5 (50% Rewards)</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rewardSpark">Spark Conversion Rate</Label>
+                <Input 
+                  id="rewardSpark"
+                  type="number" step="0.1"
+                  value={settings.rewardSpark ?? 0.5} 
+                  onChange={(e) => setSettings({...settings, rewardSpark: parseFloat(e.target.value)})} 
+                />
+                <p className="text-xs text-muted-foreground">Rate at which Spark Marks convert to Coins.</p>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={handleSave} size="lg" className="w-full md:w-auto">
+              <Save className="mr-2" />
+              Save Settings
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 }
