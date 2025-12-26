@@ -297,7 +297,11 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
         return { completed, notCompleted };
     }, [practiceWorksheets, userProfile?.completedWorksheets]);
     
-    const attemptsMap = useMemo(() => new Map(attempts.map(a => [a.worksheetId, a.id])), [attempts]);
+    const attemptsMap = useMemo(() => {
+        const map = new Map();
+        attempts.forEach(a => map.set(a.worksheetId, a.id));
+        return map;
+    }, [attempts]);
 
     const isLoading = areWorksheetsLoading || areAttemptsLoading;
 

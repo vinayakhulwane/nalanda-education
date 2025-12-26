@@ -134,13 +134,13 @@ service cloud.firestore {
       // Teachers and Admins are allowed to create, update, and delete worksheets.
       allow write: if isTeacher() || isAdmin();
     }
-    
+
     match /attempts/{attemptId} {
       // A user can create their own attempt.
       allow create: if isOwner(request.resource.data.userId);
       
       // A user can read their own attempts, but only if they query by their own userId
-      allow list: if request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy']) &&
+      allow list: if request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) &&
                    request.query.userId == request.auth.uid;
       allow get: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
 
