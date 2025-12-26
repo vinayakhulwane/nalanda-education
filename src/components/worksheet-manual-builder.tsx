@@ -227,6 +227,30 @@ export function WorksheetManualBuilder({
                         </PopoverContent>
                     </Popover>
                 </div>
+                
+                 {isFilterActive && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold">Active:</span>
+                        {filters.units.map(id => (
+                          <Badge key={id} variant="outline" className="pl-2 capitalize">
+                            {unitMap.get(id) || id}
+                            <button onClick={() => handleFilterChange('units', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                          </Badge>
+                        ))}
+                        {filters.categories.map(id => (
+                          <Badge key={id} variant="outline" className="pl-2 capitalize">
+                            {categoryMap.get(id) || id}
+                            <button onClick={() => handleFilterChange('categories', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                          </Badge>
+                        ))}
+                        {filters.currencies.map(c => (
+                          <Badge key={c} variant="outline" className="pl-2 capitalize">
+                            {c}
+                            <button onClick={() => handleFilterChange('currencies', c, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                          </Badge>
+                        ))}
+                    </div>
+                  )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {filteredQuestions.map(q => {
