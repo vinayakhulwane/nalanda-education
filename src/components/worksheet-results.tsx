@@ -193,7 +193,7 @@ export function WorksheetResults({
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl md:text-3xl text-center">{isReview ? 'Worksheet Review' : 'Worksheet Complete!'}</CardTitle>
-          <CardDescription className="text-center">
+           <CardDescription className="text-center">
             {worksheet.title}
              {attempt?.attemptedAt?.toDate && (
               <span className="block text-xs mt-1">
