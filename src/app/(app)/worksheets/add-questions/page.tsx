@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { WorksheetRandomBuilder } from "@/components/worksheet-random-builder";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import type { Question, Subject, Worksheet, Unit, Category, EconomySettings } from "@/types"; 
-import { collection, query, where, doc, addDoc, serverTimestamp, updateDoc, increment, getDoc } from "firebase/firestore"; // ✅ Added getDoc
+import { collection, query, where, doc, addDoc, serverTimestamp, updateDoc, increment, getDoc } from "firebase/firestore"; 
 import { Loader2, ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from 'react';
@@ -82,17 +82,13 @@ function AddQuestionsPageContent() {
             const isEditor = userProfile.role === 'admin' || userProfile.role === 'teacher';
             const finalWorksheetType = isEditor ? worksheetTypeParam : 'practice';
             
-            // --- Cost Calculation (Fixed: Fetch Fresh Settings) ---
+            // --- Cost Calculation ---
             if (finalWorksheetType === 'practice') {
-                // 1. Fetch the absolute latest settings from DB right now
-                // This prevents "undefined" or stale data from React state
                 const settingsSnap = await getDoc(doc(firestore, 'settings', 'economy'));
                 const latestSettings = settingsSnap.exists() ? (settingsSnap.data() as EconomySettings) : undefined;
 
-                // 2. Calculate using these fresh settings
                 const cost = calculateWorksheetCost(selectedQuestions, latestSettings);
                 
-                // 3. Check Balance
                 const canAfford = (userProfile.coins ?? 0) >= cost.coins && 
                                   (userProfile.gold ?? 0) >= cost.gold && 
                                   (userProfile.diamonds ?? 0) >= cost.diamonds;
@@ -107,7 +103,6 @@ function AddQuestionsPageContent() {
                     return;
                 }
                 
-                // 4. Atomic Wallet Deduction
                 const userRef = doc(firestore, 'users', user.uid);
                 const updatePayload: Record<string, any> = {};
                 const transactionLogs: Promise<any>[] = [];
@@ -205,10 +200,34 @@ function AddQuestionsPageContent() {
         }
     };
     
+    // ✅ MODIFIED: Add Question with AI Limit Logic
     const addQuestion = (question: Question, source: 'manual' | 'random') => {
-        if (!selectedQuestions.find(q => q.id === question.id)) {
-            setSelectedQuestions([...selectedQuestions, { ...question, source }]);
+        // 1. Prevent Duplicates
+        if (selectedQuestions.find(q => q.id === question.id)) {
+            return;
         }
+
+        // 2. TRAFFIC CONTROL: Limit to 1 AI Question per Worksheet
+        if (question.gradingMode === 'ai') {
+            const hasAiQuestion = selectedQuestions.some(q => q.gradingMode === 'ai');
+            
+            if (hasAiQuestion) {
+                toast({
+                    variant: "destructive",
+                    title: "AI Limit Reached",
+                    description: "You can only add 1 AI-graded question per worksheet.",
+                });
+                return; // Stop execution, do not add question
+            }
+        }
+
+        // 3. Add to Cart if checks pass
+        setSelectedQuestions([...selectedQuestions, { ...question, source }]);
+        
+        toast({
+            title: "Question Added",
+            description: "Question added to your worksheet.",
+        });
     };
 
     const removeQuestion = (questionId: string) => {
