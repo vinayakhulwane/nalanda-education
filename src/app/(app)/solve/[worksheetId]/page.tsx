@@ -1,4 +1,5 @@
 'use client';
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
@@ -157,6 +158,8 @@ export default function SolveWorksheetPage() {
   }
 
   // --- AI GRADING LOGIC ---
+  // ... inside SolveWorksheetPage component
+
   const handleAICheck = async (question: Question) => {
     const imageFile = aiImages[question.id];
     if (!imageFile) {
@@ -165,39 +168,69 @@ export default function SolveWorksheetPage() {
     }
 
     setIsAiGrading(true);
+    
     try {
-        // 1. Simulating AI API Call (Replace with real call later)
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // 2. Mock Response based on Rubric
-        // In real app, we send: image + question.rubric -> receive score + feedback
-        const mockScore = Math.floor(Math.random() * 5) + 5; // Random score 5-10
-        const mockFeedback = "AI Analysis: \n- Step 1: Formula is correct. \n- Step 2: Substitution values match. \n- Final Answer: Correct unit usage. \n\nGreat job!";
-
-        // 3. Update Results & Answers
-        // We update all subquestions for this main question with the AI result
-        const subQuestionIds = question.solutionSteps.flatMap(s => s.subQuestions).map(sq => sq.id);
+        // 1. Upload Image to Firebase Storage
+        // We use a unique path: attempts / userId / worksheetId / questionId_timestamp
+        const storage = getStorage(); 
+        const fileName = `attempts/${user?.uid}/${worksheetId}/${question.id}_${Date.now()}.jpg`;
+        const storageRef = ref(storage, fileName);
         
+        await uploadBytes(storageRef, imageFile);
+        const downloadURL = await getDownloadURL(storageRef);
+
+        // 2. Call our Next.js API
+        const response = await fetch('/api/grade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                imageUrl: downloadURL,
+                questionText: question.mainQuestionText,
+                // Send the rubric if it exists, otherwise a default instruction
+                rubric: question.aiRubric || { default: "Grade based on step-by-step accuracy and final answer." }
+            }),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.details || "API call failed");
+        }
+
+        const aiResult = await response.json();
+
+        // 3. Update Results in the UI
+        // We verify that the AI returned the expected fields
+        if (typeof aiResult.score !== 'number') throw new Error("Invalid AI response");
+
+        // Apply result to all subquestions (since AI grades the whole problem)
+        const subQuestionIds = question.solutionSteps.flatMap(s => s.subQuestions).map(sq => sq.id);
         const newResults: ResultState = {};
         const newAnswers: AnswerState = {};
         
         subQuestionIds.forEach(id => {
             newResults[id] = {
-                isCorrect: mockScore > 5, // Simple pass/fail logic for demo
-                score: mockScore,
-                feedback: mockFeedback
+                isCorrect: aiResult.isCorrect,
+                score: aiResult.score,
+                feedback: aiResult.feedback
             };
-            newAnswers[id] = { answer: "AI_GRADED_IMAGE" }; // Marker for answer state
+            newAnswers[id] = { answer: downloadURL }; // Save image URL as the student's answer
         });
 
         setResults(prev => ({ ...prev, ...newResults }));
         setAnswers(prev => ({ ...prev, ...newAnswers }));
         
-        toast({ title: "AI Grading Complete", description: "Your solution has been analyzed." });
+        toast({ 
+            title: "Grading Complete!", 
+            description: `AI Score: ${aiResult.score}. ${aiResult.feedback}`,
+        });
 
     } catch (error) {
         console.error("AI Grading Error", error);
-        toast({ variant: 'destructive', title: "Grading Failed", description: "Could not connect to AI service." });
+        toast({ 
+            variant: 'destructive', 
+            title: "Grading Failed", 
+            description: "Could not analyze the image. Please try again." 
+        });
     } finally {
         setIsAiGrading(false);
     }
@@ -270,7 +303,7 @@ export default function SolveWorksheetPage() {
                     </CardHeader>
                     
                     <CardContent className="flex-grow overflow-y-auto">
-                        <div className="mb-4 prose dark:prose-invert max-w-none">
+                        <div className="mb-4 prose dark:prose-invert max-w-none break-words">
                             {/* Render Main Question Text */}
                             <div dangerouslySetInnerHTML={{ __html: activeQuestion.mainQuestionText }} />
                         </div>
