@@ -1,11 +1,20 @@
 'use client';
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDoc, serverTimestamp, getDocs, limit, orderBy } from 'firebase/firestore';
 import type { Worksheet, Question, WorksheetAttempt, ResultState } from '@/types';
-import { Loader2, ArrowLeft, ArrowRight, CheckCircle, Timer, X, Sparkles, AlertCircle } from 'lucide-react';
+import { 
+  Loader2, 
+  ArrowLeft, 
+  ArrowRight, 
+  CheckCircle, 
+  Timer, 
+  X, 
+  Sparkles, 
+  FileImage, 
+  Award 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,6 +22,7 @@ import { Progress } from '@/components/ui/progress';
 import { WorksheetResults, type AnswerState } from '@/components/worksheet-results';
 import { AIAnswerUploader } from '@/components/solve/ai-answer-uploader';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 function formatTime(seconds: number) {
   const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -20,6 +30,76 @@ function formatTime(seconds: number) {
   const s = Math.floor(seconds % 60).toString().padStart(2, '0');
   return `${h}:${m}:${s}`;
 }
+
+const processedMainQuestionText = (text: string) => {
+    if (!text) return '';
+    return text.replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' ');
+};
+
+const formatCriterionKey = (key: string) => {
+    return key
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, (str) => str.toUpperCase())
+        .trim();
+};
+
+// ✅ UPDATED: Statistical Bar-Chart Rubric Breakdown
+const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record<string, any> | null, breakdown: Record<string, number>, maxMarks?: number }) => {
+    if (!breakdown || Object.keys(breakdown).length === 0) return null;
+
+    const activeRubric = (rubric && Object.keys(rubric).length > 0) 
+        ? rubric 
+        : Object.keys(breakdown).reduce((acc, key) => ({ ...acc, [key]: "N/A" }), {} as Record<string, any>);
+
+    return (
+        <div className="space-y-4 my-6 animate-in fade-in duration-700">
+            <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Skill Assessment Breakdown</h4>
+            <div className="space-y-5">
+                {Object.entries(activeRubric).map(([rawKey, rawWeight], index) => {
+                    const criterion = formatCriterionKey(rawKey);
+                    const percentageScore = breakdown[rawKey] ?? breakdown[criterion] ?? 0; 
+                    const weightPct = typeof rawWeight === 'string' ? parseFloat(rawWeight) : (rawWeight as number);
+                    
+                    // MATH: (AI Score / 100) * (Weight / 100) * Total Question Marks
+                    const maxCategoryMarks = (weightPct / 100) * maxMarks;
+                    const earnedCategoryMarks = (percentageScore / 100) * maxCategoryMarks;
+
+                    return (
+                        <div key={index} className="space-y-2">
+                            <div className="flex justify-between text-xs sm:text-sm items-end">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-1.5 bg-primary/10 rounded text-primary">
+                                       {criterion.toLowerCase().includes('understanding') && <Sparkles className="h-3 w-3"/>}
+                                       {criterion.toLowerCase().includes('formula') && <FileImage className="h-3 w-3"/>}
+                                       {criterion.toLowerCase().includes('calculation') && <Timer className="h-3 w-3"/>}
+                                       {!['understanding', 'formula', 'calculation'].some(s => criterion.toLowerCase().includes(s)) && <Award className="h-3 w-3"/>}
+                                    </div>
+                                    <span className="font-semibold">{criterion}</span>
+                                    <span className="text-muted-foreground text-[10px]">({weightPct}%)</span>
+                                </div>
+                                <div className="font-mono font-bold">
+                                    <span className={percentageScore < 50 ? "text-red-500" : "text-green-600"}>
+                                        {earnedCategoryMarks.toFixed(2)}
+                                    </span>
+                                    <span className="text-muted-foreground ml-1">/ {maxCategoryMarks.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                <div 
+                                    className={cn(
+                                        "h-full transition-all duration-1000 ease-out",
+                                        percentageScore < 40 ? "bg-red-500" : percentageScore < 70 ? "bg-amber-500" : "bg-green-500"
+                                    )}
+                                    style={{ width: `${percentageScore}%` }}
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 export default function SolveWorksheetPage() {
   const router = useRouter();
@@ -36,47 +116,33 @@ export default function SolveWorksheetPage() {
   const [timeTaken, setTimeTaken] = useState(0);
   const [attempt, setAttempt] = useState<WorksheetAttempt | null>(null);
 
-  // --- AI GRADING STATE ---
   const [aiImages, setAiImages] = useState<Record<string, File | null>>({});
   const [isAiGrading, setIsAiGrading] = useState(false);
 
-  // Fetch worksheet
   const worksheetRef = useMemoFirebase(() => (firestore && worksheetId ? doc(firestore, 'worksheets', worksheetId) : null), [firestore, worksheetId]);
   const { data: worksheet, isLoading: isWorksheetLoading } = useDoc<Worksheet>(worksheetRef);
 
-  // Fetch questions
   const questionsQuery = useMemoFirebase(() => {
     if (!firestore || !worksheet?.questions || worksheet.questions.length === 0) return null;
     return query(collection(firestore, 'questions'), where(documentId(), 'in', worksheet.questions.slice(0,30)));
   }, [firestore, worksheet?.questions]);
   const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
   
-  // Check for existing attempt (Resume functionality)
   useEffect(() => {
     const checkExistingAttempt = async () => {
         if (user && firestore && userProfile?.completedWorksheets?.includes(worksheetId)) {
-            const attemptsQuery = query(
-                collection(firestore, 'worksheet_attempts'), 
-                where('userId', '==', user.uid),
-                where('worksheetId', '==', worksheetId),
-                orderBy('attemptedAt', 'desc'),
-                limit(1)
-            );
-            
+            const attemptsQuery = query(collection(firestore, 'worksheet_attempts'), where('userId', '==', user.uid), where('worksheetId', '==', worksheetId), orderBy('attemptedAt', 'desc'), limit(1));
             try {
                 const querySnapshot = await getDocs(attemptsQuery);
                 if (!querySnapshot.empty) {
-                    const lastAttemptDoc = querySnapshot.docs[0];
-                    const lastAttempt = { id: lastAttemptDoc.id, ...lastAttemptDoc.data() } as WorksheetAttempt;
+                    const lastAttempt = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as WorksheetAttempt;
                     setAnswers(lastAttempt.answers);
                     setResults(lastAttempt.results);
                     setTimeTaken(lastAttempt.timeTaken);
                     setAttempt(lastAttempt);
                     setIsFinished(true);
                 }
-            } catch (error) {
-                console.error("Error fetching past attempt:", error);
-            }
+            } catch (error) { console.error("Error fetching past attempt:", error); }
         }
     };
     checkExistingAttempt();
@@ -88,26 +154,19 @@ export default function SolveWorksheetPage() {
     return worksheet.questions.map(id => questionsMap.get(id)).filter(Boolean) as Question[];
   }, [worksheet?.questions, questions]);
 
-  // Timer Logic
   const { totalMarks, totalDuration } = useMemo(() => {
     if (!orderedQuestions) return { totalMarks: 0, totalDuration: 0 };
     const marks = orderedQuestions.reduce((total, question) => {
-      const questionMarks = question.solutionSteps?.reduce((stepSum, step) => 
-          stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
-      return total + questionMarks;
+      return total + (question.solutionSteps?.reduce((stepSum, step) => stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0);
     }, 0);
-    const duration = marks > 0 ? marks * 20 : 60;
-    return { totalMarks: marks, totalDuration: duration };
+    return { totalMarks: marks, totalDuration: marks > 0 ? marks * 20 : 60 };
   }, [orderedQuestions]);
 
   const [timeLeft, setTimeLeft] = useState(totalDuration);
   const [startTime, setStartTime] = useState<Date | null>(null);
 
+   useEffect(() => { if (totalDuration > 0) setTimeLeft(totalDuration); }, [totalDuration]);
    useEffect(() => {
-    if (totalDuration > 0) setTimeLeft(totalDuration);
-  }, [totalDuration]);
-
-  useEffect(() => {
     if (startTime && !isFinished) {
        if (timeLeft <= 0) { handleFinish(); return; }
        const timerId = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
@@ -116,160 +175,110 @@ export default function SolveWorksheetPage() {
   }, [timeLeft, startTime, isFinished]);
 
   const isLoading = isWorksheetLoading || areQuestionsLoading;
-  
   const handleStart = () => setStartTime(new Date());
-
-  const handleNext = () => {
-    if (currentQuestionIndex < orderedQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-        handleFinish();
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentQuestionIndex > 0) setCurrentQuestionIndex(currentQuestionIndex - 1);
-  };
+  const handleNext = () => (currentQuestionIndex < orderedQuestions.length - 1) ? setCurrentQuestionIndex(currentQuestionIndex + 1) : handleFinish();
+  const handlePrevious = () => (currentQuestionIndex > 0) && setCurrentQuestionIndex(currentQuestionIndex - 1);
   
   const handleFinish = async () => {
     const finalTimeTaken = startTime ? Math.floor((new Date().getTime() - startTime.getTime()) / 1000) : 0;
     setTimeTaken(finalTimeTaken);
     setIsFinished(true);
-
     if (user && firestore && worksheet) {
         if (worksheet.worksheetType === 'practice' && !userProfile?.completedWorksheets?.includes(worksheetId)) {
-            const userRef = doc(firestore, 'users', user.uid);
-            await updateDoc(userRef, { completedWorksheets: arrayUnion(worksheetId) });
+            await updateDoc(doc(firestore, 'users', user.uid), { completedWorksheets: arrayUnion(worksheetId) });
         }
-        
-        const attemptData: Omit<WorksheetAttempt, 'id'> = {
-            userId: user.uid,
-            worksheetId: worksheet.id,
-            answers,
-            results,
-            timeTaken: finalTimeTaken,
-            attemptedAt: serverTimestamp(),
-            rewardsClaimed: false,
-        };
-
+        const attemptData = { userId: user.uid, worksheetId: worksheet.id, answers, results, timeTaken: finalTimeTaken, attemptedAt: serverTimestamp(), rewardsClaimed: false };
         const attemptRef = await addDoc(collection(firestore, 'worksheet_attempts'), attemptData);
-        setAttempt({ ...attemptData, id: attemptRef.id, attemptedAt: new Date() });
+        setAttempt({ ...attemptData, id: attemptRef.id, attemptedAt: new Date() } as any);
     }
   }
-
-  // --- AI GRADING LOGIC ---
-  // ... inside SolveWorksheetPage component
 
   const handleAICheck = async (question: Question) => {
     const imageFile = aiImages[question.id];
     if (!imageFile) {
-        toast({ variant: 'destructive', title: "Solution Required", description: "Please upload a photo of your solution first." });
+        toast({ variant: 'destructive', title: "Solution Required", description: "Please upload a photo first." });
         return;
     }
-
     setIsAiGrading(true);
     
     try {
-        // 1. Upload Image to Firebase Storage
-        // We use a unique path: attempts / userId / worksheetId / questionId_timestamp
-        const storage = getStorage(); 
-        const fileName = `attempts/${user?.uid}/${worksheetId}/${question.id}_${Date.now()}.jpg`;
-        const storageRef = ref(storage, fileName);
+        const formData = new FormData();
+        formData.append('image', imageFile);
+        formData.append('questionText', question.mainQuestionText);
         
-        await uploadBytes(storageRef, imageFile);
-        const downloadURL = await getDownloadURL(storageRef);
+        // Calculate current question total marks for the backend
+        const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
+        formData.append('totalMarks', qMaxMarks.toString());
 
-        // 2. Call our Next.js API
-        const response = await fetch('/api/grade', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                imageUrl: downloadURL,
-                questionText: question.mainQuestionText,
-                // Send the rubric if it exists, otherwise a default instruction
-                rubric: question.aiRubric || { default: "Grade based on step-by-step accuracy and final answer." }
-            }),
-        });
+        const rubricToSend = question.aiRubric || { "General Accuracy": "100%" };
+        formData.append('rubric', JSON.stringify(rubricToSend));
 
+        const response = await fetch('/api/grade', { method: 'POST', body: formData });
         if (!response.ok) {
             const errData = await response.json();
-            throw new Error(errData.details || "API call failed");
+            throw new Error(errData.error || "API call failed");
         }
-
         const aiResult = await response.json();
 
-        // 3. Update Results in the UI
-        // We verify that the AI returned the expected fields
-        if (typeof aiResult.score !== 'number') throw new Error("Invalid AI response");
+        if (typeof aiResult.totalScore !== 'number') throw new Error("AI response format was invalid");
 
-        // Apply result to all subquestions (since AI grades the whole problem)
         const subQuestionIds = question.solutionSteps.flatMap(s => s.subQuestions).map(sq => sq.id);
         const newResults: ResultState = {};
         const newAnswers: AnswerState = {};
         
+        // ✅ CONVERSION: Turn AI percentage into Actual Marks
+        const finalActualMarks = (aiResult.totalScore / 100) * qMaxMarks;
+
         subQuestionIds.forEach(id => {
             newResults[id] = {
-                isCorrect: aiResult.isCorrect,
-                score: aiResult.score,
-                feedback: aiResult.feedback
-            };
-            newAnswers[id] = { answer: downloadURL }; // Save image URL as the student's answer
+                isCorrect: aiResult.totalScore >= 50,
+                score: finalActualMarks, 
+                feedback: aiResult.feedback,
+                aiBreakdown: aiResult.breakdown 
+            } as any; 
+            
+            newAnswers[id] = { answer: aiResult.driveLink };
         });
 
         setResults(prev => ({ ...prev, ...newResults }));
         setAnswers(prev => ({ ...prev, ...newAnswers }));
         
-        toast({ 
-            title: "Grading Complete!", 
-            description: `AI Score: ${aiResult.score}. ${aiResult.feedback}`,
-        });
+        toast({ title: "Grading Complete!", description: `Scored ${finalActualMarks.toFixed(2)} / ${qMaxMarks}.` });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("AI Grading Error", error);
-        toast({ 
-            variant: 'destructive', 
-            title: "Grading Failed", 
-            description: "Could not analyze the image. Please try again." 
-        });
+        toast({ variant: 'destructive', title: "Grading Failed", description: error.message });
     } finally {
         setIsAiGrading(false);
     }
   };
 
-
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-
   if (!worksheet || orderedQuestions.length === 0) return <div className="text-center py-10"><p>Worksheet could not be loaded.</p><Button variant="link" onClick={() => router.back()}>Go Back</Button></div>;
 
   const activeQuestion = orderedQuestions[currentQuestionIndex];
   const progressPercentage = ((currentQuestionIndex + 1) / orderedQuestions.length) * 100;
   const isLastQuestion = currentQuestionIndex === orderedQuestions.length - 1;
 
-  if (isFinished) {
-    return <WorksheetResults worksheet={worksheet} questions={orderedQuestions} answers={answers} results={results} timeTaken={timeTaken} attempt={attempt ?? undefined} />;
-  }
+  if (isFinished) return <WorksheetResults worksheet={worksheet} questions={orderedQuestions} answers={answers} results={results} timeTaken={timeTaken} attempt={attempt ?? undefined} />;
 
-  if (!startTime) {
-    return (
+  if (!startTime) return (
         <div className="flex flex-col h-screen p-4 sm:p-6 lg:p-8 items-center justify-center">
              <Card className="max-w-2xl text-center">
                 <CardHeader>
                     <CardTitle>{worksheet.title}</CardTitle>
-                    <CardDescription>Ready to begin? You'll have {formatTime(totalDuration)} to complete {orderedQuestions.length} questions.</CardDescription>
+                    <CardDescription>Ready? {formatTime(totalDuration)} for {orderedQuestions.length} questions.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <Button size="lg" onClick={handleStart}>Start Attempt</Button>
-                </CardContent>
+                <CardContent><Button size="lg" onClick={handleStart}>Start Attempt</Button></CardContent>
             </Card>
         </div>
-    )
-  }
+  );
 
-  // Check if current question is AI Graded
   const isAIGradingMode = activeQuestion.gradingMode === 'ai';
-  // Check if current question has been graded (any subquestion has a result)
   const isQuestionGraded = activeQuestion.solutionSteps.some(step => step.subQuestions.some(sq => results[sq.id]));
-  const currentFeedback = activeQuestion.solutionSteps.flatMap(s => s.subQuestions).map(sq => results[sq.id]?.feedback).find(f => f);
+  const currentResult = isQuestionGraded ? results[activeQuestion.solutionSteps[0]?.subQuestions[0]?.id] : null;
+  const currentFeedback = currentResult?.feedback;
+  const qMaxMarks = activeQuestion.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
 
   return (
     <div className="flex flex-col h-screen p-4 sm:p-6 lg:p-8">
@@ -279,9 +288,7 @@ export default function SolveWorksheetPage() {
                     <Timer className="h-5 w-5 text-muted-foreground" />
                     <span className="text-lg font-semibold font-mono">{formatTime(timeLeft)}</span>
                 </div>
-                <Button variant="destructive" onClick={handleFinish}>
-                    <X className="mr-2" /> End Attempt
-                </Button>
+                <Button variant="destructive" onClick={handleFinish}><X className="mr-2" /> End Attempt</Button>
             </div>
         </header>
 
@@ -293,22 +300,16 @@ export default function SolveWorksheetPage() {
                                 <CardTitle>{worksheet.title}</CardTitle>
                                 <CardDescription>Question {currentQuestionIndex + 1} of {orderedQuestions.length}</CardDescription>
                             </div>
-                            {isAIGradingMode && (
-                                <div className="flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold border border-purple-100">
-                                    <Sparkles className="h-3 w-3" /> AI Graded
-                                </div>
-                            )}
+                            {isAIGradingMode && <div className="flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold border border-purple-100"><Sparkles className="h-3 w-3" /> AI Graded</div>}
                         </div>
                         <Progress value={progressPercentage} className="mt-2" />
                     </CardHeader>
                     
                     <CardContent className="flex-grow overflow-y-auto">
-                        <div className="mb-4 prose dark:prose-invert max-w-none break-words">
-                            {/* Render Main Question Text */}
-                            <div dangerouslySetInnerHTML={{ __html: activeQuestion.mainQuestionText }} />
+                        <div className="mb-4 prose dark:prose-invert max-w-none w-full min-w-0 break-words whitespace-pre-wrap">
+                            <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(activeQuestion.mainQuestionText) }} />
                         </div>
 
-                        {/* === LOGIC SWITCH: AI VS SYSTEM === */}
                         {isAIGradingMode ? (
                             <div className="space-y-6">
                                 <AIAnswerUploader 
@@ -316,39 +317,46 @@ export default function SolveWorksheetPage() {
                                     isGrading={isAiGrading}
                                     savedImage={aiImages[activeQuestion.id]}
                                     onImageSelected={(file) => setAiImages(prev => ({ ...prev, [activeQuestion.id]: file }))}
+                                    disabled={isQuestionGraded}
                                 />
                                 
-                                {/* Feedback Section (Appears after grading) */}
-                                {isQuestionGraded && currentFeedback && (
-                                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg animate-in fade-in slide-in-from-bottom-2">
-                                        <div className="flex items-start gap-3">
-                                            <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                                            <div>
-                                                <h4 className="font-semibold text-green-800">AI Feedback</h4>
-                                                <p className="text-sm text-green-700 mt-1 whitespace-pre-wrap">{currentFeedback}</p>
-                                            </div>
+                                {isQuestionGraded && (
+                                     <div className="animate-in fade-in slide-in-from-bottom-3 space-y-4">
+                                        <div>
+                                            <AIRubricBreakdown 
+                                                rubric={activeQuestion.aiRubric || {}} 
+                                                breakdown={(currentResult as any)?.aiBreakdown || {}} 
+                                                maxMarks={qMaxMarks}
+                                            />
                                         </div>
-                                    </div>
+
+                                        {currentFeedback && (
+                                            <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-lg">
+                                                <div className="flex items-start gap-3">
+                                                    <CheckCircle className="h-5 w-5 text-purple-600 mt-0.5" />
+                                                    <div>
+                                                        <h4 className="font-semibold text-purple-800">Feedback</h4>
+                                                        <p className="text-sm text-purple-700 mt-1 whitespace-pre-wrap leading-relaxed">{currentFeedback}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                     </div>
                                 )}
 
-                                <div className="flex justify-end pt-4">
-                                    <Button 
-                                        onClick={() => handleAICheck(activeQuestion)} 
-                                        disabled={isAiGrading || isQuestionGraded}
-                                        className={isQuestionGraded ? "bg-green-600 hover:bg-green-700" : "bg-purple-600 hover:bg-purple-700"}
-                                    >
-                                        {isAiGrading ? (
-                                            <> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing... </>
-                                        ) : isQuestionGraded ? (
-                                            <> <CheckCircle className="mr-2 h-4 w-4" /> Graded </>
-                                        ) : (
-                                            <> <Sparkles className="mr-2 h-4 w-4" /> Check with AI </>
-                                        )}
-                                    </Button>
-                                </div>
+                                {!isQuestionGraded && (
+                                    <div className="flex justify-end pt-4">
+                                        <Button 
+                                            onClick={() => handleAICheck(activeQuestion)} 
+                                            disabled={isAiGrading}
+                                            className="bg-purple-600 hover:bg-purple-700"
+                                        >
+                                            {isAiGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2 h-4 w-4" /> Check with AI</>}
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            /* === SYSTEM GRADING === */
                             <QuestionRunner 
                                 key={activeQuestion.id} 
                                 question={activeQuestion}
@@ -360,17 +368,11 @@ export default function SolveWorksheetPage() {
                     </CardContent>
 
                     <CardFooter className="flex justify-between mt-auto border-t pt-6">
-                        <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Previous
-                        </Button>
+                        <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}><ArrowLeft className="mr-2 h-4 w-4" /> Previous</Button>
                         {isLastQuestion ? (
-                            <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700">
-                                <CheckCircle className="mr-2 h-4 w-4" /> Finish Attempt
-                            </Button>
+                            <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700"><CheckCircle className="mr-2 h-4 w-4" /> Finish Attempt</Button>
                         ) : (
-                            <Button onClick={handleNext}>
-                                Next <ArrowRight className="ml-2 h-4 w-4" />
-                            </Button>
+                            <Button onClick={handleNext}>Next <ArrowRight className="ml-2 h-4 w-4" /></Button>
                         )}
                     </CardFooter>
             </Card>
