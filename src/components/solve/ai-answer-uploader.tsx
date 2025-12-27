@@ -60,21 +60,8 @@ export function AIAnswerUploader({ questionId, onImageSelected, isGrading = fals
       />
 
       {!preview ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <Card 
-            className="border-dashed border-2 cursor-pointer hover:bg-muted/50 transition-all hover:border-primary/50 group"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <CardContent className="flex flex-col items-center justify-center p-6 text-center h-40">
-              <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors mb-3">
-                 <Upload className="h-6 w-6 text-primary" />
-              </div>
-              <p className="text-sm font-medium">Upload Solution</p>
-              <p className="text-xs text-muted-foreground mt-1">From Gallery</p>
-            </CardContent>
-          </Card>
-
-           <Card 
             className="border-dashed border-2 cursor-pointer hover:bg-muted/50 transition-all hover:border-primary/50 group"
             onClick={() => fileInputRef.current?.click()}
           >
@@ -82,8 +69,8 @@ export function AIAnswerUploader({ questionId, onImageSelected, isGrading = fals
               <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors mb-3">
                  <Camera className="h-6 w-6 text-primary" />
               </div>
-              <p className="text-sm font-medium">Take Photo</p>
-              <p className="text-xs text-muted-foreground mt-1">Open Camera</p>
+              <p className="text-sm font-medium">Upload or Take Photo</p>
+              <p className="text-xs text-muted-foreground mt-1">Select an image of your solution from your device.</p>
             </CardContent>
           </Card>
         </div>
