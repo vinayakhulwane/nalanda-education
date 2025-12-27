@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, increment, addDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, updateDoc, increment, addDoc, serverTimestamp, collection, writeBatch } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,9 +38,6 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
   const GOLD_TO_DIAMOND = settings?.goldToDiamond ?? 10;
 
   // Helper: Get 'Value' of a currency relative to Coins (Base Unit)
-  // Coins = 1
-  // Gold = 100 Coins
-  // Diamond = 1000 Coins (10 * 100)
   const getBaseValue = (currency: Currency) => {
     switch (currency) {
         case 'coins': return 1;
@@ -60,22 +57,15 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
     if (fromCurrency === toCurrency) {
         return { receiveAmount: amount, exchangeRateText: '1:1' };
     }
-
-    // Determine Logic: 
-    // If From > To (e.g. Gold -> Coin), we MULTIPLY (You get more)
-    // If From < To (e.g. Coin -> Gold), we DIVIDE (You get less)
     
     const ratio = fromValue / toValue;
-    
-    // Calculate final amount (Floor to keep integers)
     const result = Math.floor(amount * ratio);
 
-    // Generate nice text for the UI (e.g. "1 Gold = 100 Coins")
     let rateText = '';
     if (ratio >= 1) {
-        rateText = `1 ${fromCurrency} = ${ratio} ${toCurrency}`;
+        rateText = `1 ${fromCurrency.slice(0,-1)} = ${ratio} ${toCurrency}`;
     } else {
-        rateText = `${1/ratio} ${fromCurrency} = 1 ${toCurrency}`;
+        rateText = `${1/ratio} ${fromCurrency} = 1 ${toCurrency.slice(0,-1)}`;
     }
 
     return { receiveAmount: result, exchangeRateText: rateText };
@@ -104,24 +94,40 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
 
     setIsSwapping(true);
     try {
+      const batch = writeBatch(firestore);
       const userRef = doc(firestore, 'users', user.uid);
-      const updates: any = {};
+      const transactionsCol = collection(firestore, 'transactions');
 
-      // Execute Swap
-      updates[fromCurrency] = increment(-amount);
-      updates[toCurrency] = increment(receiveAmount);
-
-      await updateDoc(userRef, updates);
-
-      // Log Transaction
-      await addDoc(collection(firestore, 'transactions'), {
+      // 1. Update user balance
+      batch.update(userRef, {
+        [fromCurrency]: increment(-amount),
+        [toCurrency]: increment(receiveAmount)
+      });
+      
+      // 2. Log 'spent' transaction
+      const spentTransactionRef = doc(transactionsCol);
+      batch.set(spentTransactionRef, {
         userId: user.uid,
-        type: 'spent', // or 'swapped'
+        type: 'spent',
         currency: fromCurrency,
         amount: amount,
-        description: `Swapped ${amount} ${fromCurrency} for ${receiveAmount} ${toCurrency}`,
+        description: `Exchanged for ${receiveAmount} ${toCurrency}`,
         createdAt: serverTimestamp()
       });
+      
+      // 3. Log 'earned' transaction
+      const earnedTransactionRef = doc(transactionsCol);
+       batch.set(earnedTransactionRef, {
+        userId: user.uid,
+        type: 'earned',
+        currency: toCurrency,
+        amount: receiveAmount,
+        description: `Exchanged from ${amount} ${fromCurrency}`,
+        createdAt: serverTimestamp()
+      });
+
+      // Commit all operations at once
+      await batch.commit();
 
       toast({ title: 'Swap Successful!', description: `You received ${receiveAmount} ${toCurrency}.` });
       setSwapAmount('');

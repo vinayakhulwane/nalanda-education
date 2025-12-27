@@ -41,7 +41,7 @@ const formatCriterionKey = (key: string) => {
     return key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim();
 };
 
-// --- RUBRIC COMPONENT ---
+// --- RUBRIC COMPONENT (Visual Bars & Decimals) ---
 const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record<string, any> | null, breakdown: Record<string, number>, maxMarks?: number }) => {
     if (!breakdown || Object.keys(breakdown).length === 0) return null;
 
@@ -55,9 +55,11 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
             <div className="space-y-5">
                 {Object.entries(activeRubric).map(([rawKey, rawWeight], index) => {
                     const criterion = formatCriterionKey(rawKey);
+                    // Handle case mismatch or raw key
                     const percentageScore = breakdown[rawKey] ?? breakdown[criterion] ?? 0; 
                     const weightPct = typeof rawWeight === 'string' ? parseFloat(rawWeight) : (rawWeight as number);
                     
+                    // MATH: (AI Score / 100) * (Weight / 100) * Total Question Marks
                     const maxCategoryMarks = (weightPct / 100) * maxMarks;
                     const earnedCategoryMarks = (percentageScore / 100) * maxCategoryMarks;
 
@@ -155,7 +157,7 @@ export default function SolveWorksheetPage() {
     return worksheet.questions.map(id => questionsMap.get(id)).filter(Boolean) as Question[];
   }, [worksheet?.questions, questions]);
 
-  // Timer Logic
+  // ✅ TIMER LOGIC: +40s for AI
   const { totalMarks, totalDuration } = useMemo(() => {
     if (!orderedQuestions) return { totalMarks: 0, totalDuration: 0 };
     
@@ -167,10 +169,8 @@ export default function SolveWorksheetPage() {
         marks += qMarks;
 
         let qTime = qMarks > 0 ? qMarks * 20 : 60;
-        
-        // Add 40s for AI questions (case insensitive check)
-        const mode = question.gradingMode?.toLowerCase();
-        if (mode === 'ai') {
+
+        if (question.gradingMode === 'ai') {
             qTime += 40;
         }
 
@@ -183,13 +183,11 @@ export default function SolveWorksheetPage() {
   const [timeLeft, setTimeLeft] = useState(totalDuration);
   const [startTime, setStartTime] = useState<Date | null>(null);
 
-   // Sync timer with calculated duration
    useEffect(() => { 
        if (totalDuration > 0 && !startTime) setTimeLeft(totalDuration); 
    }, [totalDuration, startTime]);
 
    useEffect(() => {
-    // Stop timer if finished or grading
     if (startTime && !isFinished) {
        if (timeLeft <= 0) { handleFinish(); return; }
        
@@ -219,6 +217,7 @@ export default function SolveWorksheetPage() {
     }
   }
 
+  // ✅ FIXED: SUMMATION LOGIC FOR SCORING
   const handleAICheck = async (question: Question) => {
     const imageFile = aiImages[question.id];
     if (!imageFile) {
@@ -228,11 +227,13 @@ export default function SolveWorksheetPage() {
     setIsAiGrading(true);
     
     try {
+        console.log("🚀 STARTING AI CHECK (FINAL V3)...");
+
         const formData = new FormData();
         formData.append('image', imageFile);
         formData.append('questionText', question.mainQuestionText);
         
-        // Calculate max marks for this specific question
+        // Calculate max marks
         const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
         formData.append('totalMarks', qMaxMarks.toString());
 
@@ -240,38 +241,60 @@ export default function SolveWorksheetPage() {
         formData.append('rubric', JSON.stringify(rubricToSend));
 
         const response = await fetch('/api/grade', { method: 'POST', body: formData });
-        if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || "API call failed");
-        }
+        if (!response.ok) throw new Error("API call failed");
+        
         const aiResult = await response.json();
-
         const subQuestionIds = question.solutionSteps.flatMap(s => s.subQuestions).map(sq => sq.id);
         const newResults: ResultState = {};
         const newAnswers: AnswerState = {};
         
-        // --- THIS IS THE FIX ---
-        // Convert the AI's percentage score (0-100) to actual marks (0-qMaxMarks)
-        const rawScore = parseFloat(aiResult.totalScore);
-        const finalActualMarks = (rawScore / 100) * qMaxMarks;
+        // ✅ CALCULATION: Exact Sum of Rubric Parts
+        // (Matches your Visual Component Logic)
+        let calculatedSum = 0;
+        const rubric = question.aiRubric || {};
+        const breakdown = aiResult.breakdown || {};
+
+        if (Object.keys(rubric).length > 0) {
+            Object.entries(rubric).forEach(([key, weight]) => {
+                const cleanKey = formatCriterionKey(key);
+                // Try both key formats to be safe
+                const scoreVal = breakdown[key] ?? breakdown[cleanKey] ?? 0;
+                
+                const weightVal = typeof weight === 'string' ? parseFloat(weight) : (weight as number);
+                
+                // Formula: (Score% / 100) * (Weight% / 100) * TotalMarks
+                const partMarks = (scoreVal / 100) * (weightVal / 100) * qMaxMarks;
+                calculatedSum += partMarks;
+            });
+        } else {
+            // Fallback only if no rubric exists
+            calculatedSum = (parseFloat(aiResult.totalScore) / 100) * qMaxMarks;
+        }
+
+        // Round to 2 decimals
+        const finalActualMarks = Math.round(calculatedSum * 100) / 100;
+
+        console.log(`🧮 CALCULATION: Summed Score = ${finalActualMarks} / ${qMaxMarks}`);
 
         subQuestionIds.forEach(id => {
-            // Store the converted marks, not the raw percentage
             newResults[id] = {
-                isCorrect: rawScore >= 50,
-                score: finalActualMarks,
+                // Correct if score > 50% of total
+                isCorrect: finalActualMarks >= (qMaxMarks / 2),
+                score: finalActualMarks, 
                 feedback: aiResult.feedback,
                 aiBreakdown: aiResult.breakdown 
             } as any; 
             
-            // Store the Drive link as the "answer" for review purposes
             newAnswers[id] = { answer: aiResult.driveLink };
         });
 
         setResults(prev => ({ ...prev, ...newResults }));
         setAnswers(prev => ({ ...prev, ...newAnswers }));
         
-        toast({ title: "Grading Complete!", description: `Scored ${finalActualMarks.toFixed(2)} / ${qMaxMarks}.` });
+        toast({ 
+            title: "Grading Complete!", 
+            description: `Summed Score: ${finalActualMarks.toFixed(2)} / ${qMaxMarks}` 
+        });
 
     } catch (error: any) {
         console.error("AI Grading Error", error);
@@ -379,7 +402,7 @@ export default function SolveWorksheetPage() {
                                             disabled={isAiGrading}
                                             className="bg-purple-600 hover:bg-purple-700"
                                         >
-                                            {isAiGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2 h-4 w-4" /> Check with AI</>}
+                                            {isAiGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2 h-4 w-4" /> Check with AI (Sum)</>}
                                         </Button>
                                     </div>
                                 )}

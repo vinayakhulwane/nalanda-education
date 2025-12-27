@@ -33,7 +33,6 @@ interface WorksheetResultsProps {
 
 // --- HELPER COMPONENTS ---
 
-// 1. Currency Icons
 const currencyIcons: Record<string, React.ElementType> = {
   coin: Coins,
   gold: Crown,
@@ -48,20 +47,15 @@ const currencyColors: Record<string, string> = {
   diamond: 'text-blue-500',
 };
 
-// 2. Helper to clean text
 const processedMainQuestionText = (text: string) => {
     if (!text) return '';
     return text.replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' ');
 };
 
 const formatCriterionKey = (key: string) => {
-    return key
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/^./, (str) => str.toUpperCase())
-        .trim();
+    return key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim();
 };
 
-// 3. "Smart" Rubric Table with Progress Bars
 const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record<string, any> | null, breakdown: Record<string, number>, maxMarks?: number }) => {
     if (!breakdown || Object.keys(breakdown).length === 0) return null;
 
@@ -118,13 +112,12 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
     );
 };
 
-// 4. Standard Answer Helper
+// Answer Helpers
 const getAnswerText = (subQuestion: SubQuestion, answer: any) => {
   if (answer === null || answer === undefined || answer === '') return 'Not Answered';
   switch (subQuestion.answerType) {
     case 'numerical':
-    case 'text':
-      return answer.toString();
+    case 'text': return answer.toString();
     case 'mcq':
       const optionMap = new Map(subQuestion.mcqAnswer?.options.map(o => [o.id, o.text]));
       if (subQuestion.mcqAnswer?.isMultiCorrect) {
@@ -133,8 +126,7 @@ const getAnswerText = (subQuestion: SubQuestion, answer: any) => {
         return answers.map(id => optionMap.get(id)).join(', ');
       }
       return optionMap.get(answer) || 'N/A';
-    default:
-      return 'N/A';
+    default: return 'N/A';
   }
 }
 
@@ -170,32 +162,63 @@ export function WorksheetResults({
   const [isClaiming, setIsClaiming] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
 
-  // Settings & Score Calculation
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
   const { data: settings } = useDoc<EconomySettings>(settingsRef);
 
+  // ✅ SCORE CALCULATION: Re-Calculates Sum of Rubric Parts
   const { totalMarks, score, calculatedRewards } = useMemo(() => {
     let totalMarks = 0;
     let score = 0;
 
     questions.forEach(q => {
-      const isAiGraded = q.gradingMode === 'ai';
-      q.solutionSteps.forEach(step => {
-        step.subQuestions.forEach(subQ => {
-          totalMarks += subQ.marks;
-          const result = results[subQ.id];
-          if (!result) return;
-          
-          // --- THIS IS THE FIX ---
-          // For AI questions, 'result.score' now holds the CORRECT calculated marks (not a percentage).
-          // For System questions, 'result.score' is undefined, so we use the old logic.
-          if (isAiGraded && typeof result.score === 'number') {
-              score += result.score;
-          } else if (result.isCorrect) {
-              score += subQ.marks;
-          }
-        });
-      });
+        const isAiGraded = q.gradingMode === 'ai';
+
+        if (isAiGraded) {
+            // 1. Calculate Max Marks
+            const qTotalMarks = q.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
+            totalMarks += qTotalMarks;
+
+            // 2. Re-calculate score from Rubric Breakdown (Source of Truth)
+            const firstSubId = q.solutionSteps[0]?.subQuestions[0]?.id;
+            const result = results[firstSubId];
+            
+            if (result) {
+                let calculatedSum = 0;
+                const breakdown = (result as any).aiBreakdown || {};
+                const rubric = q.aiRubric || {};
+
+                // If we have breakdown data, sum it up manually to ensure accuracy
+                if (Object.keys(breakdown).length > 0 && Object.keys(rubric).length > 0) {
+                    Object.entries(rubric).forEach(([key, weight]) => {
+                        const cleanKey = formatCriterionKey(key);
+                        const scoreVal = breakdown[key] ?? breakdown[cleanKey] ?? 0;
+                        const weightVal = typeof weight === 'string' ? parseFloat(weight) : (weight as number);
+                        
+                        // Formula: (Score / 100) * (Weight / 100) * MaxMarks
+                        calculatedSum += (scoreVal / 100) * (weightVal / 100) * qTotalMarks;
+                    });
+                    score += calculatedSum;
+                } else {
+                    // Fallback: Use saved score if breakdown is missing
+                    // With safety check for percentages
+                    let val = Number(result.score || 0);
+                    if (val > qTotalMarks) {
+                        val = (val / 100) * qTotalMarks;
+                    }
+                    score += val;
+                }
+            }
+        } else {
+            // System Grading
+            q.solutionSteps.forEach(step => {
+                step.subQuestions.forEach(subQ => {
+                    totalMarks += subQ.marks;
+                    if (results[subQ.id]?.isCorrect) {
+                        score += subQ.marks;
+                    }
+                })
+            });
+        }
     });
 
     const calculatedRewards = user?.uid 
@@ -271,7 +294,6 @@ export function WorksheetResults({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-4 text-center my-6">
-            {/* Stats Cards */}
             <div className="p-4 bg-muted/50 rounded-lg">
               <Timer className="h-6 w-6 mx-auto text-muted-foreground" />
               <p className="text-2xl font-bold mt-2">{Math.floor(timeTaken / 60)}m {timeTaken % 60}s</p>
@@ -279,6 +301,7 @@ export function WorksheetResults({
             </div>
             <div className="p-4 bg-muted/50 rounded-lg">
               <CheckCircle className="h-6 w-6 mx-auto text-muted-foreground" />
+              {/* Score Display */}
               <p className="text-2xl font-bold mt-2">{Number(score).toFixed(2)} / {totalMarks}</p>
               <p className="text-xs text-muted-foreground">Marks Scored</p>
             </div>
@@ -311,7 +334,6 @@ export function WorksheetResults({
 
           <Separator className="my-8" />
 
-          {/* Question Review Section */}
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-center">Question Review</h3>
             
@@ -339,12 +361,14 @@ export function WorksheetResults({
 
                         <div className="p-4 space-y-4">
                             <AIRubricBreakdown rubric={question.aiRubric || null} breakdown={breakdown} maxMarks={qMaxMarks} />
+                            
                             {feedback && (
                                 <div className="bg-muted/50 p-3 rounded-md text-sm">
                                     <p className="font-semibold text-purple-700 mb-1 flex items-center gap-2"><CheckCircle className="h-4 w-4" /> AI Feedback</p>
                                     <p className="text-muted-foreground whitespace-pre-wrap">{feedback}</p>
                                 </div>
                             )}
+
                             {driveLink && (
                                 <div className="flex justify-end">
                                     <Button variant="outline" size="sm" asChild>
@@ -361,7 +385,6 @@ export function WorksheetResults({
                   );
               }
 
-              // Standard System Grading
               return (
                 <div key={question.id}>
                   <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words">
