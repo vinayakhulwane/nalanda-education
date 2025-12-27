@@ -170,7 +170,13 @@ export interface Worksheet {
 }
 
 export type AnswerState = { [subQuestionId: string]: { answer: any } };
-export type ResultState = { [subQuestionId: string]: { isCorrect: boolean } };
+export type ResultState = {
+  [subQuestionId: string]: {
+    isCorrect: boolean;
+    score?: number;       // ✅ Added: Optional score for AI grading
+    feedback?: string;    // ✅ Added: Optional text feedback from AI
+  }
+};
 
 
 export interface WorksheetAttempt {
