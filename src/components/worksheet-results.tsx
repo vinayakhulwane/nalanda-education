@@ -78,7 +78,6 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
                     const percentageScore = breakdown[rawKey] ?? breakdown[criterion] ?? 0; 
                     const weightPct = typeof rawWeight === 'string' ? parseFloat(rawWeight) : (rawWeight as number);
                     
-                    // MATH: (AI Score / 100) * (Weight / 100) * Total Question Marks
                     const maxCategoryMarks = (weightPct / 100) * maxMarks;
                     const earnedCategoryMarks = (percentageScore / 100) * maxCategoryMarks;
 
@@ -102,7 +101,6 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
                                     <span className="text-muted-foreground ml-1">/ {maxCategoryMarks.toFixed(2)}</span>
                                 </div>
                             </div>
-                            {/* Statistical Bar */}
                             <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                                 <div 
                                     className={cn(
@@ -181,28 +179,23 @@ export function WorksheetResults({
     let score = 0;
 
     questions.forEach(q => {
-        // ✅ 1. Check if this is an AI question
-        const isAiGraded = q.gradingMode === 'ai';
-
-        q.solutionSteps.forEach(step => {
-            step.subQuestions.forEach(subQ => {
-                totalMarks += subQ.marks;
-                
-                const result = results[subQ.id];
-                if (!result) return;
-
-                // ✅ 2. Branching Logic for AI Partial Marks
-                if (isAiGraded) {
-                    // AI: Use the specific numeric score stored in the result
-                    score += Number(result.score || 0);
-                } else {
-                    // System: Use standard boolean check
-                    if (result.isCorrect) {
-                        score += subQ.marks;
-                    }
-                }
-            })
+      const isAiGraded = q.gradingMode === 'ai';
+      q.solutionSteps.forEach(step => {
+        step.subQuestions.forEach(subQ => {
+          totalMarks += subQ.marks;
+          const result = results[subQ.id];
+          if (!result) return;
+          
+          // --- THIS IS THE FIX ---
+          // For AI questions, 'result.score' now holds the CORRECT calculated marks (not a percentage).
+          // For System questions, 'result.score' is undefined, so we use the old logic.
+          if (isAiGraded && typeof result.score === 'number') {
+              score += result.score;
+          } else if (result.isCorrect) {
+              score += subQ.marks;
+          }
         });
+      });
     });
 
     const calculatedRewards = user?.uid 
@@ -286,7 +279,6 @@ export function WorksheetResults({
             </div>
             <div className="p-4 bg-muted/50 rounded-lg">
               <CheckCircle className="h-6 w-6 mx-auto text-muted-foreground" />
-              {/* ✅ UPDATED: Shows 2 decimal places for AI scores */}
               <p className="text-2xl font-bold mt-2">{Number(score).toFixed(2)} / {totalMarks}</p>
               <p className="text-xs text-muted-foreground">Marks Scored</p>
             </div>
@@ -299,7 +291,6 @@ export function WorksheetResults({
                     const Icon = currencyIcons[currency];
                     const color = currencyColors[currency];
                     if (!Icon) return null;
-                    // ✅ UPDATED: Rewards might be decimals now
                     return <div key={currency} className={cn("flex items-center gap-1 font-bold", color)}><Icon className="h-5 w-5" /><span>{Number(amount).toFixed(0)}</span></div>;
                   })
                 ) : <p className="text-2xl font-bold">0</p>}
@@ -320,21 +311,17 @@ export function WorksheetResults({
 
           <Separator className="my-8" />
 
-          {/* ✅ UPDATED REVIEW SECTION */}
+          {/* Question Review Section */}
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-center">Question Review</h3>
             
             {questions.map((question, qIndex) => {
-              // --- AI GRADING LOGIC ---
               if (question.gradingMode === 'ai') {
                   const firstSub = question.solutionSteps[0]?.subQuestions[0];
                   const result = results[firstSub?.id];
-                  // Safe access to AI props
                   const breakdown = (result as any)?.aiBreakdown;
                   const feedback = result?.feedback;
                   const driveLink = answers[firstSub?.id]?.answer;
-                  
-                  // Calculate Max Marks for this question for the bar chart
                   const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
 
                   return (
@@ -351,20 +338,13 @@ export function WorksheetResults({
                         </div>
 
                         <div className="p-4 space-y-4">
-                            {/* Rubric Table */}
                             <AIRubricBreakdown rubric={question.aiRubric || null} breakdown={breakdown} maxMarks={qMaxMarks} />
-
-                            {/* Feedback */}
                             {feedback && (
                                 <div className="bg-muted/50 p-3 rounded-md text-sm">
-                                    <p className="font-semibold text-purple-700 mb-1 flex items-center gap-2">
-                                        <CheckCircle className="h-4 w-4" /> AI Feedback
-                                    </p>
+                                    <p className="font-semibold text-purple-700 mb-1 flex items-center gap-2"><CheckCircle className="h-4 w-4" /> AI Feedback</p>
                                     <p className="text-muted-foreground whitespace-pre-wrap">{feedback}</p>
                                 </div>
                             )}
-
-                            {/* Drive Link Button */}
                             {driveLink && (
                                 <div className="flex justify-end">
                                     <Button variant="outline" size="sm" asChild>
@@ -381,7 +361,7 @@ export function WorksheetResults({
                   );
               }
 
-              // --- STANDARD SYSTEM GRADING LOGIC (Existing) ---
+              // Standard System Grading
               return (
                 <div key={question.id}>
                   <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words">

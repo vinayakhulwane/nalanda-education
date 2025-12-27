@@ -24,6 +24,7 @@ import { AIAnswerUploader } from '@/components/solve/ai-answer-uploader';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+// Helper Formatters
 function formatTime(seconds: number) {
   const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
   const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
@@ -37,13 +38,10 @@ const processedMainQuestionText = (text: string) => {
 };
 
 const formatCriterionKey = (key: string) => {
-    return key
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/^./, (str) => str.toUpperCase())
-        .trim();
+    return key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim();
 };
 
-// ✅ UPDATED: Statistical Bar-Chart Rubric Breakdown
+// --- RUBRIC COMPONENT ---
 const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record<string, any> | null, breakdown: Record<string, number>, maxMarks?: number }) => {
     if (!breakdown || Object.keys(breakdown).length === 0) return null;
 
@@ -60,7 +58,6 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
                     const percentageScore = breakdown[rawKey] ?? breakdown[criterion] ?? 0; 
                     const weightPct = typeof rawWeight === 'string' ? parseFloat(rawWeight) : (rawWeight as number);
                     
-                    // MATH: (AI Score / 100) * (Weight / 100) * Total Question Marks
                     const maxCategoryMarks = (weightPct / 100) * maxMarks;
                     const earnedCategoryMarks = (percentageScore / 100) * maxCategoryMarks;
 
@@ -101,6 +98,7 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
     );
 };
 
+// --- MAIN PAGE COMPONENT ---
 export default function SolveWorksheetPage() {
   const router = useRouter();
   const params = useParams();
@@ -119,6 +117,7 @@ export default function SolveWorksheetPage() {
   const [aiImages, setAiImages] = useState<Record<string, File | null>>({});
   const [isAiGrading, setIsAiGrading] = useState(false);
 
+  // Firestore Refs
   const worksheetRef = useMemoFirebase(() => (firestore && worksheetId ? doc(firestore, 'worksheets', worksheetId) : null), [firestore, worksheetId]);
   const { data: worksheet, isLoading: isWorksheetLoading } = useDoc<Worksheet>(worksheetRef);
 
@@ -128,6 +127,7 @@ export default function SolveWorksheetPage() {
   }, [firestore, worksheet?.questions]);
   const { data: questions, isLoading: areQuestionsLoading } = useCollection<Question>(questionsQuery);
   
+  // Existing Attempt Check
   useEffect(() => {
     const checkExistingAttempt = async () => {
         if (user && firestore && userProfile?.completedWorksheets?.includes(worksheetId)) {
@@ -148,28 +148,54 @@ export default function SolveWorksheetPage() {
     checkExistingAttempt();
   }, [user, firestore, worksheetId, userProfile?.completedWorksheets]);
 
+  // Order Questions
   const orderedQuestions = useMemo(() => {
     if (!worksheet?.questions || !questions) return [];
     const questionsMap = new Map(questions.map(q => [q.id, q]));
     return worksheet.questions.map(id => questionsMap.get(id)).filter(Boolean) as Question[];
   }, [worksheet?.questions, questions]);
 
+  // Timer Logic
   const { totalMarks, totalDuration } = useMemo(() => {
     if (!orderedQuestions) return { totalMarks: 0, totalDuration: 0 };
-    const marks = orderedQuestions.reduce((total, question) => {
-      return total + (question.solutionSteps?.reduce((stepSum, step) => stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0);
-    }, 0);
-    return { totalMarks: marks, totalDuration: marks > 0 ? marks * 20 : 60 };
+    
+    let marks = 0;
+    let duration = 0;
+
+    orderedQuestions.forEach((question) => {
+        const qMarks = question.solutionSteps?.reduce((stepSum, step) => stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
+        marks += qMarks;
+
+        let qTime = qMarks > 0 ? qMarks * 20 : 60;
+        
+        // Add 40s for AI questions (case insensitive check)
+        const mode = question.gradingMode?.toLowerCase();
+        if (mode === 'ai') {
+            qTime += 40;
+        }
+
+        duration += qTime;
+    });
+
+    return { totalMarks: marks, totalDuration: duration };
   }, [orderedQuestions]);
 
   const [timeLeft, setTimeLeft] = useState(totalDuration);
   const [startTime, setStartTime] = useState<Date | null>(null);
 
-   useEffect(() => { if (totalDuration > 0) setTimeLeft(totalDuration); }, [totalDuration]);
+   // Sync timer with calculated duration
+   useEffect(() => { 
+       if (totalDuration > 0 && !startTime) setTimeLeft(totalDuration); 
+   }, [totalDuration, startTime]);
+
    useEffect(() => {
+    // Stop timer if finished or grading
     if (startTime && !isFinished) {
        if (timeLeft <= 0) { handleFinish(); return; }
-       const timerId = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+       
+       const timerId = setInterval(() => {
+           setTimeLeft(prev => Math.max(0, prev - 1));
+       }, 1000);
        return () => clearInterval(timerId);
     }
   }, [timeLeft, startTime, isFinished]);
@@ -206,7 +232,7 @@ export default function SolveWorksheetPage() {
         formData.append('image', imageFile);
         formData.append('questionText', question.mainQuestionText);
         
-        // Calculate current question total marks for the backend
+        // Calculate max marks for this specific question
         const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
         formData.append('totalMarks', qMaxMarks.toString());
 
@@ -220,23 +246,25 @@ export default function SolveWorksheetPage() {
         }
         const aiResult = await response.json();
 
-        if (typeof aiResult.totalScore !== 'number') throw new Error("AI response format was invalid");
-
         const subQuestionIds = question.solutionSteps.flatMap(s => s.subQuestions).map(sq => sq.id);
         const newResults: ResultState = {};
         const newAnswers: AnswerState = {};
         
-        // ✅ CONVERSION: Turn AI percentage into Actual Marks
-        const finalActualMarks = (aiResult.totalScore / 100) * qMaxMarks;
+        // --- THIS IS THE FIX ---
+        // Convert the AI's percentage score (0-100) to actual marks (0-qMaxMarks)
+        const rawScore = parseFloat(aiResult.totalScore);
+        const finalActualMarks = (rawScore / 100) * qMaxMarks;
 
         subQuestionIds.forEach(id => {
+            // Store the converted marks, not the raw percentage
             newResults[id] = {
-                isCorrect: aiResult.totalScore >= 50,
-                score: finalActualMarks, 
+                isCorrect: rawScore >= 50,
+                score: finalActualMarks,
                 feedback: aiResult.feedback,
                 aiBreakdown: aiResult.breakdown 
             } as any; 
             
+            // Store the Drive link as the "answer" for review purposes
             newAnswers[id] = { answer: aiResult.driveLink };
         });
 
