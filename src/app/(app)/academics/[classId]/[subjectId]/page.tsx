@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+// ✅ Switched to standard functions for Modal safety
 import { arrayRemove, arrayUnion, collection, doc, updateDoc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
 import type { Subject, CustomTab, CurrencyType } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -24,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { UnlockContentCard } from "@/components/academics/unlock-content-card";
 
-// ✅ DYNAMIC IMPORTS
+// Dynamic Imports
 const SyllabusEditor = dynamic(
   () => import('@/components/academics/syllabus-editor'), 
   { loading: () => <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin" /></div> }
@@ -53,6 +54,7 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     const { toast } = useToast();
     
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [isSaving, setIsSaving] = useState(false); // ✅ Added Global Saving State
     
     // Custom Tab Dialog States
     const [isAddTabDialogOpen, setAddTabDialogOpen] = useState(false);
@@ -85,26 +87,36 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         }
     }, [userProfile, isUserProfileLoading, router]);
 
+    // ✅ FIXED: Async Handler
     const handleAddCustomTab = async () => {
         if (!firestore || !newTabName.trim() || !subjectId) return;
+        setIsSaving(true);
 
-        const newTab: CustomTab = {
-            id: uuidv4(),
-            label: newTabName,
-            content: `Content for ${newTabName} goes here. Edit me!`,
-            cost: tabCost > 0 ? tabCost : 0, 
-            currency: tabCurrency || 'coin',
-        };
+        try {
+            const newTab: CustomTab = {
+                id: uuidv4(),
+                label: newTabName,
+                content: `Content for ${newTabName} goes here. Edit me!`,
+                cost: tabCost > 0 ? tabCost : 0, 
+                currency: tabCurrency || 'coin',
+            };
 
-        const subjectRef = doc(firestore, 'subjects', subjectId);
-        await updateDoc(subjectRef, {
-            customTabs: arrayUnion(newTab)
-        });
+            const subjectRef = doc(firestore, 'subjects', subjectId);
+            await updateDoc(subjectRef, {
+                customTabs: arrayUnion(newTab)
+            });
 
-        setNewTabName('');
-        setTabCost(0);
-        setTabCurrency('coin');
-        setAddTabDialogOpen(false);
+            setNewTabName('');
+            setTabCost(0);
+            setTabCurrency('coin');
+            setAddTabDialogOpen(false);
+            toast({ title: "Success", description: "Tab created successfully." });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to create tab." });
+        } finally {
+            setIsSaving(false);
+        }
     }
     
     const openEditTabDialog = (tab: CustomTab) => {
@@ -115,18 +127,29 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         setEditTabDialogOpen(true);
     };
 
+    // ✅ FIXED: Async Handler
     const handleEditCustomTab = async () => {
         if (!firestore || !editedTabName.trim() || !subject || !editingTab) return;
-        const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {
-            ...t, 
-            label: editedTabName,
-            cost: tabCost > 0 ? tabCost : 0, 
-            currency: tabCurrency || 'coin',
-        } : t);
-        const subjectRef = doc(firestore, 'subjects', subjectId);
-        await updateDoc(subjectRef, { customTabs: updatedTabs });
-        setEditTabDialogOpen(false);
-        setEditingTab(null);
+        setIsSaving(true);
+
+        try {
+            const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {
+                ...t, 
+                label: editedTabName,
+                cost: tabCost > 0 ? tabCost : 0, 
+                currency: tabCurrency || 'coin',
+            } : t);
+            const subjectRef = doc(firestore, 'subjects', subjectId);
+            await updateDoc(subjectRef, { customTabs: updatedTabs });
+            setEditTabDialogOpen(false);
+            setEditingTab(null);
+            toast({ title: "Saved", description: "Tab updated successfully." });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to update tab." });
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     const openDeleteTabDialog = (tab: CustomTab) => {
@@ -134,12 +157,22 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         setDeleteTabDialogOpen(true);
     };
     
+    // ✅ FIXED: Async Handler
     const handleDeleteCustomTab = async () => {
         if (!firestore || !deletingTab || !subject) return;
-        const subjectRef = doc(firestore, 'subjects', subjectId);
-        await updateDoc(subjectRef, { customTabs: arrayRemove(deletingTab) });
-        setDeleteTabDialogOpen(false);
-        setDeletingTab(null);
+        setIsSaving(true);
+        try {
+            const subjectRef = doc(firestore, 'subjects', subjectId);
+            await updateDoc(subjectRef, { customTabs: arrayRemove(deletingTab) });
+            setDeleteTabDialogOpen(false);
+            setDeletingTab(null);
+            toast({ title: "Deleted", description: "Tab removed." });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to delete tab." });
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     const handleToggleTabVisibility = async (tab: CustomTab) => {
@@ -155,22 +188,42 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         setEditTabContentDialogOpen(true);
     }
 
+    // ✅ FIXED: Async Handler
     const handleEditTabContent = async () => {
         if (!firestore || !subject || !editingTab) return;
-        const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {...t, content: editedTabContent} : t);
-        const subjectRef = doc(firestore, 'subjects', subjectId);
-        await updateDoc(subjectRef, { customTabs: updatedTabs });
-        setEditTabContentDialogOpen(false);
-        setEditingTab(null);
+        setIsSaving(true);
+        try {
+            const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {...t, content: editedTabContent} : t);
+            const subjectRef = doc(firestore, 'subjects', subjectId);
+            await updateDoc(subjectRef, { customTabs: updatedTabs });
+            setEditTabContentDialogOpen(false);
+            setEditingTab(null);
+            toast({ title: "Saved", description: "Content updated." });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to save content." });
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     const handleEnrollment = async () => {
         if (!firestore || !user || isUserBlocked) return;
-        const userDocRef = doc(firestore, 'users', user.uid);
-        if (isEnrolled) {
-            await updateDoc(userDocRef, { enrollments: arrayRemove(subjectId) });
-        } else {
-            await updateDoc(userDocRef, { enrollments: arrayUnion(subjectId) });
+        setIsSaving(true);
+        try {
+            const userDocRef = doc(firestore, 'users', user.uid);
+            if (isEnrolled) {
+                await updateDoc(userDocRef, { enrollments: arrayRemove(subjectId) });
+                toast({ title: "Unenrolled", description: "You have left this subject." });
+            } else {
+                await updateDoc(userDocRef, { enrollments: arrayUnion(subjectId) });
+                toast({ title: "Enrolled!", description: "Welcome to the class." });
+            }
+        } catch (error) {
+            console.error(error);
+            toast({ variant: "destructive", title: "Error", description: "Enrollment failed." });
+        } finally {
+            setIsSaving(false);
         }
     }
     
@@ -193,30 +246,33 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
             return;
         }
 
-        const userRef = doc(firestore, 'users', user.uid);
-        const transactionRef = doc(collection(firestore, 'transactions'));
-        const batch = writeBatch(firestore);
-        
-        batch.update(userRef, {
-            [balanceField]: increment(-cost),
-            unlockedTabs: arrayUnion(tabId)
-        });
-        
-        batch.set(transactionRef, {
-            userId: user.uid,
-            type: 'spent',
-            description: `Unlocked tab: ${label}`,
-            amount: cost,
-            currency: currency,
-            createdAt: serverTimestamp(),
-        });
-        
+        setIsSaving(true);
         try {
+            const userRef = doc(firestore, 'users', user.uid);
+            const transactionRef = doc(collection(firestore, 'transactions'));
+            const batch = writeBatch(firestore);
+            
+            batch.update(userRef, {
+                [balanceField]: increment(-cost),
+                unlockedTabs: arrayUnion(tabId)
+            });
+            
+            batch.set(transactionRef, {
+                userId: user.uid,
+                type: 'spent',
+                description: `Unlocked tab: ${label}`,
+                amount: cost,
+                currency: currency,
+                createdAt: serverTimestamp(),
+            });
+            
             await batch.commit();
             toast({ title: 'Tab Unlocked!', description: `You can now view the content of "${label}".` });
         } catch (error) {
             console.error("Error unlocking tab:", error);
             toast({ variant: 'destructive', title: 'Unlock Failed', description: 'Could not complete the transaction.' });
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -257,7 +313,8 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                 </div>
                  {userProfile?.role === 'student' && (
                     <div className="mt-4">
-                        <Button onClick={handleEnrollment} disabled={isUserBlocked}>
+                        <Button onClick={handleEnrollment} disabled={isUserBlocked || isSaving}>
+                           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                            {isUserBlocked ? (
                                 <>
                                     <ShieldAlert className="mr-2" /> Blocked
@@ -391,7 +448,7 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
             )}
 
             {/* Add/Edit Tab Dialog */}
-            <Dialog open={isAddTabDialogOpen || isEditTabDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setAddTabDialogOpen(false); setEditTabDialogOpen(false); }}}>
+            <Dialog open={isAddTabDialogOpen || isEditTabDialogOpen} onOpenChange={(open) => !open && !isSaving && (setAddTabDialogOpen(false), setEditTabDialogOpen(false))}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{isEditTabDialogOpen ? "Edit Tab Details" : "Add New Tab"}</DialogTitle>
@@ -400,13 +457,13 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                     <div className="grid gap-4 py-4">
                         <div className="space-y-2">
                           <Label htmlFor="tab-name">Tab Name</Label>
-                          <Input id="tab-name" value={isEditTabDialogOpen ? editedTabName : newTabName} onChange={e => isEditTabDialogOpen ? setEditedTabName(e.target.value) : setNewTabName(e.target.value)} placeholder="e.g., PDF Notes"/>
+                          <Input id="tab-name" value={isEditTabDialogOpen ? editedTabName : newTabName} onChange={e => isEditTabDialogOpen ? setEditedTabName(e.target.value) : setNewTabName(e.target.value)} placeholder="e.g., PDF Notes" disabled={isSaving}/>
                         </div>
                          <div className="space-y-2">
                            <Label>Cost (Optional)</Label>
                            <div className="flex gap-2">
-                             <Input id="tab-cost" type="number" placeholder="e.g. 50" value={tabCost || ''} onChange={e => setTabCost(Number(e.target.value))} className="w-1/2"/>
-                              <Select value={tabCurrency} onValueChange={(v: any) => setTabCurrency(v)}>
+                             <Input id="tab-cost" type="number" placeholder="e.g. 50" value={tabCost || ''} onChange={e => setTabCost(Number(e.target.value))} className="w-1/2" disabled={isSaving}/>
+                              <Select value={tabCurrency} onValueChange={(v: any) => setTabCurrency(v)} disabled={isSaving}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="coin">Coins</SelectItem>
@@ -418,14 +475,17 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                          </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => { setAddTabDialogOpen(false); setEditTabDialogOpen(false); }}>Cancel</Button>
-                        <Button onClick={isEditTabDialogOpen ? handleEditCustomTab : handleAddCustomTab}>Save</Button>
+                        <Button variant="outline" onClick={() => { setAddTabDialogOpen(false); setEditTabDialogOpen(false); }} disabled={isSaving}>Cancel</Button>
+                        <Button onClick={isEditTabDialogOpen ? handleEditCustomTab : handleAddCustomTab} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Edit Tab Content Dialog */}
-             <Dialog open={isEditTabContentDialogOpen} onOpenChange={setEditTabContentDialogOpen}>
+             <Dialog open={isEditTabContentDialogOpen} onOpenChange={(open) => !open && !isSaving && setEditTabContentDialogOpen(false)}>
                 <DialogContent className="sm:max-w-[800px]">
                     <DialogHeader>
                         <DialogTitle>Edit Content</DialogTitle>
@@ -435,15 +495,18 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                         <RichTextEditor value={editedTabContent} onChange={setEditedTabContent} />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setEditTabContentDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleEditTabContent}>Save Content</Button>
+                        <Button variant="outline" onClick={() => setEditTabContentDialogOpen(false)} disabled={isSaving}>Cancel</Button>
+                        <Button onClick={handleEditTabContent} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Content
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
 
              {/* Delete Tab Dialog */}
-            <AlertDialog open={isDeleteTabDialogOpen} onOpenChange={setDeleteTabDialogOpen}>
+            <AlertDialog open={isDeleteTabDialogOpen} onOpenChange={(open) => !open && !isSaving && setDeleteTabDialogOpen(false)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -452,8 +515,9 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setDeleteTabDialogOpen(false)}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteCustomTab} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        <AlertDialogCancel onClick={() => setDeleteTabDialogOpen(false)} disabled={isSaving}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteCustomTab} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Delete Tab
                         </AlertDialogAction>
                     </AlertDialogFooter>

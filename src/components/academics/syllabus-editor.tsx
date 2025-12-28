@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion } from "@/components/ui/accordion";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Loader2, PlusCircle } from "lucide-react";
+import { Loader2, PlusCircle, Plus } from "lucide-react";
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableUnitItem } from "@/components/academics/sortable-unit-item";
@@ -181,10 +181,6 @@ export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: 
         <div className="mt-6">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold font-headline">{userIsEditor ? 'Syllabus Builder' : 'Syllabus'}</h3>
-                 {userIsEditor && <Button onClick={() => setDialogType('addUnit')}>
-                    <PlusCircle className="mr-2" />
-                    Add Unit
-                </Button>}
             </div>
             
             <DndContext collisionDetection={closestCenter} onDragEnd={handleUnitDragEnd}>
@@ -202,6 +198,17 @@ export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: 
                     </Accordion>
                 </SortableContext>
             </DndContext>
+
+             {userIsEditor && (
+                <Button 
+                    variant="outline" 
+                    className="w-full justify-center text-muted-foreground hover:text-foreground mt-4"
+                    onClick={() => openDialog('addUnit')}
+                >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Unit
+                </Button>
+            )}
             
             {units?.length === 0 && (
                 <Card className="text-center py-12">
