@@ -19,36 +19,25 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    // 1. Fetch ALL attempts by the user for this subject to build the history
+    // 1. Fetch ALL attempts by the user to build the history
     const attemptsQuery = useMemoFirebase(() => {
-        if (!firestore || !user?.uid || !subjectId) return null;
+        if (!firestore || !user?.uid) return null;
         // This is a broad query, for performance at scale, you might add `subjectId` to attempts
         return query(
             collection(firestore, 'worksheet_attempts'),
             where('userId', '==', user.uid),
             orderBy('attemptedAt', 'desc')
         );
-    }, [firestore, user, subjectId]);
+    }, [firestore, user]);
     const { data: allAttempts, isLoading: areAttemptsLoading } = useCollection<WorksheetAttempt>(attemptsQuery);
     
-    // 2. From attempts, get the list of worksheet IDs
-    const attemptedWorksheetIds = useMemo(() => {
+    // 2. From all attempts, get the unique IDs of all worksheets ever attempted by the user
+    const allAttemptedWorksheetIds = useMemo(() => {
         if (!allAttempts) return [];
         return [...new Set(allAttempts.map(a => a.worksheetId))];
     }, [allAttempts]);
 
-    // 3. Fetch only the worksheets that have been attempted and match the subject
-    const attemptedWorksheetsQuery = useMemoFirebase(() => {
-        if (!firestore || attemptedWorksheetIds.length === 0) return null;
-        return query(
-            collection(firestore, 'worksheets'),
-            where(documentId(), 'in', attemptedWorksheetIds.slice(0, 30)),
-            where('subjectId', '==', subjectId)
-        );
-    }, [firestore, attemptedWorksheetIds, subjectId]);
-    const { data: completedWorksheets, isLoading: areCompletedWorksheetsLoading } = useCollection<Worksheet>(attemptedWorksheetsQuery);
-
-    // 4. Fetch the worksheets created by the user (for the "To-Do" list)
+    // 3. Fetch all practice worksheets for this subject authored by the user
     const userCreatedWorksheetsQuery = useMemoFirebase(() => {
         if (!firestore || !user?.uid || !subjectId) return null;
         return query(
@@ -59,6 +48,18 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
         );
     }, [firestore, user, subjectId]);
     const { data: userCreatedWorksheets, isLoading: areUserCreatedLoading } = useCollection<Worksheet>(userCreatedWorksheetsQuery);
+
+    // 4. From the attempted worksheet IDs, fetch only the ones that match the current subject.
+    // This gives us our "completed" list.
+    const completedWorksheetsQuery = useMemoFirebase(() => {
+        if (!firestore || allAttemptedWorksheetIds.length === 0) return null;
+        return query(
+            collection(firestore, 'worksheets'),
+            where(documentId(), 'in', allAttemptedWorksheetIds.slice(0, 30)),
+            where('subjectId', '==', subjectId)
+        );
+    }, [firestore, allAttemptedWorksheetIds, subjectId]);
+    const { data: completedWorksheets, isLoading: areCompletedWorksheetsLoading } = useCollection<Worksheet>(completedWorksheetsQuery);
     
     // --- Data Processing ---
     const { notCompleted, attemptsMap, totalPages, paginatedCompleted } = useMemo(() => {
@@ -66,18 +67,24 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
             return { notCompleted: [], attemptsMap: new Map(), totalPages: 1, paginatedCompleted: [] };
         }
 
+        // The "To-Do" list is user-created worksheets MINUS the ones that are in the completed list.
         const completedIds = new Set(completedWorksheets.map(ws => ws.id));
         const notCompletedWorksheets = userCreatedWorksheets.filter(ws => !completedIds.has(ws.id));
         
+        // Map attempts to their worksheet ID for easy lookup
         const latestAttemptsMap = new Map<string, WorksheetAttempt>();
         allAttempts.forEach(attempt => {
-            const existing = latestAttemptsMap.get(attempt.worksheetId);
-            if (!existing || (attempt.attemptedAt && existing.attemptedAt && attempt.attemptedAt.toMillis() > existing.attemptedAt.toMillis())) {
-                latestAttemptsMap.set(attempt.worksheetId, attempt);
+            // Only consider attempts for worksheets of the current subject.
+            if(completedWorksheets.some(ws => ws.id === attempt.worksheetId)) {
+                const existing = latestAttemptsMap.get(attempt.worksheetId);
+                // Store only the most recent attempt for each worksheet
+                if (!existing || (attempt.attemptedAt && existing.attemptedAt && attempt.attemptedAt.toMillis() > existing.attemptedAt.toMillis())) {
+                    latestAttemptsMap.set(attempt.worksheetId, attempt);
+                }
             }
         });
         
-        // Sort completed worksheets by the date of their latest attempt
+        // Sort completed worksheets by the date of their latest attempt for chronological history
         const sortedCompleted = [...completedWorksheets].sort((a, b) => {
             const timeA = latestAttemptsMap.get(a.id)?.attemptedAt?.toMillis() || 0;
             const timeB = latestAttemptsMap.get(b.id)?.attemptedAt?.toMillis() || 0;
@@ -151,7 +158,7 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                                 <div className="flex justify-center items-center h-48 col-span-full">
                                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                                 </div>
-                            ) : (
+                            ) : paginatedCompleted.length > 0 ? (
                                 paginatedCompleted.map(ws => (
                                     <WorksheetDisplayCard 
                                         key={ws.id} 
@@ -161,13 +168,12 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                                         attempt={attemptsMap.get(ws.id)}
                                     />
                                 ))
+                            ) : (
+                                <div className="text-center text-muted-foreground py-10 mt-4">
+                                    <p>Your completed practice worksheets will appear here.</p>
+                                </div>
                             )}
                         </div>
-                         {completedWorksheets && completedWorksheets.length === 0 && !isLoading && (
-                            <div className="text-center text-muted-foreground py-10 mt-4">
-                                <p>Your completed practice worksheets will appear here.</p>
-                            </div>
-                        )}
                         {completedWorksheets && completedWorksheets.length > 0 && !isLoading && totalPages > 1 && (
                             <div className="flex items-center justify-between mt-4">
                                 <span className="text-sm text-muted-foreground">
