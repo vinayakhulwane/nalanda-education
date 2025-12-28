@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch, documentId, getDocs, limit, orderBy } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home } from "lucide-react";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, use } from "react";
 import type { Subject, Unit, Category, CustomTab, Worksheet, WorksheetAttempt } from "@/types";
@@ -396,6 +396,100 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     )
 }
 
+// ✅ NEW LEADERBOARD COMPONENT (Updated with robust name checking)
+function Leaderboard({ subjectId }: { subjectId: string }) {
+    const firestore = useFirestore();
+    const [students, setStudents] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [sortBy, setSortBy] = useState<'coins' | 'gold' | 'diamonds'>('coins');
+
+    useEffect(() => {
+        async function fetchStudents() {
+            if (!firestore) return;
+            try {
+                // Fetch users enrolled in this subject
+                const q = query(collection(firestore, 'users'), where('enrollments', 'array-contains', subjectId));
+                const snapshot = await getDocs(q);
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setStudents(data);
+            } catch (e) {
+                console.error("Failed to fetch leaderboard", e);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        fetchStudents();
+    }, [firestore, subjectId]);
+
+    const sortedStudents = useMemo(() => {
+        return [...students].sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+    }, [students, sortBy]);
+
+    const getMedalColor = (index: number) => {
+        switch(index) {
+            case 0: return "text-yellow-500"; // Gold
+            case 1: return "text-slate-400";   // Silver
+            case 2: return "text-amber-600";  // Bronze
+            default: return "text-muted-foreground";
+        }
+    };
+
+    // Helper to find a display name from various possible fields
+    const getStudentName = (student: any) => {
+        if (student.displayName) return student.displayName;
+        if (student.name) return student.name;
+        if (student.firstName) return `${student.firstName} ${student.lastName || ''}`.trim();
+        if (student.email) return student.email.split('@')[0]; // Fallback to email username
+        return "Unknown Student";
+    };
+
+    if (isLoading) return <div className="flex h-48 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+
+    return (
+        <Card className="mt-6">
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-yellow-500"/> Class Leaderboard</CardTitle>
+                    <CardDescription>Top achievers in this subject.</CardDescription>
+                </div>
+                <div className="flex bg-muted rounded-lg p-1">
+                    <Button variant={sortBy === 'coins' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('coins')} className="h-8 gap-1"><Coins className="h-3 w-3" /> Coins</Button>
+                    <Button variant={sortBy === 'gold' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('gold')} className="h-8 gap-1"><Crown className="h-3 w-3" /> Gold</Button>
+                    <Button variant={sortBy === 'diamonds' ? 'secondary' : 'ghost'} size="sm" onClick={() => setSortBy('diamonds')} className="h-8 gap-1"><Gem className="h-3 w-3" /> Gems</Button>
+                </div>
+            </CardHeader>
+            <CardContent>
+                {students.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No students enrolled yet.</div>
+                ) : (
+                    <div className="space-y-3">
+                        {sortedStudents.map((student, index) => (
+                            <div key={student.id} className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+                                <div className="flex items-center gap-4">
+                                    <div className={`font-bold w-8 text-center text-xl ${getMedalColor(index)}`}>
+                                        {index < 3 ? <Medal className="h-6 w-6 mx-auto" /> : `#${index + 1}`}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        {/* ✅ UPDATED NAME RENDERING */}
+                                        <span className="font-semibold text-lg">{getStudentName(student)}</span>
+                                        {index === 0 && <span className="text-xs text-yellow-600 font-bold">👑 Class Topper</span>}
+                                    </div>
+                                </div>
+                                <div className="font-mono font-bold text-xl flex items-center gap-2">
+                                    {Math.floor(student[sortBy] || 0).toLocaleString()}
+                                    {sortBy === 'coins' && <Coins className="h-5 w-5 text-yellow-500" />}
+                                    {sortBy === 'gold' && <Crown className="h-5 w-5 text-amber-500" />}
+                                    {sortBy === 'diamonds' && <Gem className="h-5 w-5 text-blue-500" />}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, subjectId: string }) {
     const { user, userProfile, isUserProfileLoading } = useUser();
     const router = useRouter();
@@ -583,7 +677,7 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                     <TabsList>
                         <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
                         <TabsTrigger value="worksheet">Worksheet</TabsTrigger>
-                        <TabsTrigger value="archivers">Archivers</TabsTrigger>
+                        <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
                         {visibleCustomTabs?.map(tab => (
                              <div key={tab.id} className="relative group">
                                 <TabsTrigger value={tab.id} className={userIsEditor ? 'pr-8' : ''}>{tab.label}</TabsTrigger>
@@ -635,19 +729,12 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                         </TabsContent>
                     </Tabs>
                 </TabsContent>
-                <TabsContent value="archivers">
-                     <Card className="mt-6">
-                        <CardHeader>
-                            <CardTitle>Archivers</CardTitle>
-                            <CardDescription>Manage archived content for this subject.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-                                <p className="text-muted-foreground">Archivers are coming soon.</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                
+                {/* ✅ LEADERBOARD TAB */}
+                <TabsContent value="leaderboard">
+                     <Leaderboard subjectId={subjectId} />
                 </TabsContent>
+
                  {visibleCustomTabs?.map(tab => (
                     <TabsContent key={tab.id} value={tab.id}>
                         <Card className="mt-6">
@@ -765,5 +852,3 @@ export default function SubjectWorkspacePage({
 
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
-
-    

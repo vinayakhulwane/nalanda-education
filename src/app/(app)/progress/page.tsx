@@ -26,46 +26,63 @@ type PerformanceMetric = {
   attemptCount: number;
 };
 
-// ✅ HELPER: Robustly calculate score from attempt data
-const getAttemptStats = (a: WorksheetAttempt, allWorksheets: Map<string, Worksheet>, allQuestions: Map<string, any>) => {
-    let score = (a as any).score;
-    let total = (a as any).totalMarks;
+// ✅ HELPER: Robustly calculate score & total
+const getAttemptTotals = (a: WorksheetAttempt, worksheet: Worksheet | undefined, allQuestions: Map<string, any>) => {
+    // 1. Try to use saved summary stats (if valid)
+    // Cast to 'any' to bypass TS error for legacy fields
+    const savedScore = (a as any).score;
+    const savedTotal = (a as any).totalMarks;
 
-    const worksheet = allWorksheets.get(a.worksheetId);
-
-    if (score === undefined || total === undefined) {
-        let calculatedScore = 0;
-        let calculatedTotal = 0;
-
-        const results = (a as any).results || {};
-
-        if (worksheet) {
-            worksheet.questions.forEach(qId => {
-                const question = allQuestions.get(qId);
-                if (question) {
-                    question.solutionSteps?.forEach((step: any) => {
-                        step.subQuestions.forEach((sub: any) => {
-                            calculatedTotal += sub.marks || 0;
-                            if (results[sub.id]?.isCorrect) {
-                                calculatedScore += sub.marks || 0;
-                            } else if (results[sub.id]?.score) {
-                                // For AI grading, add the partial score
-                                calculatedScore += Number(results[sub.id].score);
-                            }
-                        });
-                    });
-                }
-            });
+    if (typeof savedScore === 'number' && typeof savedTotal === 'number' && savedTotal > 0) {
+        // Sanity Check: If score > total, it's bad data (percentage stored as score)
+        if (savedScore > savedTotal) {
+             return { score: (savedScore / 100) * savedTotal, total: savedTotal };
         }
-        
-        if (score === undefined) score = calculatedScore;
-        if (total === undefined || total === 0) total = calculatedTotal > 0 ? calculatedTotal : Math.max(score, 10);
+        return { score: savedScore, total: savedTotal };
     }
 
-    return { score: Number(score), total: Number(total) };
+    // 2. Re-calculate from scratch (The reliable way)
+    let calcScore = 0;
+    let calcTotal = 0;
+    const results = a.results || {};
+
+    if (worksheet) {
+        worksheet.questions.forEach(qId => {
+            const question = allQuestions.get(qId);
+            if (question) {
+                // Calculate Max Marks for Question
+                const qMax = question.solutionSteps?.reduce((acc: number, s: any) => acc + s.subQuestions.reduce((ss: number, sub: any) => ss + (sub.marks || 0), 0), 0) || 0;
+                calcTotal += qMax;
+
+                // Calculate Earned Score
+                let qEarned = 0;
+                question.solutionSteps?.forEach((step: any) => {
+                    step.subQuestions.forEach((sub: any) => {
+                        const res = results[sub.id];
+                        if (res) {
+                            if (typeof res.score === 'number') qEarned += res.score;
+                            else if (res.isCorrect) qEarned += (sub.marks || 0);
+                        }
+                    });
+                });
+
+                // 🛡️ SANITIZER: If individual question score > max, fix it
+                if (qEarned > qMax && qMax > 0) {
+                    qEarned = (qEarned / 100) * qMax;
+                }
+                calcScore += qEarned;
+            }
+        });
+    }
+
+    // Only return if we found valid data
+    if (calcTotal > 0) return { score: calcScore, total: calcTotal };
+    
+    return null; // Signal that this attempt is invalid/empty
 };
 
 export default function ProgressPage() {
+  // ✅ FIXED: Added isUserProfileLoading back to destructuring
   const { user, userProfile, isUserProfileLoading } = useUser();
   const firestore = useFirestore();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
@@ -109,25 +126,27 @@ export default function ProgressPage() {
     const attemptsBySubjectByDate: Record<string, Map<string, { total: number; obtained: number }>> = {};
 
     attempts.forEach(a => {
-        const w = a.worksheetId ? lookups.worksheetMap.get(a.worksheetId) : null;
+        const w = lookups.worksheetMap.get(a.worksheetId);
         if (w && stats[w.subjectId]) {
-            const { score, total } = getAttemptStats(a, lookups.worksheetMap, lookups.questionMap);
+            const data = getAttemptTotals(a, w, lookups.questionMap);
+            
+            if (data) {
+                const { score, total } = data;
+                stats[w.subjectId].obtained += score;
+                stats[w.subjectId].total += total;
+                stats[w.subjectId].count++;
 
-            stats[w.subjectId].obtained += score;
-            stats[w.subjectId].total += total;
-            stats[w.subjectId].count++;
-
-            if (!attemptsBySubjectByDate[w.subjectId]) {
-                attemptsBySubjectByDate[w.subjectId] = new Map();
-            }
-            if(a.attemptedAt) {
-                 const dateKey = format(a.attemptedAt.toDate(), 'yyyy-MM-dd');
-                 if (!attemptsBySubjectByDate[w.subjectId].has(dateKey)) {
-                     attemptsBySubjectByDate[w.subjectId].set(dateKey, { total: 0, obtained: 0 });
-                 }
-                 const dayData = attemptsBySubjectByDate[w.subjectId].get(dateKey)!;
-                 dayData.total += total;
-                 dayData.obtained += score;
+                // Health Data
+                if (!attemptsBySubjectByDate[w.subjectId]) attemptsBySubjectByDate[w.subjectId] = new Map();
+                if(a.attemptedAt) {
+                     const dateKey = format(a.attemptedAt.toDate(), 'yyyy-MM-dd');
+                     if (!attemptsBySubjectByDate[w.subjectId].has(dateKey)) {
+                         attemptsBySubjectByDate[w.subjectId].set(dateKey, { total: 0, obtained: 0 });
+                     }
+                     const dayData = attemptsBySubjectByDate[w.subjectId].get(dateKey)!;
+                     dayData.total += total;
+                     dayData.obtained += score;
+                }
             }
         }
     });
@@ -140,11 +159,12 @@ export default function ProgressPage() {
         for (let i = 13; i >= 0; i--) {
             const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
             const dayStats = attemptsByDate.get(dateKey);
-            if (dayStats) {
-                const safeTotal = dayStats.total === 0 ? 1 : dayStats.total;
-                const dayAvg = (dayStats.obtained / safeTotal) * 100;
+            if (dayStats && dayStats.total > 0) {
+                // Calculation: Weighted Average
+                const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
                 healthScore = (healthScore * 0.6) + (dayAvg * 0.4);
             } else {
+                // Decay on inactive days
                 healthScore = Math.max(0, healthScore * 0.95);
             }
         }
@@ -159,25 +179,26 @@ export default function ProgressPage() {
     if (!attempts || !lookups || !selectedSubjectId) return null;
     const { unitMap, categoryMap, worksheetMap, questionMap } = lookups;
 
-    // Filter Data
     const activeUnits = Array.from(unitMap.values()).filter(u => u.subjectId === selectedSubjectId);
     const activeUnitIds = new Set(activeUnits.map(u => u.id));
     
-    const activeAttempts = attempts.filter(a => {
-        const w = a.worksheetId ? worksheetMap.get(a.worksheetId) : null;
-        return w && w.subjectId === selectedSubjectId;
-    });
-
     // Initialize Metrics
     const metricsMap = new Map<string, PerformanceMetric>();
     activeUnits.forEach(u => metricsMap.set(`unit_${u.id}`, { id: u.id, name: u.name, type: 'unit', totalMarks: 0, obtainedMarks: 0, percentage: 0, attemptCount: 0 }));
     
     const attemptsByDate = new Map<string, { total: number, obtained: number }>();
     
-    activeAttempts.forEach(attempt => {
-        const { score, total } = getAttemptStats(attempt, worksheetMap, questionMap);
+    // Process every attempt
+    attempts.forEach(attempt => {
         const worksheet = worksheetMap.get(attempt.worksheetId);
+        if (!worksheet || worksheet.subjectId !== selectedSubjectId) return;
 
+        const data = getAttemptTotals(attempt, worksheet, questionMap);
+        if (!data) return; // Skip invalid attempts to prevent bad data (500%)
+
+        const { score, total } = data;
+
+        // 1. Health Graph Data
         if (attempt.attemptedAt) {
              const dateKey = format(attempt.attemptedAt.toDate(), 'yyyy-MM-dd');
              if (!attemptsByDate.has(dateKey)) attemptsByDate.set(dateKey, { total: 0, obtained: 0 });
@@ -185,45 +206,69 @@ export default function ProgressPage() {
              d.total += total; d.obtained += score;
         }
 
-        if (worksheet) {
-            worksheet.questions.forEach(qId => {
-                const question = questionMap.get(qId);
-                if (question && question.unitId && activeUnitIds.has(question.unitId)) {
-                    const unitMetric = metricsMap.get(`unit_${question.unitId}`);
-                    if (unitMetric) {
-                        unitMetric.attemptCount++;
-                        // The getAttemptStats already calculates score vs total for the whole worksheet
-                        // We need to approximate here or refactor. Let's approximate for now.
-                        const worksheetScoreRatio = total > 0 ? score / total : 0;
-                        const questionMarks = question.solutionSteps?.reduce((acc: number, s: any) => acc + s.subQuestions.reduce((ss: number, sq: any) => ss + sq.marks, 0), 0) || 0;
-                        unitMetric.obtainedMarks += worksheetScoreRatio * questionMarks;
-                        unitMetric.totalMarks += questionMarks;
+        // 2. Detailed Insights (Attribute Score to Unit/Category)
+        // We distribute the total worksheet score proportional to questions
+        worksheet.questions.forEach(qId => {
+            const question = questionMap.get(qId);
+            if (!question) return;
+
+            let qMax = 0;
+            let qScore = 0;
+
+            // Calculate raw totals for this question
+            question.solutionSteps?.forEach((step: any) => {
+                step.subQuestions.forEach((sub: any) => {
+                    const m = sub.marks || 0;
+                    qMax += m;
+                    const res = attempt.results?.[sub.id];
+                    if (res) {
+                        if (typeof res.score === 'number') qScore += res.score;
+                        else if (res.isCorrect) qScore += m;
                     }
-                    if (question.categoryId) {
-                         const cat = categoryMap.get(question.categoryId);
-                         if (cat) {
-                             const key = `category_${cat.id}`;
-                             if (!metricsMap.has(key)) metricsMap.set(key, { id: cat.id, name: cat.name, type: 'category', parentName: unitMap.get(cat.unitId)?.name, totalMarks: 0, obtainedMarks: 0, percentage: 0, attemptCount: 0 });
-                             const catMetric = metricsMap.get(key)!;
-                             catMetric.attemptCount++;
-                             const worksheetScoreRatio = total > 0 ? score / total : 0;
-                             const questionMarks = question.solutionSteps?.reduce((acc: number, s: any) => acc + s.subQuestions.reduce((ss: number, sq: any) => ss + sq.marks, 0), 0) || 0;
-                             catMetric.obtainedMarks += worksheetScoreRatio * questionMarks;
-                             catMetric.totalMarks += questionMarks;
-                         }
-                    }
+                });
+            });
+
+            // Sanitizer for specific question
+            if (qScore > qMax && qMax > 0) qScore = (qScore / 100) * qMax;
+
+            // Determine Target Unit (Question > Worksheet)
+            const targetUnitId = question.unitId || worksheet.unitId;
+
+            // Attribute to Unit
+            if (targetUnitId && activeUnitIds.has(targetUnitId)) {
+                const m = metricsMap.get(`unit_${targetUnitId}`);
+                if (m) {
+                    m.attemptCount++;
+                    m.totalMarks += qMax;
+                    m.obtainedMarks += qScore;
                 }
-            })
-        }
+            }
+
+            // Attribute to Category
+            if (question.categoryId) {
+                 const c = categoryMap.get(question.categoryId);
+                 if (c && c.unitId && activeUnitIds.has(c.unitId)) {
+                     const key = `category_${c.id}`;
+                     if (!metricsMap.has(key)) {
+                         metricsMap.set(key, { id: c.id, name: c.name, type: 'category', parentName: unitMap.get(c.unitId)?.name, totalMarks: 0, obtainedMarks: 0, percentage: 0, attemptCount: 0 });
+                     }
+                     const mCat = metricsMap.get(key)!;
+                     mCat.attemptCount++;
+                     mCat.totalMarks += qMax;
+                     mCat.obtainedMarks += qScore;
+                 }
+            }
+        });
     });
 
+    // Calculate Final Percentages
     metricsMap.forEach(m => { 
         if (m.totalMarks > 0) {
-            m.percentage = (m.obtainedMarks / m.totalMarks) * 100; 
+            m.percentage = Math.min(100, (m.obtainedMarks / m.totalMarks) * 100); 
         }
     });
 
-    // Streak
+    // Streak Logic
     let currentStreak = 0;
     const sortedDates = Array.from(attemptsByDate.keys()).sort();
     if (sortedDates.length > 0) {
@@ -244,9 +289,8 @@ export default function ProgressPage() {
     for (let i = 13; i >= 0; i--) {
         const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
         const dayStats = attemptsByDate.get(dateKey);
-        if (dayStats) {
-            const safeTotal = dayStats.total === 0 ? 1 : dayStats.total;
-            const dayAvg = (dayStats.obtained / safeTotal) * 100;
+        if (dayStats && dayStats.total > 0) {
+            const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
             healthScore = (healthScore * 0.6) + (dayAvg * 0.4);
         } else {
             healthScore = Math.max(0, healthScore * 0.95);
@@ -266,7 +310,7 @@ export default function ProgressPage() {
         else if (m.percentage >= 75) {
             target.strengths.push(m);
         }
-        else if (m.percentage < 50) {
+        else if (m.percentage <= 50) {
             target.weaknesses.push(m);
         }
     });
@@ -274,7 +318,14 @@ export default function ProgressPage() {
     const sortM = (list: PerformanceMetric[], asc = false) => list.sort((a, b) => asc ? a.percentage - b.percentage : b.percentage - a.percentage);
     [unitMetrics, catMetrics].forEach(g => { sortM(g.strengths); sortM(g.weaknesses, true); });
 
-    return { streak: currentStreak, healthData: healthChartData, currentHealth: Math.round(healthScore), unitMetrics, catMetrics, activeAttempts };
+    return { 
+        streak: currentStreak, 
+        healthData: healthChartData, 
+        currentHealth: Math.round(healthScore), 
+        unitMetrics, 
+        catMetrics, 
+        activeAttemptsCount: attempts.filter(a => lookups.worksheetMap.get(a.worksheetId)?.subjectId === selectedSubjectId).length 
+    };
   }, [attempts, lookups, selectedSubjectId]);
 
 
@@ -333,7 +384,7 @@ export default function ProgressPage() {
   const InsightGrid = ({ data }: { data: typeof analytics.unitMetrics }) => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
         <Card className="border-l-4 border-l-green-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><TrendingUp className="h-5 w-5 text-green-600" /> Strengths</CardTitle><CardDescription>Score &ge; 75%</CardDescription></CardHeader><CardContent>{data.strengths.length > 0 ? (<div className="space-y-4">{data.strengths.slice(0, 5).map(s => (<div key={s.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{s.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{s.type}</span>{s.type === 'category' && s.parentName && (<><span>•</span><span className="truncate">{s.parentName}</span></>)}</div></div><Badge className="bg-green-100 text-green-700 border-none">{Math.round(s.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">Keep practicing to find your strengths!</div>}</CardContent></Card>
-        <Card className="border-l-4 border-l-red-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-red-600" /> Weaknesses</CardTitle><CardDescription>Score &lt; 50%</CardDescription></CardHeader><CardContent>{data.weaknesses.length > 0 ? (<div className="space-y-4">{data.weaknesses.slice(0, 5).map(w => (<div key={w.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{w.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{w.type}</span>{w.type === 'category' && w.parentName && (<><span>•</span><span className="truncate">{w.parentName}</span></>)}</div></div><Badge className="bg-red-100 text-red-700 border-none">{Math.round(w.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">No major weaknesses found!</div>}</CardContent></Card>
+        <Card className="border-l-4 border-l-red-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-red-600" /> Weaknesses</CardTitle><CardDescription>Score &le; 50%</CardDescription></CardHeader><CardContent>{data.weaknesses.length > 0 ? (<div className="space-y-4">{data.weaknesses.slice(0, 5).map(w => (<div key={w.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{w.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{w.type}</span>{w.type === 'category' && w.parentName && (<><span>•</span><span className="truncate">{w.parentName}</span></>)}</div></div><Badge className="bg-red-100 text-red-700 border-none">{Math.round(w.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">No major weaknesses found!</div>}</CardContent></Card>
         <Card className="border-l-4 border-l-slate-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Compass className="h-5 w-5 text-slate-600" /> Unexplored</CardTitle><CardDescription>Not yet attempted</CardDescription></CardHeader><CardContent>{data.unexplored.length > 0 ? (<div className="space-y-4">{data.unexplored.slice(0, 5).map(u => (<div key={u.id} className="flex justify-between items-center"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium text-muted-foreground">{u.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider opacity-70">{u.type}</span>{u.type === 'category' && u.parentName && (<><span>•</span><span className="truncate opacity-70">{u.parentName}</span></>)}</div></div><ArrowDownRight className="h-4 w-4 text-muted-foreground opacity-50" /></div>))}{data.unexplored.length > 5 && <p className="text-xs text-center text-muted-foreground pt-2">+{data.unexplored.length - 5} more</p>}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">All topics explored!</div>}</CardContent></Card>
     </div>
   );
@@ -348,7 +399,7 @@ export default function ProgressPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-gradient-to-br from-orange-50 to-white border-orange-200"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4 text-orange-500" /> Streak</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold text-orange-600 flex items-baseline gap-2">{analytics.streak} <span className="text-lg font-normal text-muted-foreground">days</span></div><p className="text-xs text-muted-foreground mt-2">Active days.</p></CardContent></Card>
         <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-blue-500" /> Health</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold text-blue-600 flex items-baseline gap-2">{analytics.currentHealth}%</div><Progress value={analytics.currentHealth} className="h-2 mt-3 [&>div]:bg-blue-600" /><p className="text-xs text-muted-foreground mt-2">Health score.</p></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Trophy className="h-4 w-4 text-yellow-500" /> Worksheets</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold text-foreground">{analytics.activeAttempts.length}</div><p className="text-xs text-muted-foreground mt-2">Completed.</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Trophy className="h-4 w-4 text-yellow-500" /> Worksheets</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold text-foreground">{analytics.activeAttemptsCount}</div><p className="text-xs text-muted-foreground mt-2">Completed.</p></CardContent></Card>
       </div>
 
       <Card>

@@ -1,14 +1,14 @@
 'use client';
-import type { User, Course, Class, Subject } from "@/types";
+import type { User, Course, Class, Subject, Worksheet, WorksheetAttempt, Question } from "@/types";
 import { PageHeader } from "./page-header";
 import { StatsCard } from "./stats-card";
 import { BookOpen, Target, CheckCircle, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, query, where, documentId } from "firebase/firestore";
 import { ClassCard } from "./academics/class-card";
 import { SubjectCard } from "./subject-card";
-import { Card, CardContent } from "./ui/card";
+import { useMemo } from "react";
 
 type StudentDashboardProps = {
     user: User | null;
@@ -80,7 +80,90 @@ function StudentAcademics() {
     )
 }
 
+const getAttemptTotals = (a: WorksheetAttempt, worksheet: Worksheet | undefined, allQuestions: Map<string, any>) => {
+    let calcScore = 0;
+    let calcTotal = 0;
+    const results = a.results || {};
+
+    if (worksheet) {
+        worksheet.questions.forEach(qId => {
+            const question = allQuestions.get(qId);
+            if (question) {
+                const qMax = question.solutionSteps?.reduce((acc: number, s: any) => acc + s.subQuestions.reduce((ss: number, sub: any) => ss + (sub.marks || 0), 0), 0) || 0;
+                calcTotal += qMax;
+                let qEarned = 0;
+                if (question.gradingMode === 'ai') {
+                    const firstSubId = question.solutionSteps?.[0]?.subQuestions?.[0]?.id;
+                    if(firstSubId) {
+                        const res = results[firstSubId];
+                        if (res?.score) {
+                           qEarned = (res.score / 100) * qMax;
+                        }
+                    }
+                } else {
+                    question.solutionSteps?.forEach((step: any) => {
+                        step.subQuestions.forEach((sub: any) => {
+                            const res = results[sub.id];
+                            if (res?.isCorrect) qEarned += (sub.marks || 0);
+                        });
+                    });
+                }
+                calcScore += qEarned;
+            }
+        });
+    }
+    return { score: calcScore, total: calcTotal };
+};
+
+
 export function StudentDashboard({ user }: StudentDashboardProps) {
+    const firestore = useFirestore();
+
+    const attemptsQuery = useMemoFirebase(() => {
+        if (!firestore || !user?.id) return null;
+        return query(collection(firestore, 'worksheet_attempts'), where('userId', '==', user.id));
+    }, [firestore, user?.id]);
+    const { data: attempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(attemptsQuery);
+    
+    const worksheetIds = useMemo(() => attempts ? [...new Set(attempts.map(a => a.worksheetId))] : [], [attempts]);
+
+    const worksheetsQuery = useMemoFirebase(() => {
+        if (!firestore || worksheetIds.length === 0) return null;
+        return query(collection(firestore, 'worksheets'), where(documentId(), 'in', worksheetIds.slice(0,30)));
+    }, [firestore, worksheetIds]);
+    const { data: worksheets, isLoading: worksheetsLoading } = useCollection<Worksheet>(worksheetsQuery);
+    
+    const allQuestionIds = useMemo(() => worksheets ? [...new Set(worksheets.flatMap(w => w.questions))] : [], [worksheets]);
+
+    const questionsQuery = useMemoFirebase(() => {
+        if (!firestore || allQuestionIds.length === 0) return null;
+        return query(collection(firestore, 'questions'), where(documentId(), 'in', allQuestionIds.slice(0,30)));
+    }, [firestore, allQuestionIds]);
+    const { data: questions, isLoading: questionsLoading } = useCollection<Question>(questionsQuery);
+    
+    const { overallScore, completedWorksheets } = useMemo(() => {
+        if (!attempts || !worksheets || !questions) return { overallScore: 'N/A', completedWorksheets: 0 };
+
+        const worksheetMap = new Map(worksheets.map(w => [w.id, w]));
+        const questionMap = new Map(questions.map(q => [q.id, q]));
+
+        let totalScore = 0;
+        let totalPossible = 0;
+
+        attempts.forEach(attempt => {
+            const worksheet = worksheetMap.get(attempt.worksheetId);
+            const { score, total } = getAttemptTotals(attempt, worksheet, questionMap);
+            totalScore += score;
+            totalPossible += total;
+        });
+
+        if (totalPossible === 0) return { overallScore: 'N/A', completedWorksheets: attempts.length };
+
+        const percentage = (totalScore / totalPossible) * 100;
+        return { overallScore: `${percentage.toFixed(1)}%`, completedWorksheets: attempts.length };
+    }, [attempts, worksheets, questions]);
+
+
     if (!user) {
         return null; // or a loading state
     }
@@ -100,13 +183,13 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
                 />
                 <StatsCard
                     title="Overall Score"
-                    value="N/A"
+                    value={attemptsLoading || worksheetsLoading || questionsLoading ? '...' : overallScore}
                     icon={Target}
-                    description="Your average score will appear here."
+                    description="Your average score across all attempts."
                 />
                 <StatsCard
                     title="Worksheets Completed"
-                    value="0"
+                    value={attemptsLoading ? '...' : (completedWorksheets ?? user.completedWorksheets?.length ?? 0).toString()}
                     icon={CheckCircle}
                     description="Keep up the great work!"
                 />
