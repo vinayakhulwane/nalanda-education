@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -49,8 +49,9 @@ function AdminStudentProgressPageContent({ userId }: { userId: string }) {
     )
 }
 
-export default function AdminStudentProgressPage({ params }: { params: Promise<{ userId: string }> }) {
-    const { userId } = use(params);
+export default function AdminStudentProgressPage() {
+    const params = useParams();
+    const userId = params.userId as string;
 
     return (
         <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
@@ -58,3 +59,5 @@ export default function AdminStudentProgressPage({ params }: { params: Promise<{
         </Suspense>
     );
 }
+
+  

@@ -1,3 +1,4 @@
+
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase
 import { collection, doc, query, where } from "firebase/firestore";
 import { ArrowLeft, Loader2, BookPlus, Library } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
-import { useState, use } from "react";
+import { useState } from "react";
 import type { Subject, Class } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -121,7 +122,19 @@ function NumericalManagementSubjectsPageContent({ classId }: { classId: string }
 }
 
 
-export default function NumericalManagementSubjectsPage({ params }: { params: Promise<{ classId: string }> }) {
-    const { classId } = use(params);
+export default function NumericalManagementSubjectsPage() {
+    const params = useParams();
+    const classId = params.classId as string;
+
+    if (!classId) {
+        return (
+            <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
+
     return <NumericalManagementSubjectsPageContent classId={classId} />;
 }
+
+  

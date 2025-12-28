@@ -8,8 +8,8 @@ import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch, documentId, getDocs, limit, orderBy } from "firebase/firestore";
 import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo, use } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
 import type { Subject, Unit, Category, CustomTab, Worksheet, WorksheetAttempt } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -843,12 +843,21 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     );
 }
 
-export default function SubjectWorkspacePage({ 
-  params 
-}: { 
-  params: Promise<{ classId: string; subjectId: string }> 
-}) {
-    const { classId, subjectId } = use(params);
+export default function SubjectWorkspacePage() {
+    const params = useParams();
+    const classId = params.classId as string;
+    const subjectId = params.subjectId as string;
 
+    if (!classId || !subjectId) {
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="ml-4">Loading subject details...</p>
+            </div>
+        );
+    }
+    
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
+
+  
