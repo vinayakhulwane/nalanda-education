@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch, documentId, getDocs, limit, orderBy } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem } from "lucide-react";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import type { Subject, Unit, Category, CustomTab, Worksheet, WorksheetAttempt } from "@/types";
@@ -231,6 +231,8 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     const { user, userProfile } = useUser();
     const [attempts, setAttempts] = useState<WorksheetAttempt[]>([]);
     const [areAttemptsLoading, setAttemptsLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const practiceWorksheetsQuery = useMemoFirebase(() => {
         if (!firestore || !user?.uid || !subjectId) return null;
@@ -283,11 +285,11 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     }, [firestore, user?.uid, practiceWorksheets, userProfile?.completedWorksheets]);
 
 
-    const { completed, notCompleted, attemptsMap } = useMemo(() => {
-        if (!practiceWorksheets) return { completed: [], notCompleted: [], attemptsMap: new Map() };
+    const { completed, notCompleted, attemptsMap, totalPages, paginatedCompleted } = useMemo(() => {
+        if (!practiceWorksheets) return { completed: [], notCompleted: [], attemptsMap: new Map(), totalPages: 1, paginatedCompleted: [] };
         
         const completedIds = new Set(userProfile?.completedWorksheets || []);
-        const completedWorksheets = practiceWorksheets.filter(ws => completedIds.has(ws.id));
+        const allCompletedWorksheets = practiceWorksheets.filter(ws => completedIds.has(ws.id));
         const notCompletedWorksheets = practiceWorksheets.filter(ws => !completedIds.has(ws.id));
         
         const latestAttemptsMap = new Map<string, WorksheetAttempt>();
@@ -298,7 +300,7 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
             }
         });
 
-        completedWorksheets.sort((a, b) => {
+        allCompletedWorksheets.sort((a, b) => {
             const attemptA = latestAttemptsMap.get(a.id);
             const attemptB = latestAttemptsMap.get(b.id);
             const timeA = attemptA?.attemptedAt?.toMillis() || 0;
@@ -311,12 +313,22 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
             finalAttemptsMap.set(worksheetId, attempt.id);
         });
 
-        return { completed: completedWorksheets, notCompleted: notCompletedWorksheets, attemptsMap: finalAttemptsMap };
-    }, [practiceWorksheets, userProfile?.completedWorksheets, attempts]);
+        const totalP = Math.ceil(allCompletedWorksheets.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedItems = allCompletedWorksheets.slice(startIndex, endIndex);
+
+        return { 
+            completed: allCompletedWorksheets, 
+            notCompleted: notCompletedWorksheets, 
+            attemptsMap: finalAttemptsMap,
+            totalPages: totalP,
+            paginatedCompleted: paginatedItems,
+        };
+    }, [practiceWorksheets, userProfile?.completedWorksheets, attempts, currentPage]);
     
 
     const isLoading = areWorksheetsLoading || areAttemptsLoading;
-
     const createWorksheetUrl = `/worksheets/new?classId=${classId}&subjectId=${subjectId}&source=practice`;
     
     return (
@@ -372,7 +384,7 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                                 </div>
                             ) : (
-                                completed.map(ws => (
+                                paginatedCompleted.map(ws => (
                                     <WorksheetDisplayCard 
                                         key={ws.id} 
                                         worksheet={ws} 
@@ -389,6 +401,31 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                                 <p>Your completed practice worksheets will appear here.</p>
                             </div>
                         )}
+                        {completed.length > 0 && !isLoading && (
+                            <div className="flex items-center justify-between mt-4">
+                                <span className="text-sm text-muted-foreground">
+                                    Page {currentPage} of {totalPages}
+                                </span>
+                                <div className="flex gap-2">
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+                                        disabled={currentPage === 1}
+                                    >
+                                        <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        Next <ChevronRight className="h-4 w-4 ml-1" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </TabsContent>
                 </Tabs>
             </CardContent>
@@ -396,7 +433,6 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
     )
 }
 
-// ✅ NEW LEADERBOARD COMPONENT (Updated with robust name checking)
 function Leaderboard({ subjectId }: { subjectId: string }) {
     const firestore = useFirestore();
     const [students, setStudents] = useState<any[]>([]);
@@ -434,7 +470,6 @@ function Leaderboard({ subjectId }: { subjectId: string }) {
         }
     };
 
-    // Helper to find a display name from various possible fields
     const getStudentName = (student: any) => {
         if (student.displayName) return student.displayName;
         if (student.name) return student.name;
@@ -470,7 +505,6 @@ function Leaderboard({ subjectId }: { subjectId: string }) {
                                         {index < 3 ? <Medal className="h-6 w-6 mx-auto" /> : `#${index + 1}`}
                                     </div>
                                     <div className="flex flex-col">
-                                        {/* ✅ UPDATED NAME RENDERING */}
                                         <span className="font-semibold text-lg">{getStudentName(student)}</span>
                                         {index === 0 && <span className="text-xs text-yellow-600 font-bold">👑 Class Topper</span>}
                                     </div>
@@ -730,7 +764,6 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                     </Tabs>
                 </TabsContent>
                 
-                {/* ✅ LEADERBOARD TAB */}
                 <TabsContent value="leaderboard">
                      <Leaderboard subjectId={subjectId} />
                 </TabsContent>
@@ -860,4 +893,4 @@ export default function SubjectWorkspacePage() {
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
 
-  
+    
