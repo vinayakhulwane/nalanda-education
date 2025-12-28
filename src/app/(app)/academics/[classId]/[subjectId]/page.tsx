@@ -6,11 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, where, writeBatch, documentId, getDocs, limit, orderBy } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem, ChevronLeft, ChevronRight } from "lucide-react";
+import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, writeBatch, documentId, getDocs, limit, orderBy, increment, serverTimestamp } from "firebase/firestore";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
-import type { Subject, Unit, Category, CustomTab, Worksheet, WorksheetAttempt } from "@/types";
+import type { Subject, Unit, Category, CustomTab, Worksheet, WorksheetAttempt, CurrencyType } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -25,6 +25,8 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-ki
 import { SortableUnitItem } from "@/components/academics/sortable-unit-item";
 import { WorksheetList } from "@/components/academics/worksheet-list";
 import { WorksheetDisplayCard } from "@/components/academics/worksheet-display-card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 
 function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
@@ -528,23 +530,25 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     const { user, userProfile, isUserProfileLoading } = useUser();
     const router = useRouter();
     const firestore = useFirestore();
+    const { toast } = useToast();
     
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     
     // Custom Tab Dialog States
     const [isAddTabDialogOpen, setAddTabDialogOpen] = useState(false);
-    const [newTabName, setNewTabName] = useState("");
-
     const [isEditTabDialogOpen, setEditTabDialogOpen] = useState(false);
-    const [editingTab, setEditingTab] = useState<CustomTab | null>(null);
-    const [editedTabName, setEditedTabName] = useState("");
-    
     const [isEditTabContentDialogOpen, setEditTabContentDialogOpen] = useState(false);
-    const [editedTabContent, setEditedTabContent] = useState("");
-
-
     const [isDeleteTabDialogOpen, setDeleteTabDialogOpen] = useState(false);
+    const [isUnlockTabDialogOpen, setUnlockTabDialogOpen] = useState(false);
+
+    const [editingTab, setEditingTab] = useState<CustomTab | null>(null);
+    const [newTabName, setNewTabName] = useState("");
+    const [editedTabName, setEditedTabName] = useState("");
+    const [editedTabContent, setEditedTabContent] = useState("");
+    const [tabCost, setTabCost] = useState(0);
+    const [tabCurrency, setTabCurrency] = useState<CurrencyType>('coin');
     const [deletingTab, setDeletingTab] = useState<CustomTab | null>(null);
+    const [unlockingTab, setUnlockingTab] = useState<CustomTab | null>(null);
 
     const subjectDocRef = useMemoFirebase(() => firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null, [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
@@ -554,7 +558,6 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     }, [userProfile, subjectId]);
     
     const isUserBlocked = useMemo(() => {
-        // active property is true by default, so we check for explicit false.
         return userProfile?.active === false;
     }, [userProfile]);
 
@@ -570,7 +573,9 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         const newTab: CustomTab = {
             id: uuidv4(),
             label: newTabName,
-            content: `Content for ${newTabName} goes here. Edit me!`
+            content: `Content for ${newTabName} goes here. Edit me!`,
+            cost: tabCost > 0 ? tabCost : undefined,
+            currency: tabCost > 0 ? tabCurrency : undefined,
         };
 
         const subjectRef = doc(firestore, 'subjects', subjectId);
@@ -579,18 +584,27 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         });
 
         setNewTabName('');
+        setTabCost(0);
+        setTabCurrency('coin');
         setAddTabDialogOpen(false);
     }
     
     const openEditTabDialog = (tab: CustomTab) => {
         setEditingTab(tab);
         setEditedTabName(tab.label);
+        setTabCost(tab.cost || 0);
+        setTabCurrency(tab.currency || 'coin');
         setEditTabDialogOpen(true);
     };
 
     const handleEditCustomTab = async () => {
         if (!firestore || !editedTabName.trim() || !subject || !editingTab) return;
-        const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {...t, label: editedTabName} : t);
+        const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {
+            ...t, 
+            label: editedTabName,
+            cost: tabCost > 0 ? tabCost : undefined,
+            currency: tabCost > 0 ? tabCurrency : undefined,
+        } : t);
         const subjectRef = doc(firestore, 'subjects', subjectId);
         await updateDoc(subjectRef, { customTabs: updatedTabs });
         setEditTabDialogOpen(false);
@@ -636,20 +650,64 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         if (!firestore || !user || isUserBlocked) return;
         const userDocRef = doc(firestore, 'users', user.uid);
         if (isEnrolled) {
-            // Unenroll
             await updateDoc(userDocRef, { enrollments: arrayRemove(subjectId) });
         } else {
-            // Enroll
             await updateDoc(userDocRef, { enrollments: arrayUnion(subjectId) });
         }
     }
+    
+    const handleUnlockTab = async () => {
+        if (!user || !userProfile || !firestore || !unlockingTab) return;
+        const { cost, currency, id: tabId, label } = unlockingTab;
+        if (!cost || !currency) return;
+        
+        const balanceField = currency === 'coin' ? 'coins' : currency;
+        const currentBalance = userProfile[balanceField] || 0;
 
+        if (currentBalance < cost) {
+            toast({ variant: 'destructive', title: 'Insufficient Funds', description: `You need ${cost} ${currency} to unlock this tab.` });
+            return;
+        }
+
+        const userRef = doc(firestore, 'users', user.uid);
+        const transactionRef = doc(collection(firestore, 'transactions'));
+        const batch = writeBatch(firestore);
+        
+        batch.update(userRef, {
+            [balanceField]: increment(-cost),
+            unlockedTabs: arrayUnion(tabId)
+        });
+        
+        batch.set(transactionRef, {
+            userId: user.uid,
+            type: 'spent',
+            description: `Unlocked tab: ${label}`,
+            amount: cost,
+            currency: currency,
+            createdAt: serverTimestamp(),
+        });
+        
+        try {
+            await batch.commit();
+            toast({ title: 'Tab Unlocked!', description: `You can now view the content of "${label}".` });
+            setUnlockTabDialogOpen(false);
+            setUnlockingTab(null);
+        } catch (error) {
+            console.error("Error unlocking tab:", error);
+            toast({ variant: 'destructive', title: 'Unlock Failed', description: 'Could not complete the transaction.' });
+        }
+    };
 
     const description = subject?.description || "Manage the subject curriculum.";
     const shouldTruncate = description.length > 150;
     const displayedDescription = shouldTruncate && !isDescriptionExpanded ? `${description.substring(0, 150)}...` : description;
 
     const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
+    
+    const isTabUnlocked = (tab: CustomTab) => {
+        if (!tab.cost || tab.cost <= 0) return true; // Free tabs are always unlocked
+        return userProfile?.unlockedTabs?.includes(tab.id) ?? false;
+    }
     
     const visibleCustomTabs = userIsEditor ? subject?.customTabs : subject?.customTabs?.filter(t => !t.hidden);
 
@@ -712,36 +770,52 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                         <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
                         <TabsTrigger value="worksheet">Worksheet</TabsTrigger>
                         <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-                        {visibleCustomTabs?.map(tab => (
-                             <div key={tab.id} className="relative group">
-                                <TabsTrigger value={tab.id} className={userIsEditor ? 'pr-8' : ''}>{tab.label}</TabsTrigger>
-                                {userIsEditor && (
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="absolute top-1/2 right-0.5 -translate-y-1/2 h-6 w-6 opacity-60 group-hover:opacity-100">
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => openEditTabDialog(tab)}>
-                                                <Edit className="mr-2 h-4 w-4" /> Edit Name
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
-                                                {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-                                                {tab.hidden ? 'Show to Students' : 'Hide from Students'}
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive">
-                                                <Trash className="mr-2 h-4 w-4" /> Delete Tab
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                )}
-                            </div>
-                        ))}
+                        {visibleCustomTabs?.map(tab => {
+                            const isLocked = !userIsEditor && !isTabUnlocked(tab);
+                            return (
+                                <div key={tab.id} className="relative group">
+                                    <TabsTrigger 
+                                        value={tab.id} 
+                                        className={userIsEditor ? 'pr-8' : isLocked ? 'pr-2' : ''}
+                                        onClick={(e) => {
+                                            if (isLocked) {
+                                                e.preventDefault();
+                                                setUnlockingTab(tab);
+                                                setUnlockTabDialogOpen(true);
+                                            }
+                                        }}
+                                    >
+                                        {tab.label}
+                                        {isLocked && <Lock className="ml-2 h-3 w-3 text-muted-foreground" />}
+                                    </TabsTrigger>
+                                    {userIsEditor && (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="absolute top-1/2 right-0.5 -translate-y-1/2 h-6 w-6 opacity-60 group-hover:opacity-100">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => openEditTabDialog(tab)}>
+                                                    <Edit className="mr-2 h-4 w-4" /> Edit Details
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
+                                                    {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                                                    {tab.hidden ? 'Show to Students' : 'Hide from Students'}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive">
+                                                    <Trash className="mr-2 h-4 w-4" /> Delete Tab
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    )}
+                                </div>
+                            )
+                        })}
                     </TabsList>
                     {userIsEditor && (
-                         <Button variant="ghost" size="icon" className="ml-2" onClick={() => setAddTabDialogOpen(true)}>
+                         <Button variant="ghost" size="icon" className="ml-2" onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true);}}>
                             <Plus className="h-4 w-4" />
                         </Button>
                     )}
@@ -792,51 +866,40 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
             </Tabs>
             )}
 
-            {/* Add Tab Dialog */}
-            <Dialog open={isAddTabDialogOpen} onOpenChange={setAddTabDialogOpen}>
+            {/* Add/Edit Tab Dialog */}
+            <Dialog open={isAddTabDialogOpen || isEditTabDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setAddTabDialogOpen(false); setEditTabDialogOpen(false); }}}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Add New Tab</DialogTitle>
-                        <DialogDescription>Create a new custom tab for this subject.</DialogDescription>
+                        <DialogTitle>{isEditTabDialogOpen ? "Edit Tab Details" : "Add New Tab"}</DialogTitle>
+                        <DialogDescription>{isEditTabDialogOpen ? `Update the details for '${editingTab?.label}'` : 'Create a new custom tab for this subject.'}</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <Label htmlFor="tab-name">Tab Name</Label>
-                        <Input 
-                            id="tab-name" 
-                            value={newTabName} 
-                            onChange={e => setNewTabName(e.target.value)} 
-                            placeholder="e.g., PDF Notes"
-                        />
+                        <div className="space-y-2">
+                          <Label htmlFor="tab-name">Tab Name</Label>
+                          <Input id="tab-name" value={isEditTabDialogOpen ? editedTabName : newTabName} onChange={e => isEditTabDialogOpen ? setEditedTabName(e.target.value) : setNewTabName(e.target.value)} placeholder="e.g., PDF Notes"/>
+                        </div>
+                         <div className="space-y-2">
+                           <Label>Cost (Optional)</Label>
+                           <div className="flex gap-2">
+                             <Input id="tab-cost" type="number" placeholder="e.g. 50" value={tabCost || ''} onChange={e => setTabCost(Number(e.target.value))} className="w-1/2"/>
+                              <Select value={tabCurrency} onValueChange={(v: any) => setTabCurrency(v)}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="coin">Coins</SelectItem>
+                                  <SelectItem value="gold">Gold</SelectItem>
+                                  <SelectItem value="diamond">Diamonds</SelectItem>
+                                </SelectContent>
+                              </Select>
+                           </div>
+                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setAddTabDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleAddCustomTab}>Create Tab</Button>
+                        <Button variant="outline" onClick={() => { setAddTabDialogOpen(false); setEditTabDialogOpen(false); }}>Cancel</Button>
+                        <Button onClick={isEditTabDialogOpen ? handleEditCustomTab : handleAddCustomTab}>Save</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-             {/* Edit Tab Name Dialog */}
-            <Dialog open={isEditTabDialogOpen} onOpenChange={setEditTabDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Edit Tab Name</DialogTitle>
-                        <DialogDescription>Rename the tab '{editingTab?.label}'.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <Label htmlFor="edit-tab-name">New Tab Name</Label>
-                        <Input 
-                            id="edit-tab-name" 
-                            value={editedTabName} 
-                            onChange={e => setEditedTabName(e.target.value)}
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setEditTabDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleEditCustomTab}>Save Changes</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-            
             {/* Edit Tab Content Dialog */}
              <Dialog open={isEditTabContentDialogOpen} onOpenChange={setEditTabContentDialogOpen}>
                 <DialogContent className="sm:max-w-[800px]">
@@ -872,6 +935,28 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            
+            {/* Unlock Tab Dialog */}
+            <AlertDialog open={isUnlockTabDialogOpen} onOpenChange={setUnlockTabDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Unlock "{unlockingTab?.label}"?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            To view this content, you need to pay the following cost. This is a one-time purchase.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                     <div className="flex justify-center items-center gap-2 p-4 my-4 bg-muted rounded-lg font-bold text-2xl">
+                        {(unlockingTab?.currency === 'coin' && <Coins className="h-6 w-6 text-yellow-500" />) ||
+                         (unlockingTab?.currency === 'gold' && <Crown className="h-6 w-6 text-amber-500" />) ||
+                         (unlockingTab?.currency === 'diamond' && <Gem className="h-6 w-6 text-blue-500" />)}
+                        {unlockingTab?.cost}
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setUnlockTabDialogOpen(false)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleUnlockTab}>Confirm Purchase</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
@@ -892,5 +977,3 @@ export default function SubjectWorkspacePage() {
     
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
-
-    

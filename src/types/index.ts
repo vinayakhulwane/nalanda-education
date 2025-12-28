@@ -13,6 +13,7 @@ export interface User {
   active?: boolean;
   enrollments?: string[];
   completedWorksheets?: string[];
+  unlockedTabs?: string[];
 }
 
 export interface Class {
@@ -26,6 +27,8 @@ export interface CustomTab {
     label: string;
     content: string;
     hidden?: boolean;
+    cost?: number;
+    currency?: CurrencyType;
 }
 
 export interface Subject {
