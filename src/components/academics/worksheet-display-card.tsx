@@ -18,6 +18,8 @@ interface WorksheetDisplayCardProps {
     completedAttempts?: string[];
     view?: 'card' | 'list';
     attemptId?: string;
+    // ✅ ADDED: New prop to track the navigation source
+    from?: 'progress' | 'academics';
 }
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
@@ -35,7 +37,7 @@ const currencyColors: Record<CurrencyType, string> = {
 };
 
 
-export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [], view = 'card', attemptId }: WorksheetDisplayCardProps) {
+export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [], view = 'card', attemptId, from = 'academics' }: WorksheetDisplayCardProps) {
     const router = useRouter();
     const firestore = useFirestore();
 
@@ -74,9 +76,9 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
 
     const handleReviewClick = () => {
         if (attemptId) {
-            router.push(`/worksheets/review/${attemptId}`);
+            // ✅ UPDATED: Pass the 'from' prop as a query parameter
+            router.push(`/worksheets/review/${attemptId}?from=${from}`);
         } else {
-            // Fallback for classroom assignments or if attemptId is not available
             router.push(`/worksheets/preview/${worksheet.id}`);
         }
     };

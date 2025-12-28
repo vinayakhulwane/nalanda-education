@@ -1,5 +1,5 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, documentId } from 'firebase/firestore';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { WorksheetResults } from '@/components/worksheet-results';
 import { PageHeader } from '@/components/page-header';
 
-export default function ReviewAttemptPage() {
+function ReviewAttemptPageContent() {
   const router = useRouter();
   const params = useParams();
   const attemptId = params.attemptId as string;
@@ -68,4 +68,12 @@ export default function ReviewAttemptPage() {
       attempt={attempt}
     />
   );
+}
+
+export default function ReviewAttemptPage() {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+            <ReviewAttemptPageContent />
+        </Suspense>
+    )
 }

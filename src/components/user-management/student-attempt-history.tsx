@@ -82,6 +82,8 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
                                     worksheet={ws}
                                     view="list"
                                     attemptId={latestAttempt?.id}
+                                    // ✅ ADDED: Specify the source is the progress page
+                                    from="progress"
                                 />
                             )
                         })}

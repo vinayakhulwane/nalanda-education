@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
-import { useRouter } from "next/navigation";
-import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2, ExternalLink, FileImage } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2, ExternalLink, FileImage, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -155,9 +155,13 @@ export function WorksheetResults({
   attempt,
 }: WorksheetResultsProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+
+  // ✅ ADDED: State for back button logic
+  const from = searchParams.get('from');
 
   const [isClaiming, setIsClaiming] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
@@ -276,12 +280,23 @@ export function WorksheetResults({
       setIsClaiming(false);
     }
   }
+  
+  // ✅ ADDED: Dynamic back button logic
+  const handleBackClick = () => {
+    if (from === 'progress') {
+        router.push('/progress');
+    } else {
+        router.push(`/academics/${worksheet.classId}/${worksheet.subjectId}`);
+    }
+  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="mb-4">
-        <Button variant="outline" onClick={() => router.push(`/academics/${worksheet.classId}/${worksheet.subjectId}`)}>
-          <Home className="mr-2 h-4 w-4" /> Back to Subject
+        {/* ✅ UPDATED: The back button now uses the dynamic handler */}
+        <Button variant="outline" onClick={handleBackClick}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> 
+          {from === 'progress' ? 'Back to Progress' : 'Back to Subject'}
         </Button>
       </div>
       <Card>
@@ -425,8 +440,9 @@ export function WorksheetResults({
           </div>
 
           <div className="text-center mt-8">
-            <Button onClick={() => router.push(`/academics/${worksheet.classId}/${worksheet.subjectId}`)}>
-              <Home className="mr-2 h-4 w-4" /> Back to Subject
+            <Button onClick={handleBackClick}>
+              <Home className="mr-2 h-4 w-4" /> 
+               {from === 'progress' ? 'Back to Progress' : 'Back to Subject'}
             </Button>
           </div>
         </CardContent>
