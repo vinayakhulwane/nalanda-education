@@ -25,6 +25,18 @@ oauth2Client.setCredentials({
 
 const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
+// ✅ NEW: Mapping IDs to Clear AI Instructions
+const PATTERN_MAPPING: Record<string, string> = {
+    'givenRequiredMapping': 'Given Data & Required Mapping',
+    'conceptualMisconception': 'Conceptual Understanding & Misconceptions',
+    'stepSequence': 'Step Sequence & Method Flow',
+    'calculationMistake': 'Calculation Accuracy & Arithmetic',
+    'unitsDimensions': 'Units & Dimensions',
+    'commonPitfalls': 'Common Pitfalls',
+    'answerPresentation': 'Final Answer Presentation',
+    'nextSteps': 'Next Steps for Improvement / Future Learning', // Explicit Label
+};
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -35,7 +47,7 @@ export async function POST(request: Request) {
 
     if (!imageFile) return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
 
-    // --- STEP 1: Process Rubric & Feedback Patterns ---
+    // --- STEP 1: Process Rubric ---
     let parsedRubric;
     try {
         parsedRubric = JSON.parse(rubricJson);
@@ -47,23 +59,29 @@ export async function POST(request: Request) {
         .map(([category, weight]) => `- ${category}: Weightage ${weight}`)
         .join("\n");
 
-    let feedbackFocusList = "General observations";
+    // --- STEP 2: Process Feedback Patterns (The Fix) ---
+    let feedbackFocusList = "";
     try {
         const patterns = JSON.parse(feedbackPatternsJson || '[]');
         if (Array.isArray(patterns) && patterns.length > 0) {
-            feedbackFocusList = patterns.map(p => `- ${p}`).join("\n");
+            // Map IDs to readable labels, falling back to the ID if no label exists
+            feedbackFocusList = patterns
+                .map(p => `- ${PATTERN_MAPPING[p] || p}`)
+                .join("\n");
+        } else {
+            feedbackFocusList = "- General Step-by-Step Review";
         }
     } catch (e) {
-        console.log("No feedback patterns found, using default.");
+        feedbackFocusList = "- General observations";
     }
 
-    // --- STEP 2: Process Image ---
+    // --- STEP 3: Process Image ---
     const arrayBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64Image = buffer.toString('base64');
     const dataUrl = `data:${imageFile.type};base64,${base64Image}`;
 
-    // --- STEP 3: Upload to Google Drive ---
+    // --- STEP 4: Upload to Google Drive ---
     const driveResponse = await drive.files.create({
       requestBody: {
         name: `nalanda_attempt_${Date.now()}.jpg`,
@@ -88,10 +106,9 @@ export async function POST(request: Request) {
     });
     const driveLink = fileInfo.data.webViewLink;
 
-    // --- STEP 4: Construct AI Prompt ---
+    // --- STEP 5: Construct AI Prompt ---
     const totalQuestionMarks = parseFloat(formData.get('totalMarks') as string) || 8;
 
-    // ✅ UPDATED PROMPT: More explicit about formatting and spaces
     const systemPrompt = `
       You are an expert academic grader.
       
@@ -101,23 +118,20 @@ export async function POST(request: Request) {
       QUESTION: "${questionText}"
       QUESTION MAX MARKS: ${totalQuestionMarks}
 
-      RUBRIC CRITERIA:
+      RUBRIC CRITERIA (For Scoring):
       ${rubricInstructions}
 
-      FEEDBACK FOCUS AREAS (Must Address These):
+      FEEDBACK SECTIONS (You MUST include these in your feedback):
       ${feedbackFocusList}
 
       INSTRUCTIONS:
-      1. For each Rubric criterion, assign a score from 0 to 100.
-      2. "totalScore" must be the final weighted percentage (0-100).
-      3. "feedback": You MUST return a structured Markdown list. 
-         - Create a bullet point for each "Feedback Focus Area".
-         - **Crucial:** Use bold for the focus area name, followed by a colon and a space. Ensure there are spaces between words in the focus area name (e.g., "**Step Sequence:**" not "**StepSequence:**").
-         - Example Format:
-           - **Given Data:** Mentioned correctly.
-           - **Step Sequence:** Confusing; you missed the second derivative.
-           - **Calculation Error:** Good, but watch units.
-      4. Set "isCorrect" to true if the totalScore is 50 or higher.
+      1. **Scoring:** Assign a score (0-100) for each Rubric Criterion.
+      2. **Total Score:** Calculate the weighted percentage (0-100).
+      3. **Feedback Format (CRITICAL):** - Output a structured Markdown list.
+         - You MUST create a bullet point for EVERY item listed in "FEEDBACK SECTIONS" above.
+         - Use bold for the section title, followed by a colon and a space (e.g., "**Next Steps:** ...").
+         - Ensure spaces are used correctly in titles (e.g., "**Given Data:**" NOT "**GivenData:**").
+         - If a section like "Next Steps" is requested, provide actionable advice on what the student should study next.
 
       OUTPUT FORMAT (STRICT JSON ONLY):
       {
@@ -130,7 +144,7 @@ export async function POST(request: Request) {
       }
     `;
 
-    // --- STEP 5: Call AI ---
+    // --- STEP 6: Call AI ---
     const modelsToTry = [
         "google/gemma-3-12b-it:free",
         "mistralai/mistral-small-3.1-24b-instruct:free",
@@ -164,7 +178,7 @@ export async function POST(request: Request) {
 
     if (!completion) throw lastError || new Error("All AI models failed");
 
-    // --- STEP 6: Parse & Sanitize Response ---
+    // --- STEP 7: Parse Response ---
     const content = completion.choices[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     

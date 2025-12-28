@@ -1,5 +1,5 @@
 'use client';
-
+import ReactMarkdown from 'react-markdown';
 import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, ResultState, EconomySettings } from "@/types";
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
@@ -354,51 +354,73 @@ export function WorksheetResults({
             
             {questions.map((question, qIndex) => {
               if (question.gradingMode === 'ai') {
-                  const firstSub = question.solutionSteps[0]?.subQuestions[0];
-                  const result = results[firstSub?.id];
-                  const breakdown = (result as any)?.aiBreakdown;
-                  const feedback = result?.feedback;
-                  const driveLink = answers[firstSub?.id]?.answer;
-                  const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
-
-                  return (
+                const firstSub = question.solutionSteps[0]?.subQuestions[0];
+                const result = results[firstSub?.id];
+                const breakdown = (result as any)?.aiBreakdown;
+                const feedback = result?.feedback; 
+                const driveLink = answers[firstSub?.id]?.answer;
+                const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
+        
+                return (
                     <div key={question.id} className="border rounded-lg overflow-hidden">
-                        <div className="bg-purple-50/50 dark:bg-purple-900/10 p-4 border-b">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Sparkles className="h-4 w-4 text-purple-600" />
-                                <span className="text-xs font-bold uppercase tracking-wider text-purple-600">AI Assessment</span>
-                            </div>
-                            <div className="prose dark:prose-invert max-w-none text-sm font-medium">
-                                <span className="mr-2 font-bold">Q{qIndex + 1}.</span>
-                                <span dangerouslySetInnerHTML={{ __html: processedMainQuestionText(question.mainQuestionText) }} />
+                        {/* ✅ ADDED: Display Question Text for Context */}
+                        <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words border-b">
+                            <div className="flex gap-2">
+                                <span className="font-bold">Q{qIndex + 1}.</span>
+                                <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(question.mainQuestionText) }} />
                             </div>
                         </div>
 
+                        {/* Grading Breakdown Section */}
                         <div className="p-4 space-y-4">
-                            <AIRubricBreakdown rubric={question.aiRubric || null} breakdown={breakdown} maxMarks={qMaxMarks} />
-                            
+                            <AIRubricBreakdown 
+                                rubric={question.aiRubric || null} 
+                                breakdown={breakdown} 
+                                maxMarks={qMaxMarks} 
+                            />
+        
+                            {/* Feedback Rendering with ReactMarkdown */}
                             {feedback && (
-                                <div className="bg-muted/50 p-3 rounded-md text-sm">
-                                    <p className="font-semibold text-purple-700 mb-1 flex items-center gap-2"><CheckCircle className="h-4 w-4" /> AI Feedback</p>
-                                    <p className="text-muted-foreground whitespace-pre-wrap">{feedback}</p>
+                                <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-lg">
+                                    <div className="flex items-start gap-3">
+                                        <CheckCircle className="h-5 w-5 text-purple-600 mt-0.5 shrink-0" />
+                                        <div className="flex-1">
+                                            <h4 className="font-semibold text-purple-800 mb-1">AI Feedback</h4>
+                                            
+                                            <div className="text-sm text-purple-800 leading-relaxed">
+                                                <ReactMarkdown
+                                                    components={{
+                                                        strong: ({node, ...props}) => <span className="font-bold text-purple-900" {...props} />,
+                                                        ul: ({node, ...props}) => <ul className="list-disc pl-4 space-y-1 mt-1" {...props} />,
+                                                        li: ({node, ...props}) => <li className="pl-1" {...props} />,
+                                                        p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />
+                                                    }}
+                                                >
+                                                    {feedback}
+                                                </ReactMarkdown>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
-
+        
+                            {/* Drive Link Section */}
                             {driveLink && (
-                                <div className="flex justify-end">
-                                    <Button variant="outline" size="sm" asChild>
-                                        <a href={driveLink} target="_blank" rel="noopener noreferrer">
-                                            <FileImage className="mr-2 h-4 w-4 text-blue-500" />
-                                            View My Original Solution
-                                            <ExternalLink className="ml-2 h-3 w-3 opacity-50" />
-                                        </a>
-                                    </Button>
+                                <div className="flex justify-end pt-2">
+                                    <a 
+                                        href={driveLink} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-xs flex items-center text-muted-foreground hover:text-primary transition-colors"
+                                    >
+                                        <ExternalLink className="h-3 w-3 mr-1" /> View Original Submission
+                                    </a>
                                 </div>
                             )}
                         </div>
                     </div>
-                  );
-              }
+                );
+            }
 
               return (
                 <div key={question.id}>

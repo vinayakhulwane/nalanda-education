@@ -91,12 +91,18 @@ export default {
         'blast': {
             '0%': { transform: 'scale(1)', opacity: '1' },
             '100%': { transform: 'scale(3)', opacity: '0' },
-        }
+        },
+        'pulse-once': {
+            '0%': { transform: 'scale(1)' },
+            '50%': { transform: 'scale(1.10)' },
+            '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'blast': 'blast 0.6s ease-out forwards',
+        'pulse-once': 'pulse-once 0.5s ease-out',
       },
     },
   },

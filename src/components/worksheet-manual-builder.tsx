@@ -73,6 +73,18 @@ export function WorksheetManualBuilder({
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [viewingQuestion, setViewingQuestion] = useState<Question | null>(null);
 
+    // Animation state
+    const [animateCart, setAnimateCart] = useState(false);
+    const prevSelectedCount = useMemo(() => selectedQuestions.length, []);
+
+    useEffect(() => {
+        if (selectedQuestions.length > prevSelectedCount) {
+            setAnimateCart(true);
+            const timer = setTimeout(() => setAnimateCart(false), 500); // Duration of animation
+            return () => clearTimeout(timer);
+        }
+    }, [selectedQuestions.length, prevSelectedCount]);
+
     const unitMap = new Map(units.map(u => [u.id, u.name]));
     const categoryMap = new Map(categories.map(c => [c.id, c.name]));
 
@@ -319,7 +331,11 @@ export function WorksheetManualBuilder({
                 <Sheet>
                     <SheetTrigger asChild>
                         <div className="fixed bottom-6 right-6 lg:relative lg:bottom-auto lg:right-auto">
-                            <Button size="lg" className="rounded-full h-16 w-16 shadow-xl lg:w-full lg:h-auto lg:rounded-md" disabled={selectedQuestions.length === 0}>
+                            <Button 
+                                size="lg" 
+                                className={cn("rounded-full h-16 w-16 shadow-xl lg:w-full lg:h-auto lg:rounded-md", animateCart && "animate-pulse-once")}
+                                disabled={selectedQuestions.length === 0}
+                            >
                                 <ShoppingCart className="h-6 w-6 lg:mr-2" />
                                 <span className="hidden lg:inline">Review & Create</span>
                                 <Badge className="absolute -top-1 -right-1 lg:static lg:ml-auto">{selectedQuestions.length}</Badge>
