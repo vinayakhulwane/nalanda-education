@@ -1,32 +1,49 @@
-
 'use client';
+
+import { useState, useEffect, useMemo, use } from "react";
+import { useRouter } from "next/navigation";
+import dynamic from 'next/dynamic';
+import { ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus } from "lucide-react";
+
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
-import { arrayRemove, arrayUnion, collection, doc, query, where, updateDoc, writeBatch, documentId, getDocs, limit, orderBy, increment, serverTimestamp } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem, ChevronLeft, ChevronRight, Lock, KeyRound } from "lucide-react";
-import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState, useMemo, use } from "react";
-import type { Subject, Unit, Category, CustomTab, Worksheet, WorksheetAttempt, CurrencyType } from "@/types";
+import { useUser, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { arrayRemove, arrayUnion, collection, doc, updateDoc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
+import type { Subject, CustomTab, CurrencyType } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { WorksheetList } from "@/components/academics/worksheet-list";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { UnlockContentCard } from "@/components/academics/unlock-content-card";
-import Leaderboard from "@/components/academics/leaderboard";
-import PracticeZone from "@/components/academics/practice-zone";
-import SyllabusEditor from "@/components/academics/syllabus-editor";
+
+// ✅ DYNAMIC IMPORTS
+const SyllabusEditor = dynamic(
+  () => import('@/components/academics/syllabus-editor'), 
+  { loading: () => <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin" /></div> }
+);
+
+const PracticeZone = dynamic(
+  () => import('@/components/academics/practice-zone'),
+  { loading: () => <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin" /></div> }
+);
+
+const Leaderboard = dynamic(
+  () => import('@/components/academics/leaderboard'),
+  { loading: () => <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin" /></div> }
+);
+
+const WorksheetList = dynamic(
+  () => import('@/components/academics/worksheet-list').then(mod => mod.WorksheetList),
+  { loading: () => <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin" /></div> }
+);
 
 
 function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, subjectId: string }) {
@@ -75,7 +92,7 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
             id: uuidv4(),
             label: newTabName,
             content: `Content for ${newTabName} goes here. Edit me!`,
-            cost: tabCost > 0 ? tabCost : 0, // Ensure strictly valid
+            cost: tabCost > 0 ? tabCost : 0, 
             currency: tabCurrency || 'coin',
         };
 
@@ -162,16 +179,13 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         const { cost, currency, id: tabId, label } = unlockingTab;
         if (!cost || !currency) return;
         
-        // ✅ 1. Correct Mapping: 'diamond' -> 'diamonds'
         const fieldMap: Record<string, string> = {
             coin: 'coins',
             gold: 'gold',
             diamond: 'diamonds',
-            spark: 'coins' // sparks shouldn't be used, but mapping to coins prevents error
+            spark: 'coins' 
         };
         const balanceField = fieldMap[currency] || 'coins';
-
-        // ✅ 2. Safe Access: Cast to any to bypass TS error
         const currentBalance = (userProfile as any)[balanceField] || 0;
 
         if (currentBalance < cost) {
@@ -320,9 +334,12 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                         </Button>
                     )}
                 </div>
+                
+                {/* DYNAMICALLY LOADED COMPONENTS */}
                 <TabsContent value="syllabus">
                     <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
                 </TabsContent>
+
                 <TabsContent value="worksheet">
                     <Tabs defaultValue="assignments" className="mt-4">
                         <TabsList>
@@ -450,11 +467,9 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
 export default function SubjectWorkspacePage({ 
   params 
 }: { 
-  params: { classId: string; subjectId: string }
+  params: Promise<{ classId: string; subjectId: string }> 
 }) {
     const { classId, subjectId } = use(params);
 
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
-
-    

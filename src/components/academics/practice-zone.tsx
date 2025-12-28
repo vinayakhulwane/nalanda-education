@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from "next/navigation";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, documentId, orderBy } from "firebase/firestore";
 import type { Worksheet, WorksheetAttempt } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,12 +15,41 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
     const router = useRouter();
     const firestore = useFirestore();
     const { user, userProfile } = useUser();
-    const [attempts, setAttempts] = useState<WorksheetAttempt[]>([]);
-    const [areAttemptsLoading, setAttemptsLoading] = useState(true);
+    
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    const practiceWorksheetsQuery = useMemoFirebase(() => {
+    // 1. Fetch ALL attempts by the user for this subject to build the history
+    const attemptsQuery = useMemoFirebase(() => {
+        if (!firestore || !user?.uid || !subjectId) return null;
+        // This is a broad query, for performance at scale, you might add `subjectId` to attempts
+        return query(
+            collection(firestore, 'worksheet_attempts'),
+            where('userId', '==', user.uid),
+            orderBy('attemptedAt', 'desc')
+        );
+    }, [firestore, user, subjectId]);
+    const { data: allAttempts, isLoading: areAttemptsLoading } = useCollection<WorksheetAttempt>(attemptsQuery);
+    
+    // 2. From attempts, get the list of worksheet IDs
+    const attemptedWorksheetIds = useMemo(() => {
+        if (!allAttempts) return [];
+        return [...new Set(allAttempts.map(a => a.worksheetId))];
+    }, [allAttempts]);
+
+    // 3. Fetch only the worksheets that have been attempted and match the subject
+    const attemptedWorksheetsQuery = useMemoFirebase(() => {
+        if (!firestore || attemptedWorksheetIds.length === 0) return null;
+        return query(
+            collection(firestore, 'worksheets'),
+            where(documentId(), 'in', attemptedWorksheetIds.slice(0, 30)),
+            where('subjectId', '==', subjectId)
+        );
+    }, [firestore, attemptedWorksheetIds, subjectId]);
+    const { data: completedWorksheets, isLoading: areCompletedWorksheetsLoading } = useCollection<Worksheet>(attemptedWorksheetsQuery);
+
+    // 4. Fetch the worksheets created by the user (for the "To-Do" list)
+    const userCreatedWorksheetsQuery = useMemoFirebase(() => {
         if (!firestore || !user?.uid || !subjectId) return null;
         return query(
             collection(firestore, 'worksheets'),
@@ -29,90 +58,45 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
             where('authorId', '==', user.uid)
         );
     }, [firestore, user, subjectId]);
+    const { data: userCreatedWorksheets, isLoading: areUserCreatedLoading } = useCollection<Worksheet>(userCreatedWorksheetsQuery);
     
-    const { data: practiceWorksheets, isLoading: areWorksheetsLoading } = useCollection<Worksheet>(practiceWorksheetsQuery);
+    // --- Data Processing ---
+    const { notCompleted, attemptsMap, totalPages, paginatedCompleted } = useMemo(() => {
+        if (!userCreatedWorksheets || !completedWorksheets || !allAttempts) {
+            return { notCompleted: [], attemptsMap: new Map(), totalPages: 1, paginatedCompleted: [] };
+        }
 
-    useEffect(() => {
-        const fetchAttempts = async () => {
-            if (!firestore || !user?.uid || !practiceWorksheets) {
-                setAttemptsLoading(false);
-                return;
-            }
-            
-            const completedIds = practiceWorksheets.filter(ws => userProfile?.completedWorksheets?.includes(ws.id)).map(ws => ws.id);
-
-            if (completedIds.length === 0) {
-                setAttempts([]);
-                setAttemptsLoading(false);
-                return;
-            }
-
-            try {
-                const attemptsQuery = query(
-                    collection(firestore, 'worksheet_attempts'), 
-                    where('userId', '==', user.uid),
-                    where('worksheetId', 'in', completedIds.slice(0,30)) 
-                );
-                
-                const attemptSnapshots = await getDocs(attemptsQuery);
-                const fetchedAttempts = attemptSnapshots.docs.map(d => ({ id: d.id, ...d.data() })) as WorksheetAttempt[];
-                setAttempts(fetchedAttempts);
-
-            } catch (error) {
-                console.error("Error fetching attempts:", error);
-            } finally {
-                setAttemptsLoading(false);
-            }
-        };
-
-        fetchAttempts();
-    }, [firestore, user?.uid, practiceWorksheets, userProfile?.completedWorksheets]);
-
-
-    const { completed, notCompleted, attemptsMap, totalPages, paginatedCompleted } = useMemo(() => {
-        if (!practiceWorksheets) return { completed: [], notCompleted: [], attemptsMap: new Map(), totalPages: 1, paginatedCompleted: [] };
-        
-        const completedIds = new Set(userProfile?.completedWorksheets || []);
-        const allCompletedWorksheets = practiceWorksheets.filter(ws => completedIds.has(ws.id));
-        const notCompletedWorksheets = practiceWorksheets.filter(ws => !completedIds.has(ws.id));
+        const completedIds = new Set(completedWorksheets.map(ws => ws.id));
+        const notCompletedWorksheets = userCreatedWorksheets.filter(ws => !completedIds.has(ws.id));
         
         const latestAttemptsMap = new Map<string, WorksheetAttempt>();
-        attempts.forEach(attempt => {
+        allAttempts.forEach(attempt => {
             const existing = latestAttemptsMap.get(attempt.worksheetId);
             if (!existing || (attempt.attemptedAt && existing.attemptedAt && attempt.attemptedAt.toMillis() > existing.attemptedAt.toMillis())) {
                 latestAttemptsMap.set(attempt.worksheetId, attempt);
             }
         });
-
-        allCompletedWorksheets.sort((a, b) => {
-            const attemptA = latestAttemptsMap.get(a.id);
-            const attemptB = latestAttemptsMap.get(b.id);
-            const timeA = attemptA?.attemptedAt?.toMillis() || 0;
-            const timeB = attemptB?.attemptedAt?.toMillis() || 0;
+        
+        // Sort completed worksheets by the date of their latest attempt
+        const sortedCompleted = [...completedWorksheets].sort((a, b) => {
+            const timeA = latestAttemptsMap.get(a.id)?.attemptedAt?.toMillis() || 0;
+            const timeB = latestAttemptsMap.get(b.id)?.attemptedAt?.toMillis() || 0;
             return timeB - timeA;
         });
-        
-        const finalAttemptsMap = new Map<string, WorksheetAttempt>();
-        latestAttemptsMap.forEach((attempt, worksheetId) => {
-            finalAttemptsMap.set(worksheetId, attempt);
-        });
 
-        const totalP = Math.ceil(allCompletedWorksheets.length / itemsPerPage);
+        const totalP = Math.ceil(sortedCompleted.length / itemsPerPage);
         const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        const paginatedItems = allCompletedWorksheets.slice(startIndex, endIndex);
+        const paginatedItems = sortedCompleted.slice(startIndex, endIndex);
 
         return { 
-            completed: allCompletedWorksheets, 
             notCompleted: notCompletedWorksheets, 
-            attemptsMap: finalAttemptsMap,
+            attemptsMap: latestAttemptsMap,
             totalPages: totalP,
             paginatedCompleted: paginatedItems,
         };
-    }, [practiceWorksheets, userProfile?.completedWorksheets, attempts, currentPage]);
+    }, [userCreatedWorksheets, completedWorksheets, allAttempts, currentPage]);
     
-
-    const isLoading = areWorksheetsLoading || areAttemptsLoading;
+    const isLoading = areUserCreatedLoading || areCompletedWorksheetsLoading || areAttemptsLoading;
     const createWorksheetUrl = `/worksheets/new?classId=${classId}&subjectId=${subjectId}&source=practice`;
     
     return (
@@ -149,7 +133,6 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                                         key={ws.id} 
                                         worksheet={ws} 
                                         isPractice={true}
-                                        completedAttempts={userProfile?.completedWorksheets || []}
                                         view="card"
                                     />
                                 ))
@@ -173,19 +156,18 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                                         key={ws.id} 
                                         worksheet={ws} 
                                         isPractice={true}
-                                        completedAttempts={userProfile?.completedWorksheets || []}
                                         view="list"
                                         attempt={attemptsMap.get(ws.id)}
                                     />
                                 ))
                             )}
                         </div>
-                         {completed.length === 0 && !isLoading && (
+                         {completedWorksheets && completedWorksheets.length === 0 && !isLoading && (
                             <div className="text-center text-muted-foreground py-10 mt-4">
                                 <p>Your completed practice worksheets will appear here.</p>
                             </div>
                         )}
-                        {completed.length > 0 && !isLoading && (
+                        {completedWorksheets && completedWorksheets.length > 0 && !isLoading && (
                             <div className="flex items-center justify-between mt-4">
                                 <span className="text-sm text-muted-foreground">
                                     Page {currentPage} of {totalPages}
