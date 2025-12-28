@@ -26,7 +26,7 @@ const rubricLabels: Record<AIRubricKey, string> = {
 };
 
 // ✅ UPDATED FEEDBACK PATTERNS
-// Note: Ensure your 'AIFeedbackPattern' type in @/types includes these new IDs
+// Added 'nextSteps' as requested
 const feedbackPatterns: { id: any, label: string }[] = [
     { id: 'givenRequiredMapping', label: 'Given–Required Mapping' },
     { id: 'conceptualMisconception', label: 'Conceptual Misconception' },
@@ -35,6 +35,7 @@ const feedbackPatterns: { id: any, label: string }[] = [
     { id: 'unitsDimensions', label: 'Units & Dimensions' },
     { id: 'commonPitfalls', label: 'Common Pitfalls' },
     { id: 'answerPresentation', label: 'Final Answer Presentation' },
+    { id: 'nextSteps', label: 'Next Steps / Further Learning' }, // ✨ Added Here
 ];
 
 
@@ -172,7 +173,7 @@ export function Step4Grading({ onValidityChange, question, setQuestion }: Step4G
                                 checked={question.aiFeedbackPatterns?.includes(pattern.id)}
                                 onCheckedChange={(checked) => handleFeedbackPatternChange(pattern.id, !!checked)}
                             />
-                            <Label htmlFor={pattern.id} className="text-sm font-normal">
+                            <Label htmlFor={pattern.id} className="text-sm font-normal cursor-pointer">
                                 {pattern.label}
                             </Label>
                         </div>

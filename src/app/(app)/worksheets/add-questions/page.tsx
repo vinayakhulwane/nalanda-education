@@ -224,10 +224,6 @@ function AddQuestionsPageContent() {
         // 3. Add to Cart if checks pass
         setSelectedQuestions([...selectedQuestions, { ...question, source }]);
         
-        toast({
-            title: "Question Added",
-            description: "Question added to your worksheet.",
-        });
     };
 
     const removeQuestion = (questionId: string) => {

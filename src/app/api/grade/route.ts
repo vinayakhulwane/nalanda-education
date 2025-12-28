@@ -31,10 +31,11 @@ export async function POST(request: Request) {
     const imageFile = formData.get('image') as File;
     const questionText = formData.get('questionText') as string;
     const rubricJson = formData.get('rubric') as string;
+    const feedbackPatternsJson = formData.get('feedbackPatterns') as string;
 
     if (!imageFile) return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
 
-    // --- STEP 1: Process Rubric ---
+    // --- STEP 1: Process Rubric & Feedback Patterns ---
     let parsedRubric;
     try {
         parsedRubric = JSON.parse(rubricJson);
@@ -45,6 +46,16 @@ export async function POST(request: Request) {
     const rubricInstructions = Object.entries(parsedRubric)
         .map(([category, weight]) => `- ${category}: Weightage ${weight}`)
         .join("\n");
+
+    let feedbackFocusList = "General observations";
+    try {
+        const patterns = JSON.parse(feedbackPatternsJson || '[]');
+        if (Array.isArray(patterns) && patterns.length > 0) {
+            feedbackFocusList = patterns.map(p => `- ${p}`).join("\n");
+        }
+    } catch (e) {
+        console.log("No feedback patterns found, using default.");
+    }
 
     // --- STEP 2: Process Image ---
     const arrayBuffer = await imageFile.arrayBuffer();
@@ -78,39 +89,46 @@ export async function POST(request: Request) {
     const driveLink = fileInfo.data.webViewLink;
 
     // --- STEP 4: Construct AI Prompt ---
+    const totalQuestionMarks = parseFloat(formData.get('totalMarks') as string) || 8;
 
-// Get the total marks for the question (sent from frontend)
-const totalQuestionMarks = parseFloat(formData.get('totalMarks') as string) || 8;
+    // ✅ UPDATED PROMPT: More explicit about formatting and spaces
+    const systemPrompt = `
+      You are an expert academic grader.
+      
+      TASK:
+      Analyze the student's handwritten solution in the provided image. Compare it against the Question and evaluate it strictly using the weighted Rubric provided.
 
-const systemPrompt = `
-  You are an expert academic grader for a high-stakes technical examination.
-  
-  TASK:
-  Analyze the student's handwritten solution in the provided image. Compare it against the Question and evaluate it strictly using the weighted Rubric provided.
+      QUESTION: "${questionText}"
+      QUESTION MAX MARKS: ${totalQuestionMarks}
 
-  QUESTION: "${questionText}"
-  QUESTION MAX MARKS: ${totalQuestionMarks}
+      RUBRIC CRITERIA:
+      ${rubricInstructions}
 
-  RUBRIC CRITERIA:
-  ${rubricInstructions}
+      FEEDBACK FOCUS AREAS (Must Address These):
+      ${feedbackFocusList}
 
-  INSTRUCTIONS:
-  1. For each Rubric criterion, assign a score from 0 to 100 based on the quality of the student's work for that specific part.
-  2. "totalScore" must be the final weighted percentage (0-100) based on all criteria.
-  3. Provide "feedback" that is encouraging but identifies exactly where marks were lost.
-  4. Set "isCorrect" to true if the totalScore is 50 or higher.
+      INSTRUCTIONS:
+      1. For each Rubric criterion, assign a score from 0 to 100.
+      2. "totalScore" must be the final weighted percentage (0-100).
+      3. "feedback": You MUST return a structured Markdown list. 
+         - Create a bullet point for each "Feedback Focus Area".
+         - **Crucial:** Use bold for the focus area name, followed by a colon and a space. Ensure there are spaces between words in the focus area name (e.g., "**Step Sequence:**" not "**StepSequence:**").
+         - Example Format:
+           - **Given Data:** Mentioned correctly.
+           - **Step Sequence:** Confusing; you missed the second derivative.
+           - **Calculation Error:** Good, but watch units.
+      4. Set "isCorrect" to true if the totalScore is 50 or higher.
 
-  OUTPUT FORMAT (STRICT JSON ONLY):
-  {
-    "totalScore": number, 
-    "isCorrect": boolean,
-    "feedback": "string",
-    "breakdown": { 
-       // For every key in the rubric, provide a 0-100 score
-       "Criteria Name": number 
-    }
-  }
-`;
+      OUTPUT FORMAT (STRICT JSON ONLY):
+      {
+        "totalScore": number, 
+        "isCorrect": boolean,
+        "feedback": "string (Markdown formatted list)",
+        "breakdown": { 
+           "Criteria Name": number 
+        }
+      }
+    `;
 
     // --- STEP 5: Call AI ---
     const modelsToTry = [
@@ -146,7 +164,7 @@ const systemPrompt = `
 
     if (!completion) throw lastError || new Error("All AI models failed");
 
-    // --- STEP 6: Parse & Sanitize Response (The Fix) ---
+    // --- STEP 6: Parse & Sanitize Response ---
     const content = completion.choices[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     
@@ -154,15 +172,12 @@ const systemPrompt = `
     
     const rawResult = JSON.parse(jsonMatch[0]);
 
-    // ✅ ROBUST SANITIZATION:
-    // This fixes the error by checking for "totalScore", "Score", or "score" 
-    // and ensuring it is always a Number.
     const cleanResult = {
         totalScore: Number(rawResult.totalScore ?? rawResult.score ?? rawResult.Score ?? 0),
         isCorrect: Boolean(rawResult.isCorrect),
         feedback: rawResult.feedback || "Grading complete.",
         breakdown: rawResult.breakdown || {},
-        driveLink // Add the link we generated
+        driveLink 
     };
 
     return NextResponse.json(cleanResult);

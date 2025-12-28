@@ -1,4 +1,5 @@
 'use client';
+import ReactMarkdown from 'react-markdown';
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
@@ -380,18 +381,35 @@ export default function SolveWorksheetPage() {
                                                 maxMarks={qMaxMarks}
                                             />
                                         </div>
-
-                                        {currentFeedback && (
-                                            <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-lg">
-                                                <div className="flex items-start gap-3">
-                                                    <CheckCircle className="h-5 w-5 text-purple-600 mt-0.5" />
-                                                    <div>
-                                                        <h4 className="font-semibold text-purple-800">Feedback</h4>
-                                                        <p className="text-sm text-purple-700 mt-1 whitespace-pre-wrap leading-relaxed">{currentFeedback}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
+{/* REPLACED FEEDBACK BLOCK */}
+{currentFeedback && (
+            <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-lg">
+                <div className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-purple-600 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                        <h4 className="font-semibold text-purple-800 mb-1">AI Feedback</h4>
+                        
+                        <div className="text-sm text-purple-800 leading-relaxed">
+                            <ReactMarkdown
+                                components={{
+                                    // Style bold text (**text**)
+                                    strong: ({node, ...props}) => <span className="font-bold text-purple-900" {...props} />,
+                                    
+                                    // Style lists
+                                    ul: ({node, ...props}) => <ul className="list-disc pl-4 space-y-1 mt-1" {...props} />,
+                                    li: ({node, ...props}) => <li className="pl-1" {...props} />,
+                                    
+                                    // Style paragraphs to maintain spacing
+                                    p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />
+                                }}
+                            >
+                                {currentFeedback}
+                            </ReactMarkdown>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
                                      </div>
                                 )}
 
