@@ -1,24 +1,25 @@
 'use client';
 
 import { useMemo } from "react";
-import type { Worksheet, Question, CurrencyType } from "@/types";
+import type { Worksheet, Question, CurrencyType, WorksheetAttempt } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { FileText, Sparkles, Coins, Crown, Gem, BookOpen } from "lucide-react";
+import { FileText, Sparkles, Coins, Crown, Gem, BookOpen, Calendar, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where, documentId } from "firebase/firestore";
 import { Skeleton } from "../ui/skeleton";
 import { cn } from "@/lib/utils";
+import { format } from 'date-fns';
+
 
 interface WorksheetDisplayCardProps {
     worksheet: Worksheet;
     isPractice?: boolean;
     completedAttempts?: string[];
     view?: 'card' | 'list';
-    attemptId?: string;
-    // ✅ ADDED: New prop to track the navigation source
+    attempt?: WorksheetAttempt;
     from?: 'progress' | 'academics';
 }
 
@@ -37,7 +38,7 @@ const currencyColors: Record<CurrencyType, string> = {
 };
 
 
-export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [], view = 'card', attemptId, from = 'academics' }: WorksheetDisplayCardProps) {
+export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [], view = 'card', attempt, from = 'academics' }: WorksheetDisplayCardProps) {
     const router = useRouter();
     const firestore = useFirestore();
 
@@ -73,11 +74,19 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
     const currencyColor = currencyColors[primaryCurrency];
 
     const isCompleted = isPractice ? completedAttempts.includes(worksheet.id) : false;
+    
+    const attemptTimestamp = useMemo(() => {
+        if (!attempt?.attemptedAt?.toDate) return null;
+        try {
+            return attempt.attemptedAt.toDate();
+        } catch {
+            return null;
+        }
+    }, [attempt]);
 
     const handleReviewClick = () => {
-        if (attemptId) {
-            // ✅ UPDATED: Pass the 'from' prop as a query parameter
-            router.push(`/worksheets/review/${attemptId}?from=${from}`);
+        if (attempt?.id) {
+            router.push(`/worksheets/review/${attempt.id}?from=${from}`);
         } else {
             router.push(`/worksheets/preview/${worksheet.id}`);
         }
@@ -95,7 +104,7 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
                     {isLoading ? (
                          <Skeleton className="h-4 w-48 mt-2" />
                     ): (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap mt-1">
+                        <div className="flex items-center gap-x-3 gap-y-1 text-sm text-muted-foreground flex-wrap mt-1">
                             <span>{worksheet.questions.length} Questions</span>
                             <span className="text-muted-foreground/50">|</span>
                             <span>{totalMarks} Marks</span>
@@ -103,6 +112,13 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
                              <span className={cn("flex items-center gap-1 capitalize", currencyColor)}>
                                 <CurrencyIcon className="h-4 w-4" /> {primaryCurrency}
                             </span>
+                             {attemptTimestamp && (
+                                <>
+                                 <span className="text-muted-foreground/50">|</span>
+                                 <span className="flex items-center gap-1"><Calendar className="h-4 w-4"/> {format(attemptTimestamp, 'dd MMM yyyy')}</span>
+                                 <span className="flex items-center gap-1"><Clock className="h-4 w-4"/> {format(attemptTimestamp, 'p')}</span>
+                                </>
+                             )}
                         </div>
                     )}
                 </CardContent>

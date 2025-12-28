@@ -311,9 +311,9 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
             return timeB - timeA;
         });
         
-        const finalAttemptsMap = new Map<string, string>();
+        const finalAttemptsMap = new Map<string, WorksheetAttempt>();
         latestAttemptsMap.forEach((attempt, worksheetId) => {
-            finalAttemptsMap.set(worksheetId, attempt.id);
+            finalAttemptsMap.set(worksheetId, attempt);
         });
 
         const totalP = Math.ceil(allCompletedWorksheets.length / itemsPerPage);
@@ -394,7 +394,7 @@ function PracticeZone({ classId, subjectId }: { classId: string, subjectId: stri
                                         isPractice={true}
                                         completedAttempts={userProfile?.completedWorksheets || []}
                                         view="list"
-                                        attemptId={attemptsMap.get(ws.id)}
+                                        attempt={attemptsMap.get(ws.id)}
                                     />
                                 ))
                             )}
