@@ -10,6 +10,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import { StudentProgressDetail } from '@/components/user-management/student-progress-detail';
 import { AdminStudentInfoCard } from '@/components/user-management/admin-student-info-card';
 import { Button } from '@/components/ui/button';
+import { StudentAttemptHistory } from '@/components/user-management/student-attempt-history';
 
 function AdminStudentProgressPageContent({ userId }: { userId: string }) {
     const firestore = useFirestore();
@@ -39,8 +40,9 @@ function AdminStudentProgressPageContent({ userId }: { userId: string }) {
                 <div className="lg:col-span-1">
                     <AdminStudentInfoCard student={student} />
                 </div>
-                 <div className="lg:col-span-2">
+                 <div className="lg:col-span-2 space-y-6">
                     <StudentProgressDetail student={student} />
+                    <StudentAttemptHistory student={student} />
                 </div>
             </div>
         </div>
