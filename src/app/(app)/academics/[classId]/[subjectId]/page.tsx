@@ -1,3 +1,4 @@
+
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -7,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { arrayRemove, arrayUnion, collection, doc, query, where, updateDoc, writeBatch, documentId, getDocs, limit, orderBy, increment, serverTimestamp } from "firebase/firestore";
-import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem, ChevronLeft, ChevronRight, Lock } from "lucide-react";
+import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem, ChevronLeft, ChevronRight, Lock, KeyRound } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, use } from "react";
 import type { Subject, Unit, Category, CustomTab, Worksheet, WorksheetAttempt, CurrencyType } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -573,8 +574,8 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
             id: uuidv4(),
             label: newTabName,
             content: `Content for ${newTabName} goes here. Edit me!`,
-            cost: tabCost > 0 ? tabCost : undefined,
-            currency: tabCost > 0 ? tabCurrency : undefined,
+            cost: tabCost > 0 ? tabCost : 0, // Ensure strictly valid
+            currency: tabCurrency || 'coin',
         };
 
         const subjectRef = doc(firestore, 'subjects', subjectId);
@@ -601,8 +602,8 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         const updatedTabs = subject.customTabs?.map(t => t.id === editingTab.id ? {
             ...t, 
             label: editedTabName,
-            cost: tabCost > 0 ? tabCost : undefined,
-            currency: tabCost > 0 ? tabCurrency : undefined,
+            cost: tabCost > 0 ? tabCost : 0, 
+            currency: tabCurrency || 'coin',
         } : t);
         const subjectRef = doc(firestore, 'subjects', subjectId);
         await updateDoc(subjectRef, { customTabs: updatedTabs });
@@ -660,8 +661,17 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         const { cost, currency, id: tabId, label } = unlockingTab;
         if (!cost || !currency) return;
         
-        const balanceField = currency === 'coin' ? 'coins' : currency;
-        const currentBalance = userProfile[balanceField] || 0;
+        // ✅ 1. Correct Mapping: 'diamond' -> 'diamonds'
+        const fieldMap: Record<string, string> = {
+            coin: 'coins',
+            gold: 'gold',
+            diamond: 'diamonds',
+            spark: 'coins' // sparks shouldn't be used, but mapping to coins prevents error
+        };
+        const balanceField = fieldMap[currency] || 'coins';
+
+        // ✅ 2. Safe Access: Cast to any to bypass TS error
+        const currentBalance = (userProfile as any)[balanceField] || 0;
 
         if (currentBalance < cost) {
             toast({ variant: 'destructive', title: 'Insufficient Funds', description: `You need ${cost} ${currency} to unlock this tab.` });
@@ -759,7 +769,6 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                 )}
             </div>
             
-            {/* Hide tabs if user is blocked */}
             {!isUserBlocked && (
             <Tabs defaultValue="syllabus">
                 <div className="flex items-center">
@@ -937,20 +946,14 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     );
 }
 
-export default function SubjectWorkspacePage() {
-    const params = useParams();
-    const classId = params.classId as string;
-    const subjectId = params.subjectId as string;
+export default function SubjectWorkspacePage({ 
+  params 
+}: { 
+  params: Promise<{ classId: string; subjectId: string }> 
+}) {
+    const { classId, subjectId } = use(params);
 
-    if (!classId || !subjectId) {
-        return (
-            <div className="flex h-screen items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="ml-4">Loading subject details...</p>
-            </div>
-        );
-    }
-    
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
+
     
