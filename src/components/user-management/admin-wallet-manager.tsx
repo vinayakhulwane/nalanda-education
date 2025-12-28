@@ -83,75 +83,49 @@ export function AdminWalletManager({ student }: AdminWalletManagerProps) {
   };
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <CardTitle>Wallet Management</CardTitle>
         <CardDescription>Manually add or remove currency from the student's wallet.</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Left side: Balance Display */}
-            <div className="bg-muted/50 rounded-xl flex flex-col items-center justify-center p-6 text-center">
-                 <div className="grid grid-cols-3 gap-4 w-full">
-                    <div className="flex flex-col items-center">
-                        <Coins className="h-8 w-8 text-yellow-500 mb-2" />
-                        <p className="text-3xl font-bold">{student.coins || 0}</p>
-                        <p className="text-sm text-muted-foreground mt-1">Coins</p>
-                    </div>
-                    <div className="flex flex-col items-center">
-                        <Crown className="h-8 w-8 text-amber-500 mb-2" />
-                        <p className="text-3xl font-bold">{student.gold || 0}</p>
-                        <p className="text-sm text-muted-foreground mt-1">Gold</p>
-                    </div>
-                     <div className="flex flex-col items-center">
-                        <Gem className="h-8 w-8 text-blue-500 mb-2" />
-                        <p className="text-3xl font-bold">{student.diamonds || 0}</p>
-                        <p className="text-sm text-muted-foreground mt-1">Diamonds</p>
-                    </div>
-                 </div>
-            </div>
-
-            {/* Right side: Form */}
-            <div className="space-y-4">
-                 <Tabs value={operation} onValueChange={(v) => setOperation(v as any)} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="add"><Plus className="mr-2" /> Add Currency</TabsTrigger>
-                        <TabsTrigger value="remove"><Minus className="mr-2" /> Remove Currency</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-                <div className="grid grid-cols-2 gap-4">
-                    <Input 
-                        type="number" 
-                        placeholder="Amount"
-                        value={amount}
-                        onChange={e => setAmount(e.target.value)}
-                    />
-                     <Select value={currency} onValueChange={(v: any) => setCurrency(v)}>
-                        <SelectTrigger className="w-full capitalize">
-                            <SelectValue placeholder="Select Currency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="coin"><div className="flex items-center gap-2"><Coins className="h-4 w-4 text-yellow-500" /> Coins</div></SelectItem>
-                            <SelectItem value="gold"><div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Gold</div></SelectItem>
-                            <SelectItem value="diamond"><div className="flex items-center gap-2"><Gem className="h-4 w-4 text-blue-500" /> Diamonds</div></SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                 <Input 
-                    placeholder="Reason / Description"
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                />
-                 <Button 
-                    onClick={handleTransaction} 
-                    disabled={isLoading}
-                    className="w-full"
-                >
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Confirm Transaction
-                </Button>
-            </div>
+      <CardContent className="space-y-4">
+          <Tabs value={operation} onValueChange={(v) => setOperation(v as any)} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="add"><Plus className="mr-2" /> Add Currency</TabsTrigger>
+                <TabsTrigger value="remove"><Minus className="mr-2" /> Remove Currency</TabsTrigger>
+            </TabsList>
+        </Tabs>
+        <div className="grid grid-cols-2 gap-4">
+            <Input 
+                type="number" 
+                placeholder="Amount"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+            />
+              <Select value={currency} onValueChange={(v: any) => setCurrency(v)}>
+                <SelectTrigger className="w-full capitalize">
+                    <SelectValue placeholder="Select Currency" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="coin"><div className="flex items-center gap-2"><Coins className="h-4 w-4 text-yellow-500" /> Coins</div></SelectItem>
+                    <SelectItem value="gold"><div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Gold</div></SelectItem>
+                    <SelectItem value="diamond"><div className="flex items-center gap-2"><Gem className="h-4 w-4 text-blue-500" /> Diamonds</div></SelectItem>
+                </SelectContent>
+            </Select>
         </div>
+          <Input 
+            placeholder="Reason / Description"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+        />
+          <Button 
+            onClick={handleTransaction} 
+            disabled={isLoading}
+            className="w-full"
+        >
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Confirm Transaction
+        </Button>
       </CardContent>
     </Card>
   );
