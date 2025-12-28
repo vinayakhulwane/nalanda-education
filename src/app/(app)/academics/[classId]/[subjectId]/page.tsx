@@ -27,6 +27,7 @@ import { WorksheetList } from "@/components/academics/worksheet-list";
 import { WorksheetDisplayCard } from "@/components/academics/worksheet-display-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { UnlockContentCard } from "@/components/academics/unlock-content-card";
 
 
 function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
@@ -539,7 +540,6 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     const [isEditTabDialogOpen, setEditTabDialogOpen] = useState(false);
     const [isEditTabContentDialogOpen, setEditTabContentDialogOpen] = useState(false);
     const [isDeleteTabDialogOpen, setDeleteTabDialogOpen] = useState(false);
-    const [isUnlockTabDialogOpen, setUnlockTabDialogOpen] = useState(false);
 
     const [editingTab, setEditingTab] = useState<CustomTab | null>(null);
     const [newTabName, setNewTabName] = useState("");
@@ -548,7 +548,6 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     const [tabCost, setTabCost] = useState(0);
     const [tabCurrency, setTabCurrency] = useState<CurrencyType>('coin');
     const [deletingTab, setDeletingTab] = useState<CustomTab | null>(null);
-    const [unlockingTab, setUnlockingTab] = useState<CustomTab | null>(null);
 
     const subjectDocRef = useMemoFirebase(() => firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null, [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
@@ -656,7 +655,7 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         }
     }
     
-    const handleUnlockTab = async () => {
+    const handleUnlockTab = async (unlockingTab: CustomTab) => {
         if (!user || !userProfile || !firestore || !unlockingTab) return;
         const { cost, currency, id: tabId, label } = unlockingTab;
         if (!cost || !currency) return;
@@ -690,8 +689,6 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         try {
             await batch.commit();
             toast({ title: 'Tab Unlocked!', description: `You can now view the content of "${label}".` });
-            setUnlockTabDialogOpen(false);
-            setUnlockingTab(null);
         } catch (error) {
             console.error("Error unlocking tab:", error);
             toast({ variant: 'destructive', title: 'Unlock Failed', description: 'Could not complete the transaction.' });
@@ -777,13 +774,6 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                                     <TabsTrigger 
                                         value={tab.id} 
                                         className={userIsEditor ? 'pr-8' : isLocked ? 'pr-2' : ''}
-                                        onClick={(e) => {
-                                            if (isLocked) {
-                                                e.preventDefault();
-                                                setUnlockingTab(tab);
-                                                setUnlockTabDialogOpen(true);
-                                            }
-                                        }}
                                     >
                                         {tab.label}
                                         {isLocked && <Lock className="ml-2 h-3 w-3 text-muted-foreground" />}
@@ -842,27 +832,34 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                      <Leaderboard subjectId={subjectId} />
                 </TabsContent>
 
-                 {visibleCustomTabs?.map(tab => (
-                    <TabsContent key={tab.id} value={tab.id}>
-                        <Card className="mt-6">
-                            <CardHeader className="flex-row items-center justify-between">
-                                <CardTitle>{tab.label}</CardTitle>
-                                {userIsEditor && (
-                                    <Button variant="outline" size="sm" onClick={() => openEditTabContentDialog(tab)}>
-                                        <Pencil className="mr-2 h-4 w-4" />
-                                        Edit Content
-                                    </Button>
-                                )}
-                            </CardHeader>
-                            <CardContent>
-                                <div
-                                    className="prose dark:prose-invert max-w-none"
-                                    dangerouslySetInnerHTML={{ __html: tab.content }}
-                                />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                ))}
+                 {visibleCustomTabs?.map(tab => {
+                    const isLocked = !userIsEditor && !isTabUnlocked(tab);
+                    return (
+                        <TabsContent key={tab.id} value={tab.id}>
+                            {isLocked ? (
+                                <UnlockContentCard tab={tab} onUnlock={() => handleUnlockTab(tab)} />
+                            ) : (
+                                <Card className="mt-6">
+                                    <CardHeader className="flex-row items-center justify-between">
+                                        <CardTitle>{tab.label}</CardTitle>
+                                        {userIsEditor && (
+                                            <Button variant="outline" size="sm" onClick={() => openEditTabContentDialog(tab)}>
+                                                <Pencil className="mr-2 h-4 w-4" />
+                                                Edit Content
+                                            </Button>
+                                        )}
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div
+                                            className="prose dark:prose-invert max-w-none"
+                                            dangerouslySetInnerHTML={{ __html: tab.content }}
+                                        />
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </TabsContent>
+                    )
+                })}
             </Tabs>
             )}
 
@@ -936,27 +933,6 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                 </AlertDialogContent>
             </AlertDialog>
             
-            {/* Unlock Tab Dialog */}
-            <AlertDialog open={isUnlockTabDialogOpen} onOpenChange={setUnlockTabDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Unlock "{unlockingTab?.label}"?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            To view this content, you need to pay the following cost. This is a one-time purchase.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                     <div className="flex justify-center items-center gap-2 p-4 my-4 bg-muted rounded-lg font-bold text-2xl">
-                        {(unlockingTab?.currency === 'coin' && <Coins className="h-6 w-6 text-yellow-500" />) ||
-                         (unlockingTab?.currency === 'gold' && <Crown className="h-6 w-6 text-amber-500" />) ||
-                         (unlockingTab?.currency === 'diamond' && <Gem className="h-6 w-6 text-blue-500" />)}
-                        {unlockingTab?.cost}
-                    </div>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setUnlockTabDialogOpen(false)}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleUnlockTab}>Confirm Purchase</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }
