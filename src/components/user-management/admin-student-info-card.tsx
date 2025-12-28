@@ -59,8 +59,10 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
     const updateField = currency === 'coin' ? 'coins' : currency;
 
     try {
+      // Step 1: Update the user's wallet balance.
       batch.update(studentRef, { [updateField]: increment(finalAmount) });
       
+      // Step 2: Create a corresponding transaction log record.
       batch.set(transactionRef, {
         userId: student.id,
         type: operation === 'add' ? 'earned' : 'spent',
@@ -71,6 +73,7 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
         adminId: adminUser.uid,
       });
       
+      // Step 3: Commit both operations as a single atomic batch.
       await batch.commit();
 
       toast({ title: 'Transaction Successful', description: `Wallet has been updated for ${student.name}.` });
