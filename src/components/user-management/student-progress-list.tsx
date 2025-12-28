@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { collection, doc } from "firebase/firestore";
 import type { User, Subject, Class, WorksheetAttempt, Worksheet, Question } from "@/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Loader2, Users, Filter, Wallet, BarChart2, Target, TrendingUp, Gem, Coins, Crown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 type SubjectEnrollmentInfo = {
     subject: Subject;
@@ -72,6 +73,7 @@ const getAttemptTotals = (a: WorksheetAttempt, worksheet: Worksheet | undefined,
 
 export function StudentProgressList() {
     const firestore = useFirestore();
+    const router = useRouter();
     const [selectedSubject, setSelectedSubject] = useState<SubjectEnrollmentInfo | null>(null);
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [classFilter, setClassFilter] = useState<string>('all');
@@ -258,7 +260,7 @@ export function StudentProgressList() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    <Button variant="outline" size="sm" disabled>
+                                                    <Button variant="outline" size="sm" onClick={() => router.push(`/user-management/${detail.student.id}/progress`)}>
                                                         <TrendingUp className="mr-2 h-4 w-4" />
                                                         Full Report
                                                     </Button>
