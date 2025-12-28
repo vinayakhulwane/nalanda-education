@@ -25,15 +25,16 @@ const rubricLabels: Record<AIRubricKey, string> = {
   presentationClarity: 'Presentation Clarity',
 };
 
-const feedbackPatterns: { id: AIFeedbackPattern, label: string }[] = [
-    { id: 'consistency', label: 'Consistency Pattern' },
-    { id: 'examReadiness', label: 'Exam Readiness' },
-    { id: 'calculationError', label: 'Calculation Error' },
+// ✅ UPDATED FEEDBACK PATTERNS
+// Note: Ensure your 'AIFeedbackPattern' type in @/types includes these new IDs
+const feedbackPatterns: { id: any, label: string }[] = [
+    { id: 'givenRequiredMapping', label: 'Given–Required Mapping' },
     { id: 'conceptualMisconception', label: 'Conceptual Misconception' },
-    { id: 'alternativeMethods', label: 'Alternative Methods' },
+    { id: 'stepSequence', label: 'Step Sequence / Method Flow' },
+    { id: 'calculationMistake', label: 'Arithmetic / Calculation Mistake' },
+    { id: 'unitsDimensions', label: 'Units & Dimensions' },
     { id: 'commonPitfalls', label: 'Common Pitfalls' },
-    { id: 'realWorldConnection', label: 'Real-World Connection' },
-    { id: 'nextSteps', label: 'Next Steps / Further Learning' },
+    { id: 'answerPresentation', label: 'Final Answer Presentation' },
 ];
 
 
@@ -148,7 +149,7 @@ export function Step4Grading({ onValidityChange, question, setQuestion }: Step4G
                     <div className={cn("text-right font-semibold", !isRubricValid && 'text-destructive')}>
                         Total Weightage: {totalWeightage}%
                     </div>
-                     {!isRubricValid && (
+                      {!isRubricValid && (
                         <Alert variant="destructive">
                             <AlertCircle className="h-4 w-4" />
                             <AlertTitle>Validation Error</AlertTitle>

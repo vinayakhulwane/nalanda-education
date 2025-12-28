@@ -2,7 +2,7 @@
 import type { Question, Unit, Category, CurrencyType, Worksheet, WalletTransaction, EconomySettings } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
-import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X } from 'lucide-react';
+import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X, Eye } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
@@ -17,6 +17,7 @@ import { doc } from 'firebase/firestore';
 import { calculateWorksheetCost } from '@/lib/wallet';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Checkbox } from './ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
@@ -68,6 +69,9 @@ export function WorksheetManualBuilder({
     const { userProfile } = useUser();
     const firestore = useFirestore();
     const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
+
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+    const [viewingQuestion, setViewingQuestion] = useState<Question | null>(null);
 
     const unitMap = new Map(units.map(u => [u.id, u.name]));
     const categoryMap = new Map(categories.map(c => [c.id, c.name]));
@@ -158,6 +162,17 @@ export function WorksheetManualBuilder({
     const allCurrencyTypes: CurrencyType[] = ['spark', 'coin', 'gold', 'diamond'];
     const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
     const isFilterActive = activeFilterCount > 0;
+    
+    const handleViewClick = (question: Question) => {
+        setViewingQuestion(question);
+        setIsViewModalOpen(true);
+    };
+
+    const processedQuestionText = useMemo(() => {
+        if (!viewingQuestion?.mainQuestionText) return '';
+        return viewingQuestion.mainQuestionText.replace(/&nbsp;/g, ' ');
+    }, [viewingQuestion]);
+
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
@@ -259,8 +274,11 @@ export function WorksheetManualBuilder({
                         const currencyColor = currencyColors[q.currencyType];
                         return (
                             <Card key={q.id} className="flex flex-col">
-                                <CardHeader className="pb-2">
+                                <CardHeader className="pb-2 flex-row items-start justify-between">
                                     <CardTitle className="text-base line-clamp-1">{q.name}</CardTitle>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 -mr-2 -mt-2" onClick={() => handleViewClick(q)}>
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
                                 </CardHeader>
                                 <CardContent className="space-y-2 flex-grow">
                                     <div className="flex items-center gap-2">
@@ -451,6 +469,21 @@ export function WorksheetManualBuilder({
                     </SheetContent>
                 </Sheet>
             </div>
+            
+            <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+              <DialogContent className="sm:max-w-[625px]">
+                <DialogHeader>
+                  <DialogTitle>{viewingQuestion?.name}</DialogTitle>
+                   <DialogDescription>
+                    Question Preview
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: processedQuestionText }} />
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
         </div>
     );
 }

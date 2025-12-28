@@ -89,7 +89,8 @@ export default function AboutPage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto p-6">
+        // ✅ FIX: Added 'w-full' and responsive padding to ensure it fits in the container
+        <div className="w-full max-w-4xl mx-auto p-4 md:p-6">
             <div className="flex items-center justify-between mb-6">
                 <PageHeader 
                     title="About Platform" 
@@ -129,8 +130,10 @@ export default function AboutPage() {
             ) : (
                 <Card>
                     <CardContent className="pt-6">
+                        {/* ✅ FIX: Changed overflow-hidden to overflow-x-auto. 
+                            This allows wide content (like tables) to scroll internally instead of breaking the page. */}
                         <div 
-                            className="prose dark:prose-invert max-w-none w-full break-words overflow-hidden"
+                            className="prose dark:prose-invert max-w-none w-full break-words overflow-x-auto"
                             dangerouslySetInnerHTML={{ __html: content }}
                         />
                     </CardContent>
