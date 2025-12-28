@@ -8,7 +8,7 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { mockStudent, mockTeacher } from "@/lib/data";
-import { BookOpen, LayoutDashboard, BarChart3, FilePlus2, BookPlus, Settings, LogOut, Users, Wallet, Home, Building2, Briefcase, BookCopy, History } from "lucide-react";
+import { BookOpen, LayoutDashboard, BarChart3, FilePlus2, BookPlus, Settings, LogOut, Users, Wallet, Home, Building2, Briefcase, BookCopy, History, Info } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "./logo";
 import { useDoc, useFirestore, useUser } from "@/firebase";
@@ -59,6 +59,10 @@ export function AppSidebar() {
     { href: "#", icon: Users, label: "Students" },
   ];
 
+  const sharedMenuItems = [
+      { href: "/about", icon: Info, label: "About Platform" },
+  ];
+
   let menuItems: { href: string; icon: any; label: string }[] = [];
   if (userProfile?.role === 'admin') {
     menuItems = adminMenu;
@@ -102,6 +106,13 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+           {sharedMenuItems.map((item) => (
+             <SidebarMenuItem key={item.href + item.label}>
+                <SidebarMenuButton asChild tooltip={item.label} isActive={pathname.startsWith(item.href)}>
+                    <Link href={item.href}><item.icon /><span>{item.label}</span></Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Settings">
               <Link href="#"><Settings /><span>Settings</span></Link>
