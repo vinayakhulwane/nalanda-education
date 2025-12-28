@@ -86,6 +86,7 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
 
         const totalP = Math.ceil(sortedCompleted.length / itemsPerPage);
         const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
         const paginatedItems = sortedCompleted.slice(startIndex, endIndex);
 
         return { 
@@ -94,7 +95,7 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
             totalPages: totalP,
             paginatedCompleted: paginatedItems,
         };
-    }, [userCreatedWorksheets, completedWorksheets, allAttempts, currentPage]);
+    }, [userCreatedWorksheets, completedWorksheets, allAttempts, currentPage, itemsPerPage]);
     
     const isLoading = areUserCreatedLoading || areCompletedWorksheetsLoading || areAttemptsLoading;
     const createWorksheetUrl = `/worksheets/new?classId=${classId}&subjectId=${subjectId}&source=practice`;
@@ -167,7 +168,7 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                                 <p>Your completed practice worksheets will appear here.</p>
                             </div>
                         )}
-                        {completedWorksheets && completedWorksheets.length > 0 && !isLoading && (
+                        {completedWorksheets && completedWorksheets.length > 0 && !isLoading && totalPages > 1 && (
                             <div className="flex items-center justify-between mt-4">
                                 <span className="text-sm text-muted-foreground">
                                     Page {currentPage} of {totalPages}
