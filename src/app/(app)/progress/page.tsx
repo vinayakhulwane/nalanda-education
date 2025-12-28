@@ -14,6 +14,7 @@ import { Loader2, BookOpen, ChevronLeft, Flame, TrendingUp, AlertTriangle, Compa
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { StudentAttemptHistory } from '@/components/user-management/student-attempt-history';
 
 type PerformanceMetric = {
   id: string;
@@ -378,7 +379,7 @@ export default function ProgressPage() {
       );
   }
 
-  if (!analytics) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (!analytics || !userProfile) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   const selectedSubjectName = subjects?.find(s => s.id === selectedSubjectId)?.name || 'Subject';
 
   const InsightGrid = ({ data }: { data: typeof analytics.unitMetrics }) => (
@@ -412,6 +413,8 @@ export default function ProgressPage() {
         <TabsContent value="unit"><InsightGrid data={analytics.unitMetrics} /></TabsContent>
         <TabsContent value="category"><InsightGrid data={analytics.catMetrics} /></TabsContent>
       </Tabs>
+
+      <StudentAttemptHistory student={userProfile} />
     </div>
   );
 }
