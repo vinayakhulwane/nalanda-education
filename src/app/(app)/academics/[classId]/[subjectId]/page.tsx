@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from "@/firebase";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { arrayRemove, arrayUnion, collection, doc, query, updateDoc, writeBatch, documentId, getDocs, limit, orderBy, increment, serverTimestamp } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, doc, query, where, updateDoc, writeBatch, documentId, getDocs, limit, orderBy, increment, serverTimestamp } from "firebase/firestore";
 import { Edit, Loader2, PlusCircle, Trash, ArrowLeft, MoreVertical, GripVertical, Plus, EyeOff, Eye, Pencil, UserPlus, UserMinus, ShieldAlert, BookCopy, History, FilePlus, Home, Trophy, Medal, Coins, Crown, Gem, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
@@ -977,3 +977,4 @@ export default function SubjectWorkspacePage() {
     
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
+    
