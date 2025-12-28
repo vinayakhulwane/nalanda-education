@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Coins, Crown, Gem, Plus, Minus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Separator } from '../ui/separator';
 
 interface AdminWalletManagerProps {
   student: User;
@@ -88,6 +89,26 @@ export function AdminWalletManager({ student }: AdminWalletManagerProps) {
         <CardDescription>Manually add or remove currency from the student's wallet.</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="grid grid-cols-3 gap-4 text-center mb-6">
+            <div className="p-4 bg-muted/50 rounded-lg">
+                <Coins className="h-6 w-6 mx-auto text-yellow-500" />
+                <p className="text-2xl font-bold mt-2">{student.coins || 0}</p>
+                <p className="text-xs text-muted-foreground">Coins</p>
+            </div>
+            <div className="p-4 bg-muted/50 rounded-lg">
+                <Crown className="h-6 w-6 mx-auto text-amber-500" />
+                <p className="text-2xl font-bold mt-2">{student.gold || 0}</p>
+                <p className="text-xs text-muted-foreground">Gold</p>
+            </div>
+            <div className="p-4 bg-muted/50 rounded-lg">
+                <Gem className="h-6 w-6 mx-auto text-blue-500" />
+                <p className="text-2xl font-bold mt-2">{student.diamonds || 0}</p>
+                <p className="text-xs text-muted-foreground">Diamonds</p>
+            </div>
+        </div>
+        
+        <Separator className="my-4" />
+
         <Tabs value={operation} onValueChange={(v) => setOperation(v as any)} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="add"><Plus className="mr-2" /> Add Currency</TabsTrigger>
