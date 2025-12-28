@@ -44,28 +44,39 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
         return;
     }
 
-    const currentBalance = student[currency === 'coin' ? 'coins' : currency] || 0;
+    // Determine the correct database field name
+    // ✅ FIX: Ensure 'diamond' maps to 'diamonds' (plural) to match DB schema
+    const fieldMap: Record<string, string> = {
+        coin: 'coins',
+        gold: 'gold',
+        diamond: 'diamonds'
+    };
+    const dbField = fieldMap[currency] || currency;
+
+    const currentBalance = student[dbField as keyof User] as number || 0;
+    
     if (operation === 'remove' && numAmount > currentBalance) {
         toast({ variant: 'destructive', title: 'Insufficient Funds', description: `This student only has ${currentBalance} ${currency}.` });
         return;
     }
     
     setIsLoading(true);
-    const batch = writeBatch(firestore);
-    const studentRef = doc(firestore, 'users', student.id);
-    const transactionRef = doc(collection(firestore, 'transactions'));
     
-    const finalAmount = operation === 'add' ? numAmount : -numAmount;
-    const updateField = currency === 'coin' ? 'coins' : currency;
-
     try {
-      // Step 1: Update the user's wallet balance.
-      batch.update(studentRef, { [updateField]: increment(finalAmount) });
+      const batch = writeBatch(firestore);
+      const studentRef = doc(firestore, 'users', student.id);
+      const transactionRef = doc(collection(firestore, 'transactions'));
       
-      // Step 2: Create a corresponding transaction log record.
+      const finalAmount = operation === 'add' ? numAmount : -numAmount;
+
+      // Step 1: Update the user's wallet balance using Atomic Increment
+      batch.update(studentRef, { [dbField]: increment(finalAmount) });
+      
+      // Step 2: Create a corresponding transaction log record
       batch.set(transactionRef, {
         userId: student.id,
         type: operation === 'add' ? 'earned' : 'spent',
+        category: 'admin_adjustment', // Useful tag for filtering admin actions later
         description: `Admin: ${description}`,
         amount: numAmount,
         currency: currency,
@@ -73,16 +84,23 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
         adminId: adminUser.uid,
       });
       
-      // Step 3: Commit both operations as a single atomic batch.
+      // Step 3: Commit both operations atomically
       await batch.commit();
 
       toast({ title: 'Transaction Successful', description: `Wallet has been updated for ${student.name}.` });
+      
+      // Reset form
       setAmount('');
       setDescription('');
 
     } catch (error: any) {
       console.error("Wallet transaction error:", error);
-      toast({ variant: 'destructive', title: 'Transaction Failed', description: error.message });
+      // specific error message for permission issues
+      if (error.code === 'permission-denied') {
+          toast({ variant: 'destructive', title: 'Permission Denied', description: 'Admins need explicit permission to update student wallets. Check Firestore Rules.' });
+      } else {
+          toast({ variant: 'destructive', title: 'Transaction Failed', description: error.message });
+      }
     } finally {
       setIsLoading(false);
     }

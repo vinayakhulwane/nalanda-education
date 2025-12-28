@@ -2,16 +2,18 @@
 
 import { Suspense } from 'react';
 import { use, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { User } from '@/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { StudentProgressDetail } from '@/components/user-management/student-progress-detail';
 import { AdminStudentInfoCard } from '@/components/user-management/admin-student-info-card';
+import { Button } from '@/components/ui/button';
 
 function AdminStudentProgressPageContent({ userId }: { userId: string }) {
     const firestore = useFirestore();
+    const router = useRouter();
 
     const userDocRef = useMemoFirebase(() => (
         firestore && userId ? doc(firestore, 'users', userId) : null
@@ -29,6 +31,10 @@ function AdminStudentProgressPageContent({ userId }: { userId: string }) {
     
     return (
         <div className="space-y-6">
+            <Button variant="ghost" onClick={() => router.push('/user-management')}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to User Management
+            </Button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-1">
                     <AdminStudentInfoCard student={student} />
