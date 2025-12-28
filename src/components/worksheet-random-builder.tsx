@@ -13,10 +13,10 @@ import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
 import { cn } from '@/lib/utils';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase'; // ✅ Added hooks
-import { doc } from 'firebase/firestore'; // ✅ Added doc
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase'; 
+import { doc } from 'firebase/firestore'; 
 import { calculateWorksheetCost } from '@/lib/wallet';
-
+import { useToast } from "@/hooks/use-toast"; // ✅ Added Toast Hook
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
 
@@ -38,10 +38,10 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
 };
 
 const currencyColors: Record<CurrencyType, string> = {
-  spark: 'text-gray-400',
-  coin: 'text-yellow-500',
-  gold: 'text-amber-500',
-  diamond: 'text-blue-500',
+    spark: 'text-gray-400',
+    coin: 'text-yellow-500',
+    gold: 'text-amber-500',
+    diamond: 'text-blue-500',
 };
 
 
@@ -66,6 +66,7 @@ export function WorksheetRandomBuilder({
   const [worksheetType, setWorksheetType] = useState<'classroom' | 'sample'>('classroom');
   const { userProfile } = useUser();
   const firestore = useFirestore(); 
+  const { toast } = useToast(); // ✅ Initialize Toast
   const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
   const unitMap = useMemo(() => new Map(units.map(u => [u.id, u.name])), [units]);
@@ -74,7 +75,6 @@ export function WorksheetRandomBuilder({
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
   const { data: settings } = useDoc<EconomySettings>(settingsRef);
 
-  // When unit filter changes, reset category filter
   useEffect(() => {
     setFilters(prev => ({...prev, categories: []}));
   }, [filters.units]);
@@ -155,14 +155,41 @@ export function WorksheetRandomBuilder({
     };
   }, [selectedQuestions, unitMap, categoryMap, settings]); 
 
+  // ✅ MODIFIED: Random Picker with AI Limit
   const addRandomQuestion = (currency: CurrencyType) => {
     const candidates = availableQuestions.filter(q => 
         q.currencyType === currency && 
         !selectedQuestions.some(sq => sq.id === q.id)
     );
+
     if (candidates.length > 0) {
-      const randomIndex = Math.floor(Math.random() * candidates.length);
-      setSelectedQuestions([...selectedQuestions, {...candidates[randomIndex], source: 'random'}]);
+      // Shuffle candidates to ensure randomness
+      const shuffled = candidates.sort(() => 0.5 - Math.random());
+      let questionToAdd: Question | null = null;
+
+      // Check existing AI count
+      const hasAiQuestion = selectedQuestions.some(q => q.gradingMode === 'ai');
+
+      // Try to find a valid question
+      for (const candidate of shuffled) {
+          if (candidate.gradingMode === 'ai' && hasAiQuestion) {
+              // Skip this candidate if we already have an AI question
+              continue; 
+          }
+          questionToAdd = candidate;
+          break; // Found one!
+      }
+
+      if (questionToAdd) {
+          setSelectedQuestions([...selectedQuestions, {...questionToAdd, source: 'random'}]);
+      } else {
+          // If we couldn't find one (likely because only AI questions were left and limit is hit)
+          toast({
+              variant: "destructive",
+              title: "AI Limit Reached",
+              description: "Cannot add random question. Remaining candidates are AI-graded, and you already have one.",
+          });
+      }
     }
   };
   

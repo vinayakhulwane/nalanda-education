@@ -11,35 +11,47 @@ const DEFAULT_SETTINGS: EconomySettings = {
     rewardSpark: 0.5
 };
 
-// Helper to clean rubric keys (Same as in your components)
+// Helper: Cleans rubric keys
 const formatCriterionKey = (key: string) => {
     return key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim();
 };
 
+// Helper: Safely gets a number from settings, handling Strings/Nulls/Undefined
+const getSafeNumber = (val: any, fallback: number) => {
+    if (val === undefined || val === null) return fallback;
+    const num = Number(val);
+    return isNaN(num) ? fallback : num;
+};
+
 /**
- * Calculates Cost. Now accepts optional 'settings'.
+ * Calculates Cost. 
  */
 export function calculateWorksheetCost(
     questions: Question[],
-    settings: EconomySettings = DEFAULT_SETTINGS
+    settings: EconomySettings | undefined
 ): WalletTransaction {
+    // Merge provided settings with defaults
+    const activeSettings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+    
     const totalCost: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
-    const multiplier = settings.costPerMark;
+    const multiplier = getSafeNumber(activeSettings.costPerMark, 0.5);
 
     for (const question of questions) {
-        if (question.currencyType === 'spark') continue; 
+        // Safe lowercase check
+        const type = (question.currencyType || 'coin').toLowerCase();
+        
+        if (type === 'spark') continue; 
 
         const totalMarks = question.solutionSteps?.reduce(
             (stepSum, step) => stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0),
             0
         ) || 0;
         
-        // Use the Dynamic Multiplier
         const costValue = Math.ceil(totalMarks * multiplier);
 
-        if (question.currencyType === 'coin') totalCost.coins += costValue;
-        else if (question.currencyType === 'gold') totalCost.gold += costValue;
-        else if (question.currencyType === 'diamond') totalCost.diamonds += costValue;
+        if (type === 'coin') totalCost.coins += costValue;
+        else if (type === 'gold') totalCost.gold += costValue;
+        else if (type === 'diamond') totalCost.diamonds += costValue;
     }
 
     return totalCost;
@@ -47,28 +59,31 @@ export function calculateWorksheetCost(
 
 /**
  * Calculates Rewards. 
- * ✅ UPDATED: Now performs Rubric Summation to match the Results Screen exactly.
+ * ✅ UPDATED: Robust Number Conversion for Settings
  */
 export function calculateAttemptRewards(
     worksheet: Worksheet,
     questions: Question[],
     results: ResultState,
     userId: string,
-    settings: EconomySettings = DEFAULT_SETTINGS
+    settings: EconomySettings | undefined
 ): Record<string, number> { 
   
+    // Merge settings to ensure we have values
+    const activeSettings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+
     const rewardTotals: Record<string, number> = { coin: 0, gold: 0, diamond: 0 };
 
     // 1. Determine Multiplier
     let multiplier = 0;
     if (worksheet.worksheetType === 'practice') {
-        multiplier = settings.rewardPractice;
+        multiplier = getSafeNumber(activeSettings.rewardPractice, 1.0);
     } else if (worksheet.worksheetType === 'classroom') {
-        multiplier = settings.rewardClassroom;
+        multiplier = getSafeNumber(activeSettings.rewardClassroom, 0.5);
     } else if (worksheet.authorId === userId) {
-        multiplier = settings.rewardPractice;
+        multiplier = getSafeNumber(activeSettings.rewardPractice, 1.0);
     } else if (worksheet.authorId !== userId) {
-        multiplier = settings.rewardClassroom;
+        multiplier = getSafeNumber(activeSettings.rewardClassroom, 0.5);
     }
   
     if (worksheet.worksheetType === 'sample' || worksheet.title?.toLowerCase().includes('sample')) {
@@ -78,45 +93,33 @@ export function calculateAttemptRewards(
     // 2. Calculate Rewards
     for (const question of questions) {
         let obtainedMarksForQuestion = 0;
-        
-        // Check Grading Mode
         const isAiGraded = question.gradingMode === 'ai';
 
         if (isAiGraded) {
-            // --- AI LOGIC: Summation (Source of Truth) ---
-            // We calculate the Max Marks for the question first
+            // --- AI LOGIC ---
             const qTotalMarks = question.solutionSteps?.reduce(
                 (acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0
             ) || 0;
 
-            // Get the breakdown from the first sub-question result
             const firstSubId = question.solutionSteps?.[0]?.subQuestions?.[0]?.id;
             const res = firstSubId ? results[firstSubId] : null;
 
             if (res) {
-                // @ts-ignore - safe access to dynamic prop
+                // @ts-ignore
                 const breakdown = res.aiBreakdown || {};
                 const rubric = question.aiRubric || {};
                 let calculatedSum = 0;
 
-                // 1. Try to calculate exact sum from rubric parts
                 if (Object.keys(breakdown).length > 0 && Object.keys(rubric).length > 0) {
                     Object.entries(rubric).forEach(([key, weight]) => {
                         const cleanKey = formatCriterionKey(key);
                         const scoreVal = breakdown[key] ?? breakdown[cleanKey] ?? 0;
                         const weightVal = typeof weight === 'string' ? parseFloat(weight) : (weight as number);
-                        
-                        // Formula: (Score% / 100) * (Weight% / 100) * MaxMarks
                         calculatedSum += (scoreVal / 100) * (weightVal / 100) * qTotalMarks;
                     });
-                    
-                    // Use the calculated sum (e.g. 3.25)
                     obtainedMarksForQuestion += calculatedSum;
-                } 
-                else {
-                    // 2. Fallback: Use saved score if no breakdown exists
+                } else {
                     let val = Number(res.score || 0);
-                    // Safety Net for percentage vs marks
                     if (val > qTotalMarks) {
                         val = (val / 100) * qTotalMarks;
                     }
@@ -124,7 +127,7 @@ export function calculateAttemptRewards(
                 }
             }
         } else {
-            // --- SYSTEM LOGIC: Standard ---
+            // --- SYSTEM LOGIC ---
             question.solutionSteps?.forEach(step => {
                 step.subQuestions.forEach(subQ => {
                     const res = results[subQ.id];
@@ -137,16 +140,21 @@ export function calculateAttemptRewards(
 
         if (obtainedMarksForQuestion <= 0) continue;
 
-        // Apply Multipliers and Currency Type
-        if (question.currencyType === 'spark') {
-            const rewardValue = Math.floor(obtainedMarksForQuestion * settings.rewardSpark * multiplier);
+        // ✅ SAFE CURRENCY CHECK (LowerCase)
+        const type = (question.currencyType || 'coin').toLowerCase();
+
+        if (type === 'spark') {
+            // ✅ CRITICAL FIX: Safe conversion of Spark Rate
+            const sparkRate = getSafeNumber(activeSettings.rewardSpark, 0.5);
+            const rewardValue = Math.floor(obtainedMarksForQuestion * sparkRate * multiplier);
             rewardTotals['coin'] += rewardValue; 
         } else {
-            // For Coin/Gold/Diamond, 1 Mark = 1 Currency Unit (scaled by practice multiplier)
             const rewardValue = Math.floor(obtainedMarksForQuestion * 1.0 * multiplier);
-            const type = question.currencyType || 'coin';
+            
             if (rewardTotals[type] !== undefined) {
                 rewardTotals[type] += rewardValue;
+            } else {
+                rewardTotals['coin'] += rewardValue;
             }
         }
     }
