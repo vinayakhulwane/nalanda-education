@@ -129,9 +129,8 @@ export default function AboutPage() {
             ) : (
                 <Card>
                     <CardContent className="pt-6">
-                        {/* ✅ FIX: Added 'w-full', 'break-words', and 'overflow-hidden' to ensure wrapping */}
                         <div 
-                            className="prose dark:prose-invert max-w-none w-full break-words overflow-hidden space-y-4"
+                            className="prose dark:prose-invert max-w-none w-full break-words overflow-hidden"
                             dangerouslySetInnerHTML={{ __html: content }}
                         />
                     </CardContent>
