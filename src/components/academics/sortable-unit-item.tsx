@@ -5,7 +5,7 @@ import type { Unit, Category } from "@/types";
 import { AccordionItem, AccordionTrigger, AccordionContent } from "../ui/accordion";
 import { Button } from "../ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../ui/dropdown-menu";
-import { GripVertical, MoreVertical } from "lucide-react";
+import { GripVertical, MoreVertical, Plus } from "lucide-react";
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableCategoryItem } from './sortable-category-item';
@@ -87,6 +87,16 @@ export function SortableUnitItem({ unit, categories, userIsEditor, openDialog }:
                         </DndContext>
                         {categories.length === 0 && (
                             <p className="text-sm text-muted-foreground py-4">No categories in this unit.</p>
+                        )}
+                        {userIsEditor && (
+                             <Button 
+                                variant="ghost" 
+                                className="w-full justify-start text-muted-foreground hover:text-foreground mt-2"
+                                onClick={() => openDialog('addCategory', unit)}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Category
+                            </Button>
                         )}
                     </div>
                 </AccordionContent>

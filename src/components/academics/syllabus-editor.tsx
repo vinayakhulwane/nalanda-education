@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection, doc, query, where, writeBatch } from "firebase/firestore";
+// ✅ Switched to standard Firestore functions for better control in Modals
+import { collection, doc, query, where, writeBatch, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import type { Unit, Category } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,17 +17,22 @@ import { Loader2, PlusCircle } from "lucide-react";
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableUnitItem } from "@/components/academics/sortable-unit-item";
+import { useToast } from '@/hooks/use-toast'; // Assuming you have this hook
 
 export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: string, subjectName: string }) {
     const firestore = useFirestore();
     const { userProfile } = useUser();
+    const { toast } = useToast();
     
     // Dialog states
     const [dialogType, setDialogType] = useState<'addUnit' | 'editUnit' | 'deleteUnit' | 'addCategory' | 'editCategory' | 'deleteCategory' | null>(null);
     const [currentUnit, setCurrentUnit] = useState<Unit | null>(null);
     const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
+    
+    // Form states
     const [newName, setNewName] = useState('');
     const [newDescription, setNewDescription] = useState('');
+    const [isSaving, setIsSaving] = useState(false); // ✅ Added Loading State
 
     // Data fetching
     const unitsQuery = useMemoFirebase(() => firestore && subjectId ? query(collection(firestore, 'units'), where('subjectId', '==', subjectId)) : null, [firestore, subjectId]);
@@ -65,35 +69,72 @@ export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: 
         setCurrentCategory(null);
         setNewName('');
         setNewDescription('');
+        setIsSaving(false);
     }
 
-    const handleSaveChanges = () => {
+    // ✅ FIXED: Async handler to prevent UI freezes
+    const handleSaveChanges = async () => {
         if (!firestore) return;
-        switch (dialogType) {
-            case 'addUnit':
-                const newUnitOrder = units ? units.length : 0;
-                addDocumentNonBlocking(collection(firestore, 'units'), { name: newName, description: newDescription, subjectId, order: newUnitOrder });
-                break;
-            case 'editUnit':
-                if (currentUnit) updateDocumentNonBlocking(doc(firestore, 'units', currentUnit.id), { name: newName, description: newDescription });
-                break;
-            case 'deleteUnit':
-                if (currentUnit) deleteDocumentNonBlocking(doc(firestore, 'units', currentUnit.id));
-                break;
-            case 'addCategory':
-                if (currentUnit) {
-                     const newCategoryOrder = categoriesByUnit[currentUnit.id]?.length || 0;
-                    addDocumentNonBlocking(collection(firestore, 'categories'), { name: newName, description: newDescription, unitId: currentUnit.id, order: newCategoryOrder });
-                }
-                break;
-            case 'editCategory':
-                if (currentCategory) updateDocumentNonBlocking(doc(firestore, 'categories', currentCategory.id), { name: newName, description: newDescription });
-                break;
-            case 'deleteCategory':
-                if (currentCategory) deleteDocumentNonBlocking(doc(firestore, 'categories', currentCategory.id));
-                break;
+        
+        setIsSaving(true);
+        try {
+            switch (dialogType) {
+                case 'addUnit':
+                    const newUnitOrder = units ? units.length : 0;
+                    await addDoc(collection(firestore, 'units'), { 
+                        name: newName, 
+                        description: newDescription, 
+                        subjectId, 
+                        order: newUnitOrder 
+                    });
+                    break;
+                case 'editUnit':
+                    if (currentUnit) {
+                        await updateDoc(doc(firestore, 'units', currentUnit.id), { 
+                            name: newName, 
+                            description: newDescription 
+                        });
+                    }
+                    break;
+                case 'deleteUnit':
+                    if (currentUnit) {
+                        await deleteDoc(doc(firestore, 'units', currentUnit.id));
+                    }
+                    break;
+                case 'addCategory':
+                    if (currentUnit) {
+                        const newCategoryOrder = categoriesByUnit[currentUnit.id]?.length || 0;
+                        await addDoc(collection(firestore, 'categories'), { 
+                            name: newName, 
+                            description: newDescription, 
+                            unitId: currentUnit.id, 
+                            order: newCategoryOrder 
+                        });
+                    }
+                    break;
+                case 'editCategory':
+                    if (currentCategory) {
+                        await updateDoc(doc(firestore, 'categories', currentCategory.id), { 
+                            name: newName, 
+                            description: newDescription 
+                        });
+                    }
+                    break;
+                case 'deleteCategory':
+                    if (currentCategory) {
+                        await deleteDoc(doc(firestore, 'categories', currentCategory.id));
+                    }
+                    break;
+            }
+            // Close only after success
+            closeDialog();
+            toast({ title: "Success", description: "Changes saved successfully." });
+
+        } catch (error) {
+            console.error("Error saving:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to save changes. Please try again." });
+            setIsSaving(false); // Stop loading but keep dialog open so user can retry
         }
-        closeDialog();
     }
     
     const openDialog = (type: NonNullable<typeof dialogType>, unit?: Unit, category?: Category) => {
@@ -171,7 +212,10 @@ export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: 
             )}
 
             {/* Generic Dialog for Add/Edit */}
-            <Dialog open={!!(dialogType?.includes('add') || dialogType?.includes('edit'))} onOpenChange={closeDialog}>
+            <Dialog 
+                open={!!(dialogType?.includes('add') || dialogType?.includes('edit'))} 
+                onOpenChange={(open) => !open && closeDialog()}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{dialogType?.includes('add') ? 'Add New' : 'Edit'} {dialogType?.includes('Unit') ? 'Unit' : 'Category'}</DialogTitle>
@@ -184,19 +228,22 @@ export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: 
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <Label htmlFor="name">Name</Label>
-                        <Input id="name" value={newName} onChange={e => setNewName(e.target.value)} />
+                        <Input id="name" value={newName} onChange={e => setNewName(e.target.value)} disabled={isSaving} />
                         <Label htmlFor="description">Description</Label>
-                        <Textarea id="description" value={newDescription} onChange={e => setNewDescription(e.target.value)} />
+                        <Textarea id="description" value={newDescription} onChange={e => setNewDescription(e.target.value)} disabled={isSaving} />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={closeDialog}>Cancel</Button>
-                        <Button onClick={handleSaveChanges}>Save Changes</Button>
+                        <Button variant="outline" onClick={closeDialog} disabled={isSaving}>Cancel</Button>
+                        <Button onClick={handleSaveChanges} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Changes
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Generic Delete Confirmation Dialog */}
-            <AlertDialog open={!!dialogType?.includes('delete')} onOpenChange={closeDialog}>
+            <AlertDialog open={!!dialogType?.includes('delete')} onOpenChange={(open) => !open && closeDialog()}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -206,8 +253,9 @@ export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: 
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={closeDialog}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleSaveChanges} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        <AlertDialogCancel onClick={closeDialog} disabled={isSaving}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSaveChanges} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
