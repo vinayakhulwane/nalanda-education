@@ -26,6 +26,45 @@ type PerformanceMetric = {
   attemptCount: number;
 };
 
+// ✅ HELPER: Robustly calculate score from attempt data
+const getAttemptStats = (a: WorksheetAttempt, allWorksheets: Map<string, Worksheet>, allQuestions: Map<string, any>) => {
+    let score = (a as any).score;
+    let total = (a as any).totalMarks;
+
+    const worksheet = allWorksheets.get(a.worksheetId);
+
+    if (score === undefined || total === undefined) {
+        let calculatedScore = 0;
+        let calculatedTotal = 0;
+
+        const results = (a as any).results || {};
+
+        if (worksheet) {
+            worksheet.questions.forEach(qId => {
+                const question = allQuestions.get(qId);
+                if (question) {
+                    question.solutionSteps?.forEach((step: any) => {
+                        step.subQuestions.forEach((sub: any) => {
+                            calculatedTotal += sub.marks || 0;
+                            if (results[sub.id]?.isCorrect) {
+                                calculatedScore += sub.marks || 0;
+                            } else if (results[sub.id]?.score) {
+                                // For AI grading, add the partial score
+                                calculatedScore += Number(results[sub.id].score);
+                            }
+                        });
+                    });
+                }
+            });
+        }
+        
+        if (score === undefined) score = calculatedScore;
+        if (total === undefined || total === 0) total = calculatedTotal > 0 ? calculatedTotal : Math.max(score, 10);
+    }
+
+    return { score: Number(score), total: Number(total) };
+};
+
 export default function ProgressPage() {
   const { user, userProfile, isUserProfileLoading } = useUser();
   const firestore = useFirestore();
@@ -33,38 +72,35 @@ export default function ProgressPage() {
 
   // --- 1. DATA FETCHING ---
 
-  // A. Subjects (Enrolled)
   const enrolledSubjectsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile?.enrollments || userProfile.enrollments.length === 0) return null;
     return query(collection(firestore, 'subjects'), where(documentId(), 'in', userProfile.enrollments.slice(0, 30)));
   }, [firestore, userProfile?.enrollments]);
   const { data: subjects, isLoading: subjectsLoading } = useCollection<Subject>(enrolledSubjectsQuery);
 
-  // B. Attempts (All User Attempts)
   const attemptsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return query(collection(firestore, 'worksheet_attempts'), where('userId', '==', user.uid), orderBy('attemptedAt', 'asc'));
   }, [user, firestore]);
   const { data: attempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(attemptsQuery);
 
-  // C. Metadata (Units, Categories, Worksheets)
   const { data: units } = useCollection<Unit>(useMemoFirebase(() => firestore ? collection(firestore, 'units') : null, [firestore]));
   const { data: categories } = useCollection<Category>(useMemoFirebase(() => firestore ? collection(firestore, 'categories') : null, [firestore]));
   const { data: allWorksheets } = useCollection<Worksheet>(useMemoFirebase(() => firestore ? collection(firestore, 'worksheets') : null, [firestore]));
+  const { data: allQuestions } = useCollection<any>(useMemoFirebase(() => firestore ? collection(firestore, 'questions') : null, [firestore]));
 
   // --- 2. DATA PROCESSING ---
 
-  // Global Lookups
   const lookups = useMemo(() => {
-    if (!units || !categories || !allWorksheets) return null;
+    if (!units || !categories || !allWorksheets || !allQuestions) return null;
     return {
         unitMap: new Map(units.map(u => [u.id, u])),
         categoryMap: new Map(categories.map(c => [c.id, c])),
         worksheetMap: new Map(allWorksheets.map(w => [w.id, w])),
+        questionMap: new Map(allQuestions.map(q => [q.id, q])),
     };
-  }, [units, categories, allWorksheets]);
+  }, [units, categories, allWorksheets, allQuestions]);
 
-  // Subject Overview Stats (For the Cards)
   const subjectStats = useMemo(() => {
     if (!subjects || !attempts || !lookups) return {};
     const stats: Record<string, { total: number, obtained: number, count: number, health: number }> = {};
@@ -75,14 +111,12 @@ export default function ProgressPage() {
     attempts.forEach(a => {
         const w = a.worksheetId ? lookups.worksheetMap.get(a.worksheetId) : null;
         if (w && stats[w.subjectId]) {
-            let score = (a as any).score || 0;
-            let total = (a as any).totalMarks || 0;
-            if (total === 0) total = Math.max(score, 10);
+            const { score, total } = getAttemptStats(a, lookups.worksheetMap, lookups.questionMap);
+
             stats[w.subjectId].obtained += score;
             stats[w.subjectId].total += total;
             stats[w.subjectId].count++;
 
-            // For health calculation
             if (!attemptsBySubjectByDate[w.subjectId]) {
                 attemptsBySubjectByDate[w.subjectId] = new Map();
             }
@@ -98,7 +132,6 @@ export default function ProgressPage() {
         }
     });
 
-    // Calculate health for each subject
     Object.keys(stats).forEach(subjectId => {
         const attemptsByDate = attemptsBySubjectByDate[subjectId];
         if (!attemptsByDate) return;
@@ -108,7 +141,8 @@ export default function ProgressPage() {
             const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
             const dayStats = attemptsByDate.get(dateKey);
             if (dayStats) {
-                const dayAvg = (dayStats.obtained / dayStats.total) * 100;
+                const safeTotal = dayStats.total === 0 ? 1 : dayStats.total;
+                const dayAvg = (dayStats.obtained / safeTotal) * 100;
                 healthScore = (healthScore * 0.6) + (dayAvg * 0.4);
             } else {
                 healthScore = Math.max(0, healthScore * 0.95);
@@ -120,31 +154,30 @@ export default function ProgressPage() {
     return stats;
   }, [subjects, attempts, lookups]);
 
-  // Detailed Analytics (Filtered by Selected Subject)
+  // --- DETAILED ANALYTICS ---
   const analytics = useMemo(() => {
     if (!attempts || !lookups || !selectedSubjectId) return null;
-    const { unitMap, categoryMap, worksheetMap } = lookups;
+    const { unitMap, categoryMap, worksheetMap, questionMap } = lookups;
 
     // Filter Data
     const activeUnits = Array.from(unitMap.values()).filter(u => u.subjectId === selectedSubjectId);
     const activeUnitIds = new Set(activeUnits.map(u => u.id));
+    
     const activeAttempts = attempts.filter(a => {
         const w = a.worksheetId ? worksheetMap.get(a.worksheetId) : null;
         return w && w.subjectId === selectedSubjectId;
     });
 
-    // Metrics Init
+    // Initialize Metrics
     const metricsMap = new Map<string, PerformanceMetric>();
     activeUnits.forEach(u => metricsMap.set(`unit_${u.id}`, { id: u.id, name: u.name, type: 'unit', totalMarks: 0, obtainedMarks: 0, percentage: 0, attemptCount: 0 }));
     
-    // Process Attempts
     const attemptsByDate = new Map<string, { total: number, obtained: number }>();
+    
     activeAttempts.forEach(attempt => {
-        let score = (attempt as any).score || 0;
-        let total = (attempt as any).totalMarks || 0;
-        if (total === 0) total = Math.max(score, 10);
+        const { score, total } = getAttemptStats(attempt, worksheetMap, questionMap);
+        const worksheet = worksheetMap.get(attempt.worksheetId);
 
-        // Date Aggregation
         if (attempt.attemptedAt) {
              const dateKey = format(attempt.attemptedAt.toDate(), 'yyyy-MM-dd');
              if (!attemptsByDate.has(dateKey)) attemptsByDate.set(dateKey, { total: 0, obtained: 0 });
@@ -152,29 +185,43 @@ export default function ProgressPage() {
              d.total += total; d.obtained += score;
         }
 
-        // Metric Aggregation
-        let unitId = (attempt as any).unitId;
-        if (!unitId && attempt.worksheetId) unitId = worksheetMap.get(attempt.worksheetId)?.unitId;
-        
-        if (unitId && activeUnitIds.has(unitId)) {
-            const m = metricsMap.get(`unit_${unitId}`);
-            if (m) { m.attemptCount++; m.obtainedMarks += score; m.totalMarks += total; }
-            
-            // Also handle categories if present
-            const categoryId = (attempt as any).categoryId;
-            if (categoryId) {
-                 const c = categoryMap.get(categoryId);
-                 if (c) {
-                     const key = `category_${c.id}`;
-                     if (!metricsMap.has(key)) metricsMap.set(key, { id: c.id, name: c.name, type: 'category', parentName: unitMap.get(c.unitId)?.name, totalMarks: 0, obtainedMarks: 0, percentage: 0, attemptCount: 0 });
-                     const mCat = metricsMap.get(key)!;
-                     mCat.attemptCount++; mCat.obtainedMarks += score; mCat.totalMarks += total;
-                 }
-            }
+        if (worksheet) {
+            worksheet.questions.forEach(qId => {
+                const question = questionMap.get(qId);
+                if (question && question.unitId && activeUnitIds.has(question.unitId)) {
+                    const unitMetric = metricsMap.get(`unit_${question.unitId}`);
+                    if (unitMetric) {
+                        unitMetric.attemptCount++;
+                        // The getAttemptStats already calculates score vs total for the whole worksheet
+                        // We need to approximate here or refactor. Let's approximate for now.
+                        const worksheetScoreRatio = total > 0 ? score / total : 0;
+                        const questionMarks = question.solutionSteps?.reduce((acc: number, s: any) => acc + s.subQuestions.reduce((ss: number, sq: any) => ss + sq.marks, 0), 0) || 0;
+                        unitMetric.obtainedMarks += worksheetScoreRatio * questionMarks;
+                        unitMetric.totalMarks += questionMarks;
+                    }
+                    if (question.categoryId) {
+                         const cat = categoryMap.get(question.categoryId);
+                         if (cat) {
+                             const key = `category_${cat.id}`;
+                             if (!metricsMap.has(key)) metricsMap.set(key, { id: cat.id, name: cat.name, type: 'category', parentName: unitMap.get(cat.unitId)?.name, totalMarks: 0, obtainedMarks: 0, percentage: 0, attemptCount: 0 });
+                             const catMetric = metricsMap.get(key)!;
+                             catMetric.attemptCount++;
+                             const worksheetScoreRatio = total > 0 ? score / total : 0;
+                             const questionMarks = question.solutionSteps?.reduce((acc: number, s: any) => acc + s.subQuestions.reduce((ss: number, sq: any) => ss + sq.marks, 0), 0) || 0;
+                             catMetric.obtainedMarks += worksheetScoreRatio * questionMarks;
+                             catMetric.totalMarks += questionMarks;
+                         }
+                    }
+                }
+            })
         }
     });
 
-    metricsMap.forEach(m => { if (m.attemptCount > 0) m.percentage = (m.obtainedMarks / m.totalMarks) * 100; });
+    metricsMap.forEach(m => { 
+        if (m.totalMarks > 0) {
+            m.percentage = (m.obtainedMarks / m.totalMarks) * 100; 
+        }
+    });
 
     // Streak
     let currentStreak = 0;
@@ -192,14 +239,14 @@ export default function ProgressPage() {
         }
     }
 
-    // Health Chart
     const healthChartData = [];
     let healthScore = 80; 
     for (let i = 13; i >= 0; i--) {
         const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
         const dayStats = attemptsByDate.get(dateKey);
         if (dayStats) {
-            const dayAvg = (dayStats.obtained / dayStats.total) * 100;
+            const safeTotal = dayStats.total === 0 ? 1 : dayStats.total;
+            const dayAvg = (dayStats.obtained / safeTotal) * 100;
             healthScore = (healthScore * 0.6) + (dayAvg * 0.4);
         } else {
             healthScore = Math.max(0, healthScore * 0.95);
@@ -210,12 +257,20 @@ export default function ProgressPage() {
     // Sort Buckets
     const unitMetrics = { strengths: [] as PerformanceMetric[], weaknesses: [] as PerformanceMetric[], unexplored: [] as PerformanceMetric[] };
     const catMetrics = { strengths: [] as PerformanceMetric[], weaknesses: [] as PerformanceMetric[], unexplored: [] as PerformanceMetric[] };
+    
     metricsMap.forEach(m => {
         const target = m.type === 'unit' ? unitMetrics : catMetrics;
-        if (m.attemptCount === 0) target.unexplored.push(m);
-        else if (m.percentage >= 75) target.strengths.push(m);
-        else if (m.percentage < 50) target.weaknesses.push(m);
+        if (m.attemptCount === 0) {
+            target.unexplored.push(m);
+        }
+        else if (m.percentage >= 75) {
+            target.strengths.push(m);
+        }
+        else if (m.percentage < 50) {
+            target.weaknesses.push(m);
+        }
     });
+    
     const sortM = (list: PerformanceMetric[], asc = false) => list.sort((a, b) => asc ? a.percentage - b.percentage : b.percentage - a.percentage);
     [unitMetrics, catMetrics].forEach(g => { sortM(g.strengths); sortM(g.weaknesses, true); });
 
@@ -225,7 +280,6 @@ export default function ProgressPage() {
 
   const isLoading = isUserProfileLoading || subjectsLoading || attemptsLoading || !lookups;
 
-  // --- VIEW 1: SUBJECT LIST ---
   if (!selectedSubjectId) {
     return (
         <div>
@@ -237,10 +291,10 @@ export default function ProgressPage() {
               {subjects && subjects.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {subjects.map((subject) => {
-                     const stats = subjectStats[subject.id];
-                     const health = stats?.health ?? 0;
-                     const healthColor = health > 75 ? "bg-green-500" : health > 50 ? "bg-yellow-500" : "bg-primary";
-                     return (
+                      const stats = subjectStats[subject.id];
+                      const health = stats?.health ?? 0;
+                      const healthColor = health > 75 ? "bg-green-500" : health > 50 ? "bg-yellow-500" : "bg-primary";
+                      return (
                         <Card key={subject.id}>
                           <CardHeader>
                             <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" />{subject.name}</CardTitle>
@@ -259,7 +313,7 @@ export default function ProgressPage() {
                               <Button variant="secondary" className="w-full" onClick={() => setSelectedSubjectId(subject.id)}>View Details</Button>
                           </CardFooter>
                         </Card>
-                     );
+                      );
                   })}
                 </div>
               ) : (
@@ -273,14 +327,13 @@ export default function ProgressPage() {
       );
   }
 
-  // --- VIEW 2: DETAILED DASHBOARD ---
   if (!analytics) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   const selectedSubjectName = subjects?.find(s => s.id === selectedSubjectId)?.name || 'Subject';
 
   const InsightGrid = ({ data }: { data: typeof analytics.unitMetrics }) => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
-        <Card className="border-l-4 border-l-green-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><TrendingUp className="h-5 w-5 text-green-600" /> Strengths</CardTitle><CardDescription>Score &gt; 75%</CardDescription></CardHeader><CardContent>{data.strengths.length > 0 ? (<div className="space-y-4">{data.strengths.slice(0, 5).map(s => (<div key={s.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{s.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{s.type}</span>{s.type === 'category' && s.parentName && (<><span>•</span><span className="truncate">{s.parentName}</span></>)}</div></div><Badge className="bg-green-100 text-green-700 border-none">{Math.round(s.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">Keep practicing!</div>}</CardContent></Card>
-        <Card className="border-l-4 border-l-red-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-red-600" /> Weaknesses</CardTitle><CardDescription>Score &lt; 50%</CardDescription></CardHeader><CardContent>{data.weaknesses.length > 0 ? (<div className="space-y-4">{data.weaknesses.slice(0, 5).map(w => (<div key={w.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{w.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{w.type}</span>{w.type === 'category' && w.parentName && (<><span>•</span><span className="truncate">{w.parentName}</span></>)}</div></div><Badge className="bg-red-100 text-red-700 border-none">{Math.round(w.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">No weaknesses found!</div>}</CardContent></Card>
+        <Card className="border-l-4 border-l-green-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><TrendingUp className="h-5 w-5 text-green-600" /> Strengths</CardTitle><CardDescription>Score &ge; 75%</CardDescription></CardHeader><CardContent>{data.strengths.length > 0 ? (<div className="space-y-4">{data.strengths.slice(0, 5).map(s => (<div key={s.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{s.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{s.type}</span>{s.type === 'category' && s.parentName && (<><span>•</span><span className="truncate">{s.parentName}</span></>)}</div></div><Badge className="bg-green-100 text-green-700 border-none">{Math.round(s.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">Keep practicing to find your strengths!</div>}</CardContent></Card>
+        <Card className="border-l-4 border-l-red-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-red-600" /> Weaknesses</CardTitle><CardDescription>Score &lt; 50%</CardDescription></CardHeader><CardContent>{data.weaknesses.length > 0 ? (<div className="space-y-4">{data.weaknesses.slice(0, 5).map(w => (<div key={w.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{w.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{w.type}</span>{w.type === 'category' && w.parentName && (<><span>•</span><span className="truncate">{w.parentName}</span></>)}</div></div><Badge className="bg-red-100 text-red-700 border-none">{Math.round(w.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">No major weaknesses found!</div>}</CardContent></Card>
         <Card className="border-l-4 border-l-slate-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Compass className="h-5 w-5 text-slate-600" /> Unexplored</CardTitle><CardDescription>Not yet attempted</CardDescription></CardHeader><CardContent>{data.unexplored.length > 0 ? (<div className="space-y-4">{data.unexplored.slice(0, 5).map(u => (<div key={u.id} className="flex justify-between items-center"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium text-muted-foreground">{u.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider opacity-70">{u.type}</span>{u.type === 'category' && u.parentName && (<><span>•</span><span className="truncate opacity-70">{u.parentName}</span></>)}</div></div><ArrowDownRight className="h-4 w-4 text-muted-foreground opacity-50" /></div>))}{data.unexplored.length > 5 && <p className="text-xs text-center text-muted-foreground pt-2">+{data.unexplored.length - 5} more</p>}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">All topics explored!</div>}</CardContent></Card>
     </div>
   );
