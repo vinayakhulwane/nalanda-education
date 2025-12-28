@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useFirestore, useDoc, useUser } from '@/firebase';
+import { useFirestore, useDoc, useUser, useMemoFirebase } from '@/firebase'; 
 import { doc, setDoc } from 'firebase/firestore';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,6 @@ import { Loader2, Edit, Save, X, Info } from 'lucide-react';
 import { RichTextEditor } from '@/components/rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// This is the default text that appears if you haven't saved anything yet.
-// It covers the points you mentioned: Process, Economy, Grading, and Contact.
 const DEFAULT_CONTENT = `
   <h2>🎓 Welcome to Nalanda</h2>
   <p>Welcome to your personalized learning journey! Here is how you can Learn, Earn, and Grow.</p>
@@ -55,14 +53,16 @@ export default function AboutPage() {
     const [content, setContent] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
-    // Fetch Content from 'settings/about' document
-    const docRef = firestore ? doc(firestore, 'settings', 'about') : null;
+    // Memoize doc ref to prevent "Maximum update depth" error
+    const docRef = useMemoFirebase(
+        () => firestore ? doc(firestore, 'settings', 'about') : null,
+        [firestore]
+    );
+    
     const { data: settingsData, isLoading } = useDoc(docRef);
 
-    // Only Admins or Teachers can edit this page
     const canEdit = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
-    // Load initial data
     useEffect(() => {
         if (settingsData && settingsData.content) {
             setContent(settingsData.content);
@@ -129,8 +129,9 @@ export default function AboutPage() {
             ) : (
                 <Card>
                     <CardContent className="pt-6">
+                        {/* ✅ FIX: Added 'w-full', 'break-words', and 'overflow-hidden' to ensure wrapping */}
                         <div 
-                            className="prose dark:prose-invert max-w-none space-y-4"
+                            className="prose dark:prose-invert max-w-none w-full break-words overflow-hidden space-y-4"
                             dangerouslySetInnerHTML={{ __html: content }}
                         />
                     </CardContent>

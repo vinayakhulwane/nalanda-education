@@ -2,16 +2,14 @@
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection } from "firebase/firestore";
-import type { User, Subject, Class } from "@/types";
+import type { User, Subject, Class, WorksheetAttempt, Worksheet, Question } from "@/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Users, Filter, Wallet, BarChart2, Target, TrendingUp, Gem, Coins, Sparkles, Crown } from "lucide-react";
+import { Loader2, Users, Filter, Wallet, BarChart2, Target, TrendingUp, Gem, Coins, Crown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
-import { Progress } from '../ui/progress';
 
 type SubjectEnrollmentInfo = {
     subject: Subject;
@@ -26,12 +24,59 @@ type StudentProgressDetails = {
     avgScore: number;
 };
 
+// Re-using the robust score calculation logic
+const getAttemptTotals = (a: WorksheetAttempt, worksheet: Worksheet | undefined, allQuestions: Map<string, any>) => {
+    let calcScore = 0;
+    let calcTotal = 0;
+    const results = a.results || {};
+
+    if (worksheet) {
+        worksheet.questions.forEach(qId => {
+            const question = allQuestions.get(qId);
+            if (question) {
+                const qMax = question.solutionSteps?.reduce((acc: number, s: any) => acc + s.subQuestions.reduce((ss: number, sub: any) => ss + (sub.marks || 0), 0), 0) || 0;
+                calcTotal += qMax;
+
+                let qEarned = 0;
+                // AI Graded Question
+                if (question.gradingMode === 'ai') {
+                    const firstSubId = question.solutionSteps?.[0]?.subQuestions?.[0]?.id;
+                    if (firstSubId) {
+                        const res = results[firstSubId];
+                        // Handle both old format (score is percentage) and new format (score is marks)
+                        if (res?.score) {
+                            const scoreValue = Number(res.score);
+                             if (scoreValue > qMax && qMax > 0) { // Likely a percentage
+                                qEarned = (scoreValue / 100) * qMax;
+                            } else {
+                                qEarned = scoreValue;
+                            }
+                        }
+                    }
+                } else {
+                    // System Graded Question
+                    question.solutionSteps?.forEach((step: any) => {
+                        step.subQuestions.forEach((sub: any) => {
+                            const res = results[sub.id];
+                            if (res?.isCorrect) qEarned += (sub.marks || 0);
+                        });
+                    });
+                }
+                calcScore += qEarned;
+            }
+        });
+    }
+    return { score: calcScore, total: calcTotal };
+};
+
+
 export function StudentProgressList() {
     const firestore = useFirestore();
     const [selectedSubject, setSelectedSubject] = useState<SubjectEnrollmentInfo | null>(null);
     const [isDialogOpen, setDialogOpen] = useState(false);
     const [classFilter, setClassFilter] = useState<string>('all');
 
+    // --- DATA FETCHING (Now includes all necessary collections) ---
     const subjectsRef = useMemoFirebase(() => firestore && collection(firestore, 'subjects'), [firestore]);
     const { data: subjects, isLoading: subjectsLoading } = useCollection<Subject>(subjectsRef);
 
@@ -41,7 +86,48 @@ export function StudentProgressList() {
     const usersRef = useMemoFirebase(() => firestore && collection(firestore, 'users'), [firestore]);
     const { data: users, isLoading: usersLoading } = useCollection<User>(usersRef);
 
-    const isLoading = subjectsLoading || classesLoading || usersLoading;
+    const attemptsRef = useMemoFirebase(() => firestore && collection(firestore, 'worksheet_attempts'), [firestore]);
+    const { data: allAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(attemptsRef);
+
+    const worksheetsRef = useMemoFirebase(() => firestore && collection(firestore, 'worksheets'), [firestore]);
+    const { data: allWorksheets, isLoading: worksheetsLoading } = useCollection<Worksheet>(worksheetsRef);
+    
+    const questionsRef = useMemoFirebase(() => firestore && collection(firestore, 'questions'), [firestore]);
+    const { data: allQuestions, isLoading: questionsLoading } = useCollection<Question>(questionsRef);
+
+    const isLoading = subjectsLoading || classesLoading || usersLoading || attemptsLoading || worksheetsLoading || questionsLoading;
+
+    // --- DATA PROCESSING (All calculations are now based on live data) ---
+    const studentProgressDetails = useMemo((): StudentProgressDetails[] => {
+        if (!selectedSubject || !allAttempts || !allWorksheets || !allQuestions) return [];
+
+        const worksheetMap = new Map(allWorksheets.map(w => [w.id, w]));
+        const questionMap = new Map(allQuestions.map(q => [q.id, q]));
+
+        return selectedSubject.enrolledStudents.map(student => {
+            const studentAttempts = allAttempts.filter(a => a.userId === student.id);
+            
+            let totalScore = 0;
+            let totalPossible = 0;
+
+            studentAttempts.forEach(attempt => {
+                const worksheet = worksheetMap.get(attempt.worksheetId);
+                const { score, total } = getAttemptTotals(attempt, worksheet, questionMap);
+                totalScore += score;
+                totalPossible += total;
+            });
+
+            const avgScore = totalPossible > 0 ? (totalScore / totalPossible) * 100 : 0;
+            
+            return {
+                student,
+                wallet: { coins: student.coins, gold: student.gold, diamonds: student.diamonds },
+                totalAttempts: studentAttempts.length,
+                avgScore: Math.round(avgScore),
+            };
+        });
+    }, [selectedSubject, allAttempts, allWorksheets, allQuestions]);
+
 
     const enrollmentData = useMemo((): SubjectEnrollmentInfo[] => {
         if (!subjects || !classes || !users) return [];
@@ -57,16 +143,6 @@ export function StudentProgressList() {
         return enrollmentData.filter(data => data.subject.classId === classFilter);
     }, [enrollmentData, classFilter]);
 
-    // Mock student progress data for the dialog
-    const studentProgressDetails = useMemo((): StudentProgressDetails[] => {
-        if (!selectedSubject) return [];
-        return selectedSubject.enrolledStudents.map(student => ({
-            student,
-            wallet: { coins: student.coins, gold: student.gold, diamonds: student.diamonds },
-            totalAttempts: Math.floor(Math.random() * 50) + 5, // Mock data
-            avgScore: Math.floor(Math.random() * 30) + 70, // Mock data (70-100)
-        }));
-    }, [selectedSubject]);
 
     const handleViewStudents = (data: SubjectEnrollmentInfo) => {
         setSelectedSubject(data);
@@ -134,8 +210,9 @@ export function StudentProgressList() {
                         <DialogDescription>Overview of student performance in this subject.</DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
-                        {studentProgressDetails.length > 0 ? (
-                            <TooltipProvider>
+                        {isLoading ? (
+                             <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+                        ) : studentProgressDetails.length > 0 ? (
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -161,30 +238,12 @@ export function StudentProgressList() {
                                                         </div>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                                <Wallet className="h-4 w-4" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <div className="flex flex-col gap-2 p-1 text-xs">
-                                                                <div className="flex justify-between items-center gap-4">
-                                                                    <span className="flex items-center gap-1"><Coins className="h-3 w-3 text-yellow-500" /> Coins:</span>
-                                                                    <span>{detail.wallet.coins}</span>
-                                                                </div>
-                                                                <div className="flex justify-between items-center gap-4">
-                                                                    <span className="flex items-center gap-1"><Crown className="h-3 w-3 text-amber-500" /> Gold:</span>
-                                                                    <span>{detail.wallet.gold}</span>
-                                                                </div>
-                                                                 <div className="flex justify-between items-center gap-4">
-                                                                    <span className="flex items-center gap-1"><Gem className="h-3 w-3 text-blue-500" /> Diamonds:</span>
-                                                                    <span>{detail.wallet.diamonds}</span>
-                                                                </div>
-                                                            </div>
-                                                        </TooltipContent>
-                                                    </Tooltip>
+                                                <TableCell className="text-center font-mono text-xs">
+                                                     <div className="flex justify-center items-center gap-3">
+                                                        <span className="flex items-center gap-1 text-yellow-600"><Coins className="h-3 w-3" />{detail.wallet.coins}</span>
+                                                        <span className="flex items-center gap-1 text-amber-600"><Crown className="h-3 w-3" />{detail.wallet.gold}</span>
+                                                        <span className="flex items-center gap-1 text-blue-600"><Gem className="h-3 w-3" />{detail.wallet.diamonds}</span>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-center font-medium">
                                                     <div className="flex items-center justify-center gap-2">
@@ -201,14 +260,13 @@ export function StudentProgressList() {
                                                 <TableCell className="text-center">
                                                     <Button variant="outline" size="sm" disabled>
                                                         <TrendingUp className="mr-2 h-4 w-4" />
-                                                        Progress
+                                                        Full Report
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                 </Table>
-                            </TooltipProvider>
                         ) : (
                             <p className="text-center text-muted-foreground">No students are currently enrolled in this subject.</p>
                         )}
