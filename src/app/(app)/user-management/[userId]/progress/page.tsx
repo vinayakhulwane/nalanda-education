@@ -9,7 +9,6 @@ import type { User } from '@/types';
 import { Loader2 } from 'lucide-react';
 import { StudentProgressDetail } from '@/components/user-management/student-progress-detail';
 import { AdminStudentInfoCard } from '@/components/user-management/admin-student-info-card';
-import { AdminWalletManager } from '@/components/user-management/admin-wallet-manager';
 
 function AdminStudentProgressPageContent({ userId }: { userId: string }) {
     const firestore = useFirestore();
@@ -35,10 +34,9 @@ function AdminStudentProgressPageContent({ userId }: { userId: string }) {
                     <AdminStudentInfoCard student={student} />
                 </div>
                  <div className="lg:col-span-2">
-                    <AdminWalletManager student={student} />
+                    <StudentProgressDetail student={student} />
                 </div>
             </div>
-            <StudentProgressDetail student={student} />
         </div>
     )
 }
