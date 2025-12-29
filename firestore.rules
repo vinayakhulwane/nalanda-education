@@ -118,9 +118,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    /**
+     * Questions Collection
+     * ⚠️ TEMPORARY DEBUGGING RULE: ALLOW EVERYTHING
+     */
     match /questions/{questionId} {
-      allow read: if isSignedIn();
-      allow write: if isTeacher() || isAdmin();
+      allow read: if true;
+      allow write: if true;
     }
 
     match /worksheets/{worksheetId} {

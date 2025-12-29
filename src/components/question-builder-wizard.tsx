@@ -8,11 +8,11 @@ import { Step3Validation } from "@/components/question-builder/step-3-validation
 import { Step4Grading } from "@/components/question-builder/step-4-grading"; 
 import { Step5Preview } from "@/components/question-builder/step-5-preview"; 
 import { Question } from "@/types";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"; // Keeping standard button for navigation
 import { useToast } from "@/hooks/use-toast"; 
-import { Check, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Check, Loader2, ChevronRight, ChevronLeft, Save, Rocket, RefreshCw } from 'lucide-react'; 
 import { useFirestore } from '@/firebase'; 
-import { useUser } from '@/hooks/use-user'; // Ensure you created this file from the previous step!
+import { useUser } from '@/hooks/use-user'; 
 import { collection, doc, addDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 // --- HELPER: CLEAN DATA ---
@@ -61,7 +61,7 @@ export function QuestionBuilderWizard() {
     ? Object.values(question.aiRubric).reduce((a, b) => a + b, 0) === 100 
     : false;
 
-  // --- 1. LOAD DATA ---
+  // --- LOAD DATA ---
   useEffect(() => {
     const loadData = async () => {
         if (!firestore) return; 
@@ -89,15 +89,18 @@ export function QuestionBuilderWizard() {
     loadData();
   }, [firestore, searchParams, toast]);
 
-  // --- 2. SAVE ENGINE ---
+  // --- SAVE ENGINE ---
   const saveToDatabase = async (status: 'draft' | 'published') => {
+    // 1. Force Alert to prove function ran
+    alert(`🚀 TRIGGERED: Saving as ${status}...`); 
+    console.log(`[ENGINE] Attempting to save as ${status}...`); 
+    
     if (!firestore || !user) {
-        toast({ variant: "destructive", title: "Error", description: "You must be logged in to save." });
+        alert("❌ Error: Missing Database Connection or User Login");
         return;
     }
     
     setIsSaving(true);
-    console.log("Saving...", status);
 
     try {
         const payload = cleanPayload({
@@ -115,16 +118,16 @@ export function QuestionBuilderWizard() {
             });
             setQuestion(prev => ({ ...prev, id: docRef.id, status }));
             window.history.replaceState(null, '', `/questions/new?questionId=${docRef.id}`);
-            toast({ title: "Success", description: "Question created successfully!" });
+            alert("✅ Success: Created New Question!");
         } else {
             const docRef = doc(firestore, 'questions', question.id);
             await updateDoc(docRef, payload);
             setQuestion(prev => ({ ...prev, status }));
-            toast({ title: "Saved", description: status === 'published' ? "Question is now Live!" : "Draft saved." });
+            alert("✅ Success: Updated Question!");
         }
     } catch (error: any) {
         console.error("Save Error:", error);
-        toast({ variant: "destructive", title: "Save Failed", description: error.message || "Could not save question." });
+        alert(`❌ SAVE FAILED: ${error.message}`);
     } finally {
         setIsSaving(false);
     }
@@ -134,13 +137,15 @@ export function QuestionBuilderWizard() {
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
 
   const handleSaveDraft = async () => {
+      console.log("🖱️ CLICK DETECTED: Save Draft"); 
       if (question.status === 'published') {
-          if (!confirm("⚠️ Warning: This question is currently LIVE.\n\nSaving as Draft will UNPUBLISH it (hide it from students).\n\nAre you sure?")) return;
+          if (!confirm("⚠️ Warning: This question is currently LIVE.\n\nSaving as Draft will UNPUBLISH it.\n\nAre you sure?")) return;
       }
       await saveToDatabase('draft');
   };
 
   const handlePublish = async () => {
+      console.log("🖱️ CLICK DETECTED: Publish"); 
       const isUpdate = question.status === 'published';
       const msg = isUpdate 
         ? "Update this live question? Changes will be visible immediately." 
@@ -176,7 +181,7 @@ export function QuestionBuilderWizard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4"> 
+    <div className="max-w-5xl mx-auto py-8 px-4 pb-40"> {/* Huge padding bottom to clear footer */}
       
       {/* HEADER */}
       <div className="flex justify-between items-center mb-8 border-b pb-4">
@@ -205,7 +210,7 @@ export function QuestionBuilderWizard() {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="min-h-[400px] bg-white p-6 rounded-lg shadow-sm border mb-6">
+      <div className="min-h-[400px] bg-white p-6 rounded-lg shadow-sm border mb-6 relative z-0">
         <div key={question.id || 'new'}>
             {currentStep === 1 && <Step1Metadata question={question} setQuestion={setQuestion} onValidityChange={setIsStep1Valid} />}
             {currentStep === 2 && <Step2Sequence question={question} setQuestion={setQuestion} />}
@@ -215,57 +220,62 @@ export function QuestionBuilderWizard() {
         </div>
       </div>
 
-      {/* FOOTER - THE SAFE ZONE */}
-      <div className="flex justify-between items-center pt-4 border-t mt-12 mb-20">
-            {/* 1. LEFT: Back Button (Always here) */}
+      {/* 🟢 FOOTER - THE HAMMER FIX 🟢 */}
+      {/* Fixed Position + Z-Index 99999 + Pointer Events Auto */}
+      <div 
+        style={{ zIndex: 99999, pointerEvents: 'auto' }}
+        className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-between items-center shadow-[0_-5px_20px_rgba(0,0,0,0.2)]"
+      >
+        <div className="max-w-5xl mx-auto w-full flex justify-between items-center px-4">
+            {/* 1. LEFT: Back Button */}
             <Button variant="outline" onClick={handleBack} disabled={currentStep === 1} className="gap-2">
                 <ChevronLeft className="w-4 h-4" /> Back
             </Button>
             
-            {/* 2. RIGHT SIDE - DYNAMIC ACTIONS */}
+            {/* 2. RIGHT SIDE */}
             <div className="flex items-center gap-3">
                 {currentStep < 5 ? (
-                    // A: STANDARD NEXT BUTTON (Steps 1-4)
                     <Button onClick={handleNext} disabled={isNextDisabled()} className="bg-violet-600 hover:bg-violet-700 text-white gap-2">
                         Next Step <ChevronRight className="w-4 h-4" />
                     </Button>
                 ) : (
-                    // B: STEP 5 "SPLIT ACTION" BUTTON CONTAINER
-                    // This is one "box" with two clickable text areas inside
-                    <div className={`flex items-center justify-center bg-violet-100 text-violet-700 px-6 py-2.5 rounded-md text-sm font-medium transition-colors border border-violet-200 ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}>
-                        
-                        {isSaving ? (
-                            // Loading State: Shows Spinner inside the unified container
-                            <div className="flex items-center gap-2">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>Processing...</span>
-                            </div>
-                        ) : (
-                            // Active State: Two Options separated by Pipe
-                            <>
-                                {/* OPTION 1: SAVE DRAFT */}
-                                <button 
-                                    onClick={handleSaveDraft}
-                                    className="hover:underline hover:text-violet-900 focus:outline-none"
-                                >
-                                    {isPublished ? "Revert to Draft" : "Save Draft"}
-                                </button>
-                                
-                                {/* DIVIDER */}
-                                <span className="mx-3 text-violet-300">|</span>
-                                
-                                {/* OPTION 2: PUBLISH */}
-                                <button 
-                                    onClick={handlePublish}
-                                    className="font-bold hover:underline hover:text-violet-900 focus:outline-none"
-                                >
-                                    {isPublished ? "Update" : "Publish"}
-                                </button>
-                            </>
-                        )}
+                    // 🔴 HAMMER BUTTONS
+                    <div className="flex gap-4">
+                        {/* OPTION 1: SAVE DRAFT */}
+                        <button 
+                            type="button"
+                            // Using MouseDown because it triggers faster than Click and ignores some overlays
+                            onMouseDown={(e) => { e.preventDefault(); handleSaveDraft(); }}
+                            onClick={handleSaveDraft}
+                            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold border-2 transition-all cursor-pointer select-none
+                                ${isSaving ? 'bg-slate-100 text-slate-400' : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'}`}
+                        >
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} 
+                            {isPublished ? "Revert to Draft" : "Save Draft"}
+                        </button>
+
+                        {/* OPTION 2: PUBLISH */}
+                        <button 
+                            type="button"
+                            // Using MouseDown here too
+                            onMouseDown={(e) => { e.preventDefault(); handlePublish(); }}
+                            onClick={handlePublish} 
+                            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-white shadow-lg transition-all transform hover:scale-105 cursor-pointer select-none
+                                ${isSaving ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                        >
+                            {isSaving ? (
+                                <Loader2 className="w-4 h-4 animate-spin"/>
+                            ) : isPublished ? (
+                                <RefreshCw className="w-4 h-4" /> 
+                            ) : (
+                                <Rocket className="w-4 h-4" />
+                            )} 
+                            {isPublished ? "Update Question" : "Publish Question"}
+                        </button>
                     </div>
                 )}
             </div>
+        </div>
       </div>
     </div>
   );
