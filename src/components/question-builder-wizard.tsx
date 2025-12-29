@@ -14,19 +14,24 @@ import { Save, Check, Rocket, Loader2, RefreshCw } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase'; 
 import { collection, doc, addDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
-// --- DATA SANITIZER ---
+// --- HELPER: CLEAN DATA (Prevent Firebase Crashes) ---
 const cleanPayload = (obj: any): any => {
     if (Array.isArray(obj)) return obj.map(v => cleanPayload(v));
     if (obj !== null && typeof obj === 'object') {
-        // Firestore doesn't like 'undefined', so we convert to 'null'
-        return Object.keys(obj).reduce((acc, key) => {
-            const value = obj[key];
-            acc[key] = value === undefined ? null : cleanPayload(value);
-            return acc;
-        }, {} as any);
+        // Return a new object
+        const newObj: { [key: string]: any } = {};
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                const value = obj[key];
+                // Replace undefined with null, otherwise process recursively
+                newObj[key] = value === undefined ? null : cleanPayload(value);
+            }
+        }
+        return newObj;
     }
     return obj;
 };
+
 
 const initialQuestionState: Question = {
   id: '', name: '', mainQuestionText: '', authorId: '', classId: '', subjectId: '', unitId: '', categoryId: '', currencyType: 'spark',
@@ -58,7 +63,7 @@ export function QuestionBuilderWizard() {
     ? Object.values(question.aiRubric).reduce((a, b) => a + b, 0) === 100 
     : false;
 
-  // --- LOAD DATA ---
+  // --- 1. LOAD DATA (Edit Mode) ---
   useEffect(() => {
     const loadData = async () => {
         if (!firestore) return; 
@@ -90,74 +95,107 @@ export function QuestionBuilderWizard() {
     loadData();
   }, [firestore, searchParams, toast]);
 
-  // --- SAVE LOGIC ---
+  // --- 2. THE ENGINE: SAVE TO DATABASE ---
   const saveToDatabase = async (status: 'draft' | 'published') => {
     if (!firestore || !user) {
         toast({ variant: "destructive", title: "Error", description: "You must be logged in to save." });
         return;
-    };
+    }
+    
     setIsSaving(true);
+    console.log(`Starting Save Process... Target Status: ${status}`);
+
     try {
+        // A. Prepare Data
         const payload = cleanPayload({
             ...question,
+            authorId: user.uid,
             status,
-            authorId: question.authorId || user.uid, // Ensure authorId is set
             updatedAt: serverTimestamp(),
-            ...(status === 'published' ? { publishedAt: serverTimestamp() } : {})
+            // Only set publishedAt if we are actually publishing for the first time
+            ...(status === 'published' && question.status !== 'published' ? { publishedAt: serverTimestamp() } : {})
         });
+        
+        // Remove ID from the payload (it's the document key, not a field)
         delete payload.id; 
 
+        // B. Check: Create vs Update
         if (!question.id) {
-            // NEW DOC
-            const docRef = await addDoc(collection(firestore, 'questions'), { ...payload, createdAt: serverTimestamp() });
-            setQuestion(prev => ({ ...prev, id: docRef.id }));
-            toast({ title: "Success", description: "Question created!" });
+            // ---> CASE 1: NEW QUESTION (Create)
+            console.log("Creating New Document...");
+            const docRef = await addDoc(collection(firestore, 'questions'), { 
+                ...payload, 
+                createdAt: serverTimestamp() 
+            });
+            
+            // Update local state immediately
+            setQuestion(prev => ({ ...prev, id: docRef.id, status }));
+            
+            // Silent URL update
             window.history.replaceState(null, '', `/questions/new?questionId=${docRef.id}`);
+            
+            toast({ title: "Success", description: "Question created successfully!" });
+
         } else {
-            // UPDATE DOC
+            // ---> CASE 2: EXISTING QUESTION (Update)
+            console.log(`Updating Existing Document: ${question.id}`);
             const docRef = doc(firestore, 'questions', question.id);
             await updateDoc(docRef, payload);
             
+            // Update local state
             setQuestion(prev => ({ ...prev, status }));
             
-            toast({ title: "Saved", description: status === 'published' ? "Question updated and live!" : "Draft saved." });
+            toast({ title: "Saved", description: status === 'published' ? "Question is now Live!" : "Draft saved." });
         }
-    } catch (error) {
-        console.error(error);
-        toast({ variant: "destructive", title: "Error", description: "Could not save." });
+
+    } catch (error: any) {
+        console.error("Save Error:", error);
+        toast({ variant: "destructive", title: "Save Failed", description: error.message || "Could not save question." });
+        throw error; // Rethrow so caller knows it failed
     } finally {
         setIsSaving(false);
     }
   };
 
+  // --- 3. BUTTON HANDLERS ---
+  
   const handleNext = () => setCurrentStep((prev) => prev + 1);
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
 
+  // Handler: Save Draft
   const handleSaveDraft = async () => {
+      // Safety check: Don't accidentally unpublish a live question without warning
       if (question.status === 'published') {
-          if (!confirm("⚠️ Warning: This question is currently PUBLISHED.\n\nSaving as Draft will UNPUBLISH it (hide it from students).\n\nAre you sure?")) return;
+          if (!confirm("⚠️ Warning: This question is currently LIVE.\n\nSaving as Draft will UNPUBLISH it (hide it from students).\n\nAre you sure?")) return;
       }
       await saveToDatabase('draft');
   };
 
+  // Handler: Publish Question (The one you asked about)
   const handlePublish = async () => {
       const isUpdate = question.status === 'published';
       const confirmMsg = isUpdate 
-        ? "Update this live question? Changes will be visible immediately." 
+        ? "Update this live question? Changes will be visible to students immediately." 
         : "Publish this question? It will become visible to students.";
 
       if (!confirm(confirmMsg)) return;
       
-      await saveToDatabase('published');
-
-      if (!isUpdate) {
-        const backUrl = `/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`;
-        setTimeout(() => router.push(backUrl), 1000);
+      try {
+          await saveToDatabase('published');
+          
+          // Redirect logic: Give the user a moment to see the success toast, then move them
+           setTimeout(() => {
+                const backUrl = `/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`;
+                router.push(backUrl);
+            }, 1000);
+      } catch (e) {
+          // Error already handled in saveToDatabase
       }
   };
 
   const isNextDisabled = () => {
     if (currentStep === 1) return !isStep1Valid;
+    if (currentStep === 2 && question.solutionSteps.length === 0) return true;
     if (currentStep === 3) return !isStep3Valid; 
     if (currentStep === 4) return !isStep4Valid; 
     return false;
@@ -216,7 +254,7 @@ export function QuestionBuilderWizard() {
             </Button>
             
             {currentStep === 5 ? (
-                <Button onClick={handlePublish} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white shadow-md gap-2">
+                <Button onClick={handlePublish} disabled={isSaving || !isStep3Valid} className="bg-green-600 hover:bg-green-700 text-white shadow-md gap-2">
                     {isSaving ? (
                         <Loader2 className="w-4 h-4 animate-spin"/>
                     ) : isPublished ? (
@@ -224,7 +262,7 @@ export function QuestionBuilderWizard() {
                     ) : (
                         <Rocket className="w-4 h-4" />
                     )} 
-                    {isPublished ? "Update Question" : "Publish Question"}
+                    {isPublished ? "Update Live Question" : "Publish Question"}
                 </Button>
             ) : (
                 <Button onClick={handleNext} disabled={isNextDisabled()} className="bg-violet-600 hover:bg-violet-700 text-white">Next Step →</Button>
@@ -234,4 +272,3 @@ export function QuestionBuilderWizard() {
     </div>
   );
 }
-    
