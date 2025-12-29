@@ -1,7 +1,7 @@
 'use client';
 
-// ✅ FIX: Added 'useMemo' to the imports list
-import React, { useEffect, useState, Dispatch, SetStateAction, useMemo } from 'react';
+import React, { useEffect, Dispatch, SetStateAction, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation'; // ✅ NEW: To read URL params
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,24 @@ interface Step1Props {
 
 export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1Props) {
   const firestore = useFirestore();
+  const searchParams = useSearchParams(); // ✅ NEW: Hook to get URL params
+
+  // --- 1. AUTO-SELECT FROM URL (NEW) ---
+  useEffect(() => {
+    // Only run if question is empty (new) so we don't overwrite user changes
+    if (!question.classId && searchParams) {
+      const urlClassId = searchParams.get('classId');
+      const urlSubjectId = searchParams.get('subjectId');
+
+      if (urlClassId || urlSubjectId) {
+        setQuestion(prev => ({
+          ...prev,
+          classId: urlClassId || prev.classId,
+          subjectId: urlSubjectId || prev.subjectId
+        }));
+      }
+    }
+  }, [searchParams, setQuestion, question.classId]);
 
   // --- JSON Upload Logic ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,19 +54,19 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
           alert("Invalid file: Missing main question text.");
           return;
         }
-
+        
+        // Preserve ID if editing, otherwise allow new
         const importedQuestion: Question = {
-           ...initialQuestionState,
+           ...question, // Keep current state defaults
            ...jsonData,
            id: question.id,
            status: 'draft'
         };
 
         setQuestion(importedQuestion);
-
       } catch (error) {
         console.error("Import Error:", error);
-        alert("Failed to parse JSON. Please ensure the file is valid.");
+        alert("Failed to parse JSON.");
       }
     };
     reader.readAsText(file);
@@ -69,15 +87,12 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
   }, [firestore, question.subjectId]);
   const { data: units } = useCollection<Unit>(unitsQuery);
 
-  // Fetch ALL categories first (as per your error log logic), then filter in memory
-  // This avoids the "30 item limit" of Firestore 'in' queries if lists get long
   const allCategoriesQuery = useMemoFirebase(() => {
       if (!firestore) return null;
       return collection(firestore, 'categories'); 
   }, [firestore]);
   const { data: allCategories } = useCollection<Category>(allCategoriesQuery);
 
-  // Filter categories for the selected unit
   const categoriesForUnit = useMemo(() => {
     if (!allCategories || !question.unitId) return [];
     return allCategories.filter(c => c.unitId === question.unitId);
@@ -89,7 +104,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
       question.mainQuestionText && 
       question.classId && 
       question.subjectId && 
-      question.unitId &&
+      question.unitId && 
       question.categoryId &&
       question.currencyType
   );
@@ -100,19 +115,14 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
 
   const onFieldChange = (field: keyof Question, value: any) => {
     const updatedQuestion = { ...question, [field]: value };
-
-    // Waterfall Reset Logic
+    // Waterfall Reset
     if (field === 'classId') {
-        updatedQuestion.subjectId = '';
-        updatedQuestion.unitId = '';
-        updatedQuestion.categoryId = '';
+        updatedQuestion.subjectId = ''; updatedQuestion.unitId = ''; updatedQuestion.categoryId = '';
     } else if (field === 'subjectId') {
-        updatedQuestion.unitId = '';
-        updatedQuestion.categoryId = '';
+        updatedQuestion.unitId = ''; updatedQuestion.categoryId = '';
     } else if (field === 'unitId') {
         updatedQuestion.categoryId = '';
     }
-    
     setQuestion(updatedQuestion);
   }
 
@@ -126,19 +136,10 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
         <div>
           <Label htmlFor="json-upload" className="cursor-pointer">
             <Button asChild variant="outline">
-                <div>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Import JSON
-                </div>
+                <div><Upload className="mr-2 h-4 w-4" /> Import JSON</div>
             </Button>
           </Label>
-          <Input 
-            id="json-upload" 
-            type="file" 
-            accept=".json" 
-            className="hidden" 
-            onChange={handleFileUpload}
-          />
+          <Input id="json-upload" type="file" accept=".json" className="hidden" onChange={handleFileUpload} />
         </div>
       </div>
 
@@ -162,14 +163,9 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label>Class</Label>
-          <Select 
-            value={question.classId || ''} 
-            onValueChange={(val) => onFieldChange('classId', val)}
-          >
+          <Select value={question.classId || ''} onValueChange={(val) => onFieldChange('classId', val)}>
             <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
-            <SelectContent>
-              {classes?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
+            <SelectContent>{classes?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
@@ -180,9 +176,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
             disabled={!question.classId || !subjects || subjects.length === 0}
           >
             <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
-            <SelectContent>
-              {subjects?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-            </SelectContent>
+            <SelectContent>{subjects?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
@@ -193,9 +187,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
             disabled={!question.subjectId || !units || units.length === 0}
           >
             <SelectTrigger><SelectValue placeholder="Select Unit" /></SelectTrigger>
-            <SelectContent>
-              {units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-            </SelectContent>
+            <SelectContent>{units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
@@ -206,21 +198,14 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
             disabled={!question.unitId || !categoriesForUnit || categoriesForUnit.length === 0}
           >
             <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
-            <SelectContent>
-                {categoriesForUnit.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-            </SelectContent>
+            <SelectContent>{categoriesForUnit.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
       </div>
 
       <div className="space-y-2">
         <Label>Currency Reward Type</Label>
-        <Select 
-          value={question.currencyType || 'spark'} 
-          onValueChange={(val: CurrencyType) => onFieldChange('currencyType', val)}
-        >
+        <Select value={question.currencyType || 'spark'} onValueChange={(val: CurrencyType) => onFieldChange('currencyType', val)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="spark">Spark (Standard)</SelectItem>
@@ -233,29 +218,3 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
     </div>
   );
 }
-
-const initialQuestionState: Question = {
-  id: '',
-  authorId: '',
-  name: '',
-  mainQuestionText: '',
-  classId: '',
-  subjectId: '',
-  unitId: '',
-  categoryId: '',
-  currencyType: 'spark',
-  solutionSteps: [],
-  gradingMode: 'system',
-  aiRubric: {
-      problemUnderstanding: 20,
-      formulaSelection: 15,
-      substitution: 15,
-      calculationAccuracy: 20,
-      finalAnswer: 20,
-      presentationClarity: 10,
-  },
-  aiFeedbackPatterns: [],
-  status: 'draft',
-  createdAt: { seconds: 0, nanoseconds: 0 },
-  updatedAt: { seconds: 0, nanoseconds: 0 }
-};
