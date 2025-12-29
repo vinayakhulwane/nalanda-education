@@ -59,9 +59,12 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
     const { data: units, isLoading: unitsLoading } = useCollection<Unit>(unitsQuery);
 
     const categoriesQuery = useMemoFirebase(() => {
-        if (!firestore || !question.unitId) return null;
-        return query(collection(firestore, 'categories'), where('unitId', '==', question.unitId));
-    }, [firestore, question.unitId]);
+        if (!firestore || !units || units.length === 0) return null;
+        // ✅ FIX: Query for categories across ALL units of the selected subject
+        const unitIds = units.map(u => u.id);
+        // Firestore 'in' queries are limited to 30 items per query.
+        return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
+    }, [firestore, units]);
     const { data: categories, isLoading: categoriesLoading } = useCollection<Category>(categoriesQuery);
 
     const handleClassChange = (newClassId: string) => {
@@ -71,6 +74,23 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
     const handleSubjectChange = (newSubjectId: string) => {
         setQuestion(prev => ({...prev, subjectId: newSubjectId, unitId: '', categoryId: ''}));
     }
+    
+    // ✅ FIX: When unit changes, only update the category if it's no longer valid
+    const handleUnitChange = (newUnitId: string) => {
+        const selectedCategoryIsValid = categories?.some(c => c.id === question.categoryId && c.unitId === newUnitId);
+        setQuestion(prev => ({
+            ...prev, 
+            unitId: newUnitId, 
+            categoryId: selectedCategoryIsValid ? prev.categoryId : ''
+        }));
+    }
+
+    // ✅ FIX: Categories for the dropdown should be filtered by the selected unit
+    const categoriesForSelectedUnit = useMemo(() => {
+        if (!categories || !question.unitId) return categories || []; // Show all if no unit selected
+        return categories.filter(c => c.unitId === question.unitId);
+    }, [categories, question.unitId]);
+
 
     const isFormValid = !!question.name && !!question.mainQuestionText && !!question.classId && !!question.subjectId && !!question.unitId && !!question.categoryId && !!question.currencyType;
 
@@ -165,7 +185,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
              <div className="grid md:grid-cols-2 gap-4">
                  <div className="space-y-2">
                     <Label>Unit</Label>
-                    <Select onValueChange={val => setQuestion({...question, unitId: val, categoryId: ''})} value={question.unitId || ''} disabled={!selectedSubject || unitsLoading}>
+                    <Select onValueChange={handleUnitChange} value={question.unitId || ''} disabled={!selectedSubject || unitsLoading}>
                         <SelectTrigger>
                             <SelectValue placeholder={unitsLoading ? 'Loading units...' : 'Select a unit'} />
                         </SelectTrigger>
@@ -181,7 +201,7 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
                             <SelectValue placeholder={categoriesLoading ? 'Loading...' : 'Select a category'} />
                         </SelectTrigger>
                         <SelectContent>
-                           {categories?.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+                           {categoriesForSelectedUnit?.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
