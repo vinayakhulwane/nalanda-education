@@ -120,7 +120,7 @@ service cloud.firestore {
 
     match /questions/{questionId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isTeacher() || isAdmin();
     }
 
     match /worksheets/{worksheetId} {
@@ -135,7 +135,7 @@ service cloud.firestore {
       allow write: if isTeacher() || isAdmin();
     }
 
-    match /attempts/{attemptId} {
+    match /worksheet_attempts/{attemptId} {
       // A user can create their own attempt.
       allow create: if isOwner(request.resource.data.userId);
       
