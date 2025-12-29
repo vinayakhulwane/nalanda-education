@@ -1,169 +1,182 @@
-import React, { useState, useEffect } from 'react';
+'use client';
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { ArrowLeft, ArrowRight, Save, CheckCircle } from 'lucide-react';
+import type { Question } from '@/types'; // Using the master type
+import { useSearchParams } from 'next/navigation';
+import { useFirestore, useUser } from '@/firebase';
+import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
-// 1. Define the Shape of your Question Data (Fixes the 'any' type issues)
-interface Question {
-  id: string;
-  name: string;
-  mainQuestionText: string;
-  classId: string;
-  subjectId: string;
-  unitId: string;
-  categoryId: string;
-  solutionSteps: any[]; 
-  // Add other fields as needed
-}
+// Step Components
+import { Step1Metadata } from './question-builder/step-1-metadata';
+import { Step2SolutionBuilder } from './question-builder/step-2-solution-builder';
+import { Step3Preview } from './question-builder/step-3-preview';
+import { Step4Grading } from './question-builder/step-4-grading';
+import { Step5Finalize } from './question-builder/step-5-finalize';
 
-// Initial empty state
-const initialQuestionState: Question = {
-  id: '',
+
+const initialQuestionState: Partial<Question> = {
   name: '',
   mainQuestionText: '',
   classId: '',
   subjectId: '',
   unitId: '',
   categoryId: '',
-  solutionSteps: []
+  currencyType: 'spark',
+  solutionSteps: [],
+  gradingMode: 'system',
+  aiRubric: {
+      problemUnderstanding: 20,
+      formulaSelection: 15,
+      substitution: 15,
+      calculationAccuracy: 20,
+      finalAnswer: 20,
+      presentationClarity: 10,
+  },
+  aiFeedbackPatterns: [],
+  status: 'draft',
 };
 
+
 export function QuestionBuilderWizard() {
-  // ---------------------------------------------------------------------------
-  // STATE MANAGEMENT
-  // ---------------------------------------------------------------------------
-  
-  // Explicitly type the state to <Question> so 'prev' is never 'any'
-  const [question, setQuestion] = useState<Question>(initialQuestionState);
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const firestore = useFirestore();
+    const { user } = useUser();
+    const { toast } = useToast();
 
-  // "Staging Area" for uploaded JSON. 
-  // We store the file data here first, then apply it piece-by-piece.
-  const [pendingData, setPendingData] = useState<Question | null>(null);
+    const [currentStep, setCurrentStep] = useState(1);
+    const [question, setQuestion] = useState<Partial<Question>>(initialQuestionState);
+    const [stepValidity, setStepValidity] = useState({ 1: false, 2: false, 3: true, 4: true, 5: true });
+    
+    const totalSteps = 5;
 
-  // Mocking your dropdown options (You likely fetch these from an API)
-  const [classes, setClasses] = useState<any[]>([]);
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const [units, setUnits] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
+    useEffect(() => {
+        const questionId = searchParams.get('questionId');
+        const classId = searchParams.get('classId');
+        const subjectId = searchParams.get('subjectId');
 
-  // ---------------------------------------------------------------------------
-  // FILE UPLOAD HANDLER (Fixes Syntax Error + TS Error)
-  // ---------------------------------------------------------------------------
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+        if (questionId && firestore) {
+            const fetchQuestion = async () => {
+                const docRef = doc(firestore, 'questions', questionId);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setQuestion({ id: docSnap.id, ...docSnap.data() } as Partial<Question>);
+                }
+            };
+            fetchQuestion();
+        } else {
+             // If creating a new question, pre-fill from URL params
+            setQuestion(prev => ({
+                ...prev,
+                classId: classId || '',
+                subjectId: subjectId || '',
+            }))
+        }
+    }, [searchParams, firestore]);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result as string;
-        
-        // 1. Safe Parse
-        const jsonData = JSON.parse(content);
-
-        // 2. Validate it has the minimum required fields
-        if (!jsonData.mainQuestionText) throw new Error("Invalid JSON structure");
-
-        // 3. IMMEDIATE UPDATE: Text & Basic Info
-        // We update non-dependent fields immediately so the user sees progress.
-        // We explicitly type 'prev' as Question to fix your TS error.
-        setQuestion((prev: Question) => ({
-          ...prev,
-          name: jsonData.name,
-          mainQuestionText: jsonData.mainQuestionText,
-          solutionSteps: jsonData.solutionSteps,
-          status: jsonData.status || 'draft',
-          // Note: We do NOT set classId/subjectId yet. 
-          // We let the Waterfall Effect handle those.
-        }));
-
-        // 4. QUEUE UPDATES: Dependent Fields (Class, Subject, etc.)
-        // Store the full data in the "staging" state to trigger the waterfall.
-        setPendingData(jsonData);
-
-      } catch (error) {
-        console.error("Error parsing JSON:", error);
-        alert("Failed to upload file. Please ensure it is valid JSON without hidden line breaks.");
-      }
+    const handleNext = () => {
+        if (currentStep < totalSteps) {
+            setCurrentStep(currentStep + 1);
+        }
     };
-    reader.readAsText(file);
-  };
 
-  // ---------------------------------------------------------------------------
-  // WATERFALL EFFECTS (The "Race Condition" Fix)
-  // ---------------------------------------------------------------------------
+    const handleBack = () => {
+        if (currentStep > 1) {
+            setCurrentStep(currentStep - 1);
+        }
+    };
 
-  // STEP 1: Sync Class ID
-  // When pendingData arrives, set the Class ID first.
-  useEffect(() => {
-    if (pendingData && pendingData.classId) {
-      // Type 'prev' safely here as well
-      setQuestion((prev: Question) => ({ ...prev, classId: pendingData.classId }));
-      // This change in 'question.classId' will trigger your existing 
-      // API calls to fetch 'subjects'.
-    }
-  }, [pendingData]);
+    const handleValidityChange = (step: number, isValid: boolean) => {
+        setStepValidity(prev => ({ ...prev, [step]: isValid }));
+    };
+    
+    const handleSave = async () => {
+        if (!firestore || !user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'User or database not available.' });
+            return;
+        }
 
-  // STEP 2: Sync Subject ID
-  // Wait until 'subjects' are actually loaded AND match the pending class
-  useEffect(() => {
-    if (pendingData && pendingData.subjectId && subjects.length > 0) {
-      // Set Subject ID only after options exist
-      setQuestion((prev: Question) => ({ ...prev, subjectId: pendingData.subjectId }));
-    }
-  }, [pendingData, subjects]); // dependent on 'subjects' loading
+        const finalQuestionData = {
+            ...question,
+            authorId: question.authorId || user.uid,
+            updatedAt: serverTimestamp(),
+        };
 
-  // STEP 3: Sync Unit ID
-  // Wait until 'units' are loaded
-  useEffect(() => {
-    if (pendingData && pendingData.unitId && units.length > 0) {
-      setQuestion((prev: Question) => ({ ...prev, unitId: pendingData.unitId }));
-    }
-  }, [pendingData, units]);
+        try {
+            if (question.id) {
+                // Update existing question
+                const questionRef = doc(firestore, 'questions', question.id);
+                await setDoc(questionRef, finalQuestionData, { merge: true });
+                toast({ title: 'Question Updated', description: `"${question.name}" has been saved.` });
+            } else {
+                // Create new question
+                const questionWithCreationDate = {
+                    ...finalQuestionData,
+                    createdAt: serverTimestamp(),
+                };
+                const questionRef = await addDoc(collection(firestore, 'questions'), questionWithCreationDate);
+                setQuestion(prev => ({ ...prev, id: questionRef.id })); // Set new ID in state
+                toast({ title: 'Question Created', description: `"${question.name}" has been saved.` });
+            }
+            // Navigate to question bank
+            router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`);
+        } catch (error) {
+            console.error("Error saving question:", error);
+            toast({ variant: 'destructive', title: 'Save Failed', description: 'An error occurred while saving.' });
+        }
+    };
 
-  // STEP 4: Cleanup
-  // Once everything is synced, clear the pending data to stop effects
-  useEffect(() => {
-    if (
-      pendingData &&
-      question.classId === pendingData.classId &&
-      question.subjectId === pendingData.subjectId &&
-      question.unitId === pendingData.unitId
-    ) {
-      console.log("Hydration Complete.");
-      setPendingData(null);
-    }
-  }, [question, pendingData]);
+    const renderStep = () => {
+        switch (currentStep) {
+            case 1:
+                return <Step1Metadata question={question} setQuestion={setQuestion} onValidityChange={(isValid) => handleValidityChange(1, isValid)} />;
+            case 2:
+                return <Step2SolutionBuilder question={question} setQuestion={setQuestion} onValidityChange={(isValid) => handleValidityChange(2, isValid)} />;
+            case 3:
+                return <Step3Preview question={question} />;
+            case 4:
+                return <Step4Grading question={question} setQuestion={setQuestion} onValidityChange={(isValid) => handleValidityChange(4, isValid)} />;
+            case 5:
+                return <Step5Finalize question={question} setQuestion={setQuestion} />;
+            default:
+                return <div>Invalid Step</div>;
+        }
+    };
 
+    const stepTitles = ["Metadata", "Solution Builder", "Live Preview", "Grading Logic", "Finalize & Publish"];
 
-  // ---------------------------------------------------------------------------
-  // RENDER
-  // ---------------------------------------------------------------------------
-  return (
-    <div className="p-4">
-      {/* File Upload Input */}
-      <div className="mb-4">
-        <label className="block mb-2 font-bold">Upload Question JSON</label>
-        <input 
-          type="file" 
-          accept=".json" 
-          onChange={handleFileUpload}
-          className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"
-        />
-      </div>
+    return (
+        <div className="p-4 sm:p-6 lg:p-8">
+            <div className="mb-8">
+                <Progress value={(currentStep / totalSteps) * 100} className="w-full" />
+                <div className="mt-2 text-center text-sm font-medium text-muted-foreground">
+                    Step {currentStep} of {totalSteps}: {stepTitles[currentStep - 1]}
+                </div>
+            </div>
 
-      {/* Main Question Text Editor (Mock) */}
-      <div className="mb-4">
-         <h3>Main Question Text</h3>
-         <div dangerouslySetInnerHTML={{ __html: question.mainQuestionText || '<p>No content</p>' }} />
-      </div>
+            <div className="min-h-[400px]">
+                {renderStep()}
+            </div>
 
-      {/* Dropdowns (Mock - Your existing Select logic goes here) */}
-      <div className="grid grid-cols-2 gap-4">
-        <select value={question.classId} disabled>
-             <option>Class ID: {question.classId || 'Waiting...'}</option>
-        </select>
-        <select value={question.subjectId} disabled>
-             <option>Subject ID: {question.subjectId || 'Waiting...'}</option>
-        </select>
-      </div>
-    </div>
-  );
+            <div className="mt-8 flex justify-between items-center border-t pt-6">
+                <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Button>
+                {currentStep === totalSteps ? (
+                    <Button onClick={handleSave} disabled={!stepValidity[1] || !stepValidity[2] || !stepValidity[4]}>
+                        <Save className="mr-2 h-4 w-4" /> Save Question
+                    </Button>
+                ) : (
+                    <Button onClick={handleNext} disabled={!stepValidity[currentStep]}>
+                        Next <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
 }
