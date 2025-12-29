@@ -22,7 +22,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
   const firestore = useFirestore();
   const searchParams = useSearchParams(); 
   
-  // ✅ FORCE REFRESH STATE: Used to force-reload inputs after import
+  // Force Refresh State
   const [formVersion, setFormVersion] = useState(0);
 
   // --- AUTO-SELECT FROM URL ---
@@ -51,44 +51,43 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
         const content = event.target?.result as string;
         const json = JSON.parse(content);
 
-        // Explicitly Map Data to ensure structure match
+        // Explicitly Map Data
         const mappedQuestion: Question = {
-            id: question.id, // Keep current session ID
+            id: question.id, 
             status: 'draft',
             
-            // Map Basic Fields
+            // --- CONTENT (Import this) ---
             name: json.name || '', 
             mainQuestionText: json.mainQuestionText || '',
             authorId: json.authorId || '',
+            
+            // --- METADATA (KEEP EXISTING SELECTION) ---
+            // We ignore the JSON file here and keep what is currently selected in the UI
+            classId: question.classId,
+            subjectId: question.subjectId,
+            unitId: question.unitId,
+            categoryId: question.categoryId,
 
-            // Map Dropdowns
-            classId: json.classId || '',
-            subjectId: json.subjectId || '',
-            unitId: json.unitId || '',
-            categoryId: json.categoryId || '',
-
-            // Map Settings
+            // --- SETTINGS (Import this) ---
             currencyType: json.currencyType || 'spark',
             gradingMode: json.gradingMode || 'system',
             aiFeedbackPatterns: json.aiFeedbackPatterns || [],
 
-            // Map Steps (Critical)
+            // --- STEPS (Import this) ---
             solutionSteps: Array.isArray(json.solutionSteps) ? json.solutionSteps : [],
+            aiRubric: json.aiRubric || undefined, // Also import rubric if present
 
             createdAt: { seconds: 0, nanoseconds: 0 },
             updatedAt: { seconds: 0, nanoseconds: 0 }
         };
 
-        // 1. Update Data
         setQuestion(mappedQuestion);
 
-        // 2. Force UI Refresh (Crucial for Name Input)
+        // Increment version to force-refresh text inputs (Name/Editor)
         setFormVersion(v => v + 1);
         
-        // 3. Feedback
-        alert(`Import Successful!\n\nName: ${mappedQuestion.name}\nSteps Found: ${mappedQuestion.solutionSteps.length}\n\n(Click OK to view)`);
+        alert(`Import Successful!\n\nName: ${mappedQuestion.name}\nSteps Found: ${mappedQuestion.solutionSteps.length}\n\n(Metadata preserved)`);
         
-        // Reset file input
         e.target.value = ''; 
 
       } catch (error) {
@@ -153,8 +152,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
   }
 
   return (
-    // ✅ KEY ADDED HERE: Forces entire form to re-render when import happens
-    <div className="space-y-6" key={formVersion}>
+    <div className="space-y-6">
       
       <div className="flex justify-between items-center border-b pb-4">
         <div>
@@ -180,6 +178,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
       <div className="space-y-2">
         <Label>Question Name <span className="text-red-500">*</span></Label>
         <Input 
+          key={`name-${formVersion}`} 
           value={question.name || ''} 
           onChange={(e) => onFieldChange('name', e.target.value)}
           placeholder="Internal reference name (e.g., 'Newton 2nd Law Basic')"
@@ -189,19 +188,25 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
       <div className="space-y-2">
         <Label>Main Question Text <span className="text-red-500">*</span></Label>
         <RichTextEditor
+          key={`rte-${formVersion}`}
           value={question.mainQuestionText || ''}
           onChange={(val) => onFieldChange('mainQuestionText', val)}
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* DROPDOWNS: NO KEY NEEDED NOW as data is not being reset by import */}
         <div className="space-y-2">
           <Label>Class</Label>
-          <Select value={question.classId || ''} onValueChange={(val) => onFieldChange('classId', val)}>
+          <Select 
+            value={question.classId || ''} 
+            onValueChange={(val) => onFieldChange('classId', val)}
+          >
             <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
             <SelectContent>{classes?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+
         <div className="space-y-2">
           <Label>Subject</Label>
           <Select 
@@ -213,6 +218,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
             <SelectContent>{subjects?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+
         <div className="space-y-2">
           <Label>Unit</Label>
           <Select 
@@ -224,6 +230,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
             <SelectContent>{units?.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+
         <div className="space-y-2">
           <Label>Category</Label>
           <Select 
@@ -239,7 +246,11 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
 
       <div className="space-y-2">
         <Label>Currency Reward Type</Label>
-        <Select value={question.currencyType || 'spark'} onValueChange={(val: CurrencyType) => onFieldChange('currencyType', val)}>
+        <Select 
+            key={`curr-${formVersion}`}
+            value={question.currencyType || 'spark'} 
+            onValueChange={(val: CurrencyType) => onFieldChange('currencyType', val)}
+        >
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="spark">Spark (Standard)</SelectItem>

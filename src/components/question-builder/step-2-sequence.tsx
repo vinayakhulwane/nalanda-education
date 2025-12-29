@@ -278,7 +278,7 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                  <h4 className="font-semibold text-slate-800 truncate">{step.title || 'Untitled Step'}</h4>
                              </div>
                              <p className="text-sm text-slate-500 truncate">
-                                {step.subQuestions.length === 0 ? 'No sub-questions' : `${step.subQuestions.length} sub-question(s)`}
+                                {step.subQuestions.length} sub-question(s)
                              </p>
                         </div>
 
