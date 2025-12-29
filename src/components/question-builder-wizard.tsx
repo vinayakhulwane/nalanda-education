@@ -9,9 +9,10 @@ import { Step4Grading } from "@/components/question-builder/step-4-grading";
 import { Step5Preview } from "@/components/question-builder/step-5-preview"; 
 import { Question } from "@/types";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Save, Check, Rocket, Loader2, RefreshCw, ChevronRight, ChevronLeft } from 'lucide-react';
-import { useFirestore, useUser } from '@/firebase'; 
+import { useToast } from "@/hooks/use-toast"; 
+import { Check, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { useFirestore } from '@/firebase'; 
+import { useUser } from '@/hooks/use-user'; // Ensure you created this file from the previous step!
 import { collection, doc, addDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 // --- HELPER: CLEAN DATA ---
@@ -150,7 +151,7 @@ export function QuestionBuilderWizard() {
       await saveToDatabase('published');
       
       if (!isUpdate) {
-         setTimeout(() => router.push('/questions/bank'), 1500);
+         setTimeout(() => router.push('/questions'), 1500);
       }
   };
 
@@ -177,7 +178,7 @@ export function QuestionBuilderWizard() {
   return (
     <div className="max-w-5xl mx-auto py-8 px-4"> 
       
-      {/* HEADER - Clean Title Only */}
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-8 border-b pb-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Question Builder</h1>
@@ -229,35 +230,40 @@ export function QuestionBuilderWizard() {
                         Next Step <ChevronRight className="w-4 h-4" />
                     </Button>
                 ) : (
-                    // B: STEP 5 ACTIONS (Replaces Next Button)
-                    <>
-                        {/* Option 1: Save Draft */}
-                        <Button 
-                            variant="ghost" 
-                            onClick={handleSaveDraft} 
-                            disabled={isSaving} 
-                            className="text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                        >
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Save className="w-4 h-4 mr-2" />} 
-                            {isPublished ? "Revert to Draft" : "Save as Draft"}
-                        </Button>
-
-                        {/* Option 2: Publish / Update */}
-                        <Button 
-                            onClick={handlePublish} 
-                            disabled={isSaving} 
-                            className="bg-green-600 hover:bg-green-700 text-white shadow-md gap-2"
-                        >
-                            {isSaving ? (
-                                <Loader2 className="w-4 h-4 animate-spin"/>
-                            ) : isPublished ? (
-                                <RefreshCw className="w-4 h-4" /> 
-                            ) : (
-                                <Rocket className="w-4 h-4" />
-                            )} 
-                            {isPublished ? "Update Question" : "Publish Question"}
-                        </Button>
-                    </>
+                    // B: STEP 5 "SPLIT ACTION" BUTTON CONTAINER
+                    // This is one "box" with two clickable text areas inside
+                    <div className={`flex items-center justify-center bg-violet-100 text-violet-700 px-6 py-2.5 rounded-md text-sm font-medium transition-colors border border-violet-200 ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                        
+                        {isSaving ? (
+                            // Loading State: Shows Spinner inside the unified container
+                            <div className="flex items-center gap-2">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Processing...</span>
+                            </div>
+                        ) : (
+                            // Active State: Two Options separated by Pipe
+                            <>
+                                {/* OPTION 1: SAVE DRAFT */}
+                                <button 
+                                    onClick={handleSaveDraft}
+                                    className="hover:underline hover:text-violet-900 focus:outline-none"
+                                >
+                                    {isPublished ? "Revert to Draft" : "Save Draft"}
+                                </button>
+                                
+                                {/* DIVIDER */}
+                                <span className="mx-3 text-violet-300">|</span>
+                                
+                                {/* OPTION 2: PUBLISH */}
+                                <button 
+                                    onClick={handlePublish}
+                                    className="font-bold hover:underline hover:text-violet-900 focus:outline-none"
+                                >
+                                    {isPublished ? "Update" : "Publish"}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 )}
             </div>
       </div>
