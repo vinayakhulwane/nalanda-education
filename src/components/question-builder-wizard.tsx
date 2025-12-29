@@ -5,6 +5,7 @@ import { Step1Metadata } from "@/components/question-builder/step-1-metadata";
 import { Step2Sequence } from "@/components/question-builder/step-2-sequence";
 import { Step3Validation } from "@/components/question-builder/step-3-validation"; 
 import { Step4Grading } from "@/components/question-builder/step-4-grading"; 
+import { Step5Preview } from "@/components/question-builder/step-5-preview";
 import { Question } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Save, Check } from 'lucide-react';
@@ -85,7 +86,7 @@ export function QuestionBuilderWizard() {
         {currentStep === 2 && <Step2Sequence question={question} setQuestion={setQuestion} />}
         {currentStep === 3 && <Step3Validation question={question} onValidityChange={setIsStep3Valid} />}
         {currentStep === 4 && <Step4Grading question={question} setQuestion={setQuestion} />}
-        {currentStep === 5 && <div className="text-center p-10"><h3 className="text-xl font-bold">Preview Mode (Coming Soon)</h3></div>}
+        {currentStep === 5 && <Step5Preview question={question} />}
       </div>
 
       {/* FOOTER */}

@@ -30,6 +30,7 @@ function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: Colla
       <div className="flex justify-between items-center">
         <Label className="text-xs font-semibold text-slate-500 uppercase">{label}</Label>
         <Button
+          type="button" 
           variant="ghost"
           size="sm"
           onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
@@ -76,7 +77,10 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
   };
 
   const deleteStep = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening the edit modal
+    e.preventDefault(); 
+    e.stopPropagation(); // ✅ CRITICAL FIX: Stops the click from reaching the parent div
+    
+    // Safety check: Don't accidentally delete if user mis-clicked
     if (!confirm("Are you sure you want to delete this step?")) return;
     
     setQuestion(prev => ({ 
@@ -84,11 +88,14 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
         solutionSteps: prev.solutionSteps.filter(s => s.id !== id) 
     }));
     
+    // If we deleted the step that was open, close the panel
     if (activeStepId === id) setActiveStepId(null);
   };
 
   const moveStep = (idx: number, dir: 'up' | 'down', e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation(); // ✅ Fix: Prevents opening the step while moving it
+    
     const steps = [...question.solutionSteps];
     const target = dir === 'up' ? idx - 1 : idx + 1;
     if (target >= 0 && target < steps.length) {
@@ -124,7 +131,9 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
   };
 
   const duplicateSubQuestion = (sub: SubQuestion, e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation(); // ✅ Fix: Prevents toggling the accordion
+    
     if (!activeStepId) return;
     const newSub = { ...sub, id: uuidv4() };
     setQuestion(prev => ({
@@ -136,7 +145,9 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
   };
 
   const deleteSubQuestion = (subId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation(); // ✅ Fix: Prevents toggling the accordion
+    
     if (!activeStepId) return;
     setQuestion(prev => ({
         ...prev,
@@ -246,7 +257,6 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                 <h3 className="text-lg font-bold text-slate-800">Solution Sequence</h3>
                 <p className="text-sm text-slate-500">Define the logical steps to solve the problem.</p>
             </div>
-            {/* REMOVED TOP BUTTON */}
         </div>
         
         <div className="space-y-3">
@@ -261,15 +271,15 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
             {question.solutionSteps.map((step, index) => (
                 <div 
                     key={step.id}
-                    onClick={() => setActiveStepId(step.id)}
+                    onClick={() => setActiveStepId(step.id)} // 🛑 This is the Parent Handler
                     className={`group relative p-4 rounded-lg border cursor-pointer transition-all bg-white hover:border-violet-300 hover:shadow-md ${
                         activeStepId === step.id ? 'border-violet-500 ring-1 ring-violet-500 shadow-md' : 'border-slate-200 shadow-sm'
                     }`}
                 >
                     <div className="flex items-center gap-4">
                         <div className="flex flex-col gap-1 text-slate-300 group-hover:text-slate-500">
-                             <button onClick={(e)=>moveStep(index, 'up', e)} disabled={index===0} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"><ArrowUp className="w-4 h-4"/></button>
-                             <button onClick={(e)=>moveStep(index, 'down', e)} disabled={index===question.solutionSteps.length-1} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"><ArrowDown className="w-4 h-4"/></button>
+                             <button type="button" onClick={(e)=>moveStep(index, 'up', e)} disabled={index===0} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"><ArrowUp className="w-4 h-4"/></button>
+                             <button type="button" onClick={(e)=>moveStep(index, 'down', e)} disabled={index===question.solutionSteps.length-1} className="p-1 hover:bg-slate-100 rounded disabled:opacity-30"><ArrowDown className="w-4 h-4"/></button>
                         </div>
                         
                         <div className="flex-1 min-w-0">
@@ -278,13 +288,16 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                  <h4 className="font-semibold text-slate-800 truncate">{step.title || 'Untitled Step'}</h4>
                              </div>
                              <p className="text-sm text-slate-500 truncate">
-                                {step.subQuestions.length} sub-question(s)
+                                {step.subQuestions.length === 0 ? 'No sub-questions' : `${step.subQuestions.length} sub-question(s)`}
                              </p>
                         </div>
 
                         <div className="flex items-center gap-2">
                             <Button variant="secondary" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">Edit</Button>
+                            
+                            {/* ✅ DELETE BUTTON with Propagation Fix */}
                             <button 
+                                type="button"
                                 onClick={(e) => deleteStep(step.id, e)}
                                 className="p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded transition-colors"
                                 title="Delete Step"
@@ -296,7 +309,6 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                 </div>
             ))}
 
-            {/* ✅ ADD STEP BUTTON - ALWAYS AT BOTTOM */}
             <Button onClick={addStep} className="w-full py-6 bg-violet-600 hover:bg-violet-700 text-white shadow-sm mt-4">
                 <Plus className="w-5 h-5 mr-2" /> Add New Step
             </Button>
@@ -315,7 +327,7 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                         <h2 className="text-xl font-bold text-slate-800">Edit Step</h2>
                         <p className="text-sm text-slate-500">Configure content and sub-questions.</p>
                     </div>
-                    <button onClick={() => setActiveStepId(null)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full">
+                    <button type="button" onClick={() => setActiveStepId(null)} className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-full">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -376,8 +388,8 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                             </span>
                                             <div className="h-4 w-px bg-slate-200"></div>
                                             <div className="flex items-center text-slate-400">
-                                                <button onClick={(e) => duplicateSubQuestion(sub, e)} className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded" title="Duplicate"><Copy className="w-4 h-4" /></button>
-                                                <button onClick={(e) => deleteSubQuestion(sub.id, e)} className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                                <button type="button" onClick={(e) => duplicateSubQuestion(sub, e)} className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded" title="Duplicate"><Copy className="w-4 h-4" /></button>
+                                                <button type="button" onClick={(e) => deleteSubQuestion(sub.id, e)} className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button>
                                             </div>
                                             <div className="text-slate-400">
                                                 {isOpen ? <ChevronDown className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
@@ -409,8 +421,7 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                                     <Input type="number" min={1} value={sub.marks} onChange={(e)=>updateSubQuestion(sub.id,'marks',parseInt(e.target.value)||0)}/>
                                                 </div>
                                             </div>
-                                            {/* (Nested Configs Omitted for brevity - same as previous step, kept intact) */}
-                                            {/* Ensure Numerical/MCQ configs are here as per previous code */}
+                                            
                                              <div className={`rounded-lg p-5 border ${sub.answerType === 'numerical' ? 'bg-violet-50/50 border-violet-100' : 'bg-orange-50/50 border-orange-100'}`}>
                                                 <h5 className={`text-xs font-bold uppercase mb-4 border-b pb-2 ${sub.answerType === 'numerical' ? 'text-violet-700 border-violet-200' : 'text-orange-700 border-orange-200'}`}>
                                                     {sub.answerType === 'numerical' ? 'Numerical Answer Settings' : 'MCQ Options & Settings'}
@@ -433,14 +444,14 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                                                 const isCorrect = sub.mcqAnswer!.correctOptions.includes(opt.id);
                                                                 return (
                                                                     <div key={opt.id} className="flex gap-3 items-center group">
-                                                                        <button onClick={() => toggleMcqCorrect(sub.id, opt.id)} className={`shrink-0 transition-colors p-1 rounded-full ${isCorrect ? 'text-green-600 bg-green-100' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}>{isCorrect ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}</button>
+                                                                        <button type="button" onClick={() => toggleMcqCorrect(sub.id, opt.id)} className={`shrink-0 transition-colors p-1 rounded-full ${isCorrect ? 'text-green-600 bg-green-100' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}>{isCorrect ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}</button>
                                                                         <Input value={opt.text} onChange={(e) => updateMcqOption(sub.id, opt.id, e.target.value)} className={`bg-white ${isCorrect ? 'border-green-400 ring-1 ring-green-400' : 'border-orange-200'}`} placeholder={`Option ${optIdx + 1}`}/>
-                                                                        <button onClick={() => deleteMcqOption(sub.id, opt.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-5 h-5" /></button>
+                                                                        <button type="button" onClick={() => deleteMcqOption(sub.id, opt.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-5 h-5" /></button>
                                                                     </div>
                                                                 );
                                                             })}
                                                         </div>
-                                                        <Button onClick={() => addMcqOption(sub.id)} variant="outline" className="w-full border-dashed border-orange-300 text-orange-700 hover:bg-orange-50 mt-2"><Plus className="w-4 h-4 mr-2" /> Add Option</Button>
+                                                        <Button type="button" onClick={() => addMcqOption(sub.id)} variant="outline" className="w-full border-dashed border-orange-300 text-orange-700 hover:bg-orange-50 mt-2"><Plus className="w-4 h-4 mr-2" /> Add Option</Button>
                                                     </div>
                                                 )}
                                             </div>
