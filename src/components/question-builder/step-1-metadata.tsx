@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, Dispatch, SetStateAction } from 'react';
+// ✅ FIX: Added 'useMemo' to the imports list
+import React, { useEffect, useState, Dispatch, SetStateAction, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,12 +16,12 @@ interface Step1Props {
   question: Question;
   setQuestion: Dispatch<SetStateAction<Question>>;
   onValidityChange: (isValid: boolean) => void;
-  setUploadedQuestionData: Dispatch<SetStateAction<Partial<Question> | null>>;
 }
 
-export function Step1Metadata({ question, setQuestion, onValidityChange, setUploadedQuestionData }: Step1Props) {
+export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1Props) {
   const firestore = useFirestore();
 
+  // --- JSON Upload Logic ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -30,12 +31,21 @@ export function Step1Metadata({ question, setQuestion, onValidityChange, setUplo
       try {
         const content = event.target?.result as string;
         const jsonData = JSON.parse(content);
+
         if (!jsonData.mainQuestionText) {
           alert("Invalid file: Missing main question text.");
           return;
         }
-        // Use the dedicated state setter for uploaded data
-        setUploadedQuestionData(jsonData);
+
+        const importedQuestion: Question = {
+           ...initialQuestionState,
+           ...jsonData,
+           id: question.id,
+           status: 'draft'
+        };
+
+        setQuestion(importedQuestion);
+
       } catch (error) {
         console.error("Import Error:", error);
         alert("Failed to parse JSON. Please ensure the file is valid.");
@@ -44,6 +54,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange, setUplo
     reader.readAsText(file);
   };
 
+  // --- Data Fetching ---
   const { data: classes } = useCollection<Class>(useMemoFirebase(() => firestore ? collection(firestore, 'classes') : null, [firestore]));
   
   const subjectsQuery = useMemoFirebase(() => {
@@ -58,20 +69,21 @@ export function Step1Metadata({ question, setQuestion, onValidityChange, setUplo
   }, [firestore, question.subjectId]);
   const { data: units } = useCollection<Unit>(unitsQuery);
 
+  // Fetch ALL categories first (as per your error log logic), then filter in memory
+  // This avoids the "30 item limit" of Firestore 'in' queries if lists get long
   const allCategoriesQuery = useMemoFirebase(() => {
-    if (!firestore || !subjects || subjects.length === 0) return null;
-    const subjectIds = subjects.map(s => s.id);
-    if (subjectIds.length === 0) return null;
-    return query(collection(firestore, 'categories'), where('subjectId', 'in', subjectIds.slice(0, 30)));
-  }, [firestore, subjects]);
+      if (!firestore) return null;
+      return collection(firestore, 'categories'); 
+  }, [firestore]);
   const { data: allCategories } = useCollection<Category>(allCategoriesQuery);
-  
+
+  // Filter categories for the selected unit
   const categoriesForUnit = useMemo(() => {
     if (!allCategories || !question.unitId) return [];
     return allCategories.filter(c => c.unitId === question.unitId);
   }, [allCategories, question.unitId]);
-
-
+  
+  // --- Form Validation ---
   const isFormValid = !!(
       question.name && 
       question.mainQuestionText && 
@@ -88,6 +100,8 @@ export function Step1Metadata({ question, setQuestion, onValidityChange, setUplo
 
   const onFieldChange = (field: keyof Question, value: any) => {
     const updatedQuestion = { ...question, [field]: value };
+
+    // Waterfall Reset Logic
     if (field === 'classId') {
         updatedQuestion.subjectId = '';
         updatedQuestion.unitId = '';
@@ -98,6 +112,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange, setUplo
     } else if (field === 'unitId') {
         updatedQuestion.categoryId = '';
     }
+    
     setQuestion(updatedQuestion);
   }
 
@@ -192,7 +207,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange, setUplo
           >
             <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
             <SelectContent>
-                {categoriesForUnit?.map((c) => (
+                {categoriesForUnit.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
             </SelectContent>
@@ -218,3 +233,29 @@ export function Step1Metadata({ question, setQuestion, onValidityChange, setUplo
     </div>
   );
 }
+
+const initialQuestionState: Question = {
+  id: '',
+  authorId: '',
+  name: '',
+  mainQuestionText: '',
+  classId: '',
+  subjectId: '',
+  unitId: '',
+  categoryId: '',
+  currencyType: 'spark',
+  solutionSteps: [],
+  gradingMode: 'system',
+  aiRubric: {
+      problemUnderstanding: 20,
+      formulaSelection: 15,
+      substitution: 15,
+      calculationAccuracy: 20,
+      finalAnswer: 20,
+      presentationClarity: 10,
+  },
+  aiFeedbackPatterns: [],
+  status: 'draft',
+  createdAt: { seconds: 0, nanoseconds: 0 },
+  updatedAt: { seconds: 0, nanoseconds: 0 }
+};

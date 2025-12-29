@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Step1Metadata } from "@/components/question-builder/step-1-metadata";
+import { Step2Sequence } from "@/components/question-builder/step-2-sequence";
 import { Question } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Step2SolutionBuilder } from './question-builder/step-2-solution-builder';
+import { v4 as uuidv4 } from 'uuid';
 
 // Initial empty state matching your strict types
 const initialQuestionState: Question = {
-  id: '',
+  id: uuidv4(),
   name: '',
   mainQuestionText: '',
   authorId: '', 
@@ -20,12 +21,12 @@ const initialQuestionState: Question = {
   solutionSteps: [],
   gradingMode: 'system',
   aiRubric: {
-      problemUnderstanding: 20,
-      formulaSelection: 15,
-      substitution: 15,
-      calculationAccuracy: 20,
-      finalAnswer: 20,
-      presentationClarity: 10,
+    problemUnderstanding: 20,
+    formulaSelection: 15,
+    substitution: 15,
+    calculationAccuracy: 20,
+    finalAnswer: 20,
+    presentationClarity: 10,
   },
   aiFeedbackPatterns: [],
   status: 'draft',
@@ -39,30 +40,22 @@ export function QuestionBuilderWizard() {
   // ---------------------------------------------------------------------------
   const [question, setQuestion] = useState<Question>(initialQuestionState);
   const [currentStep, setCurrentStep] = useState(1);
+  const [uploadedQuestionData, setUploadedQuestionData] = useState<Partial<Question> | null>(null);
+
   
   // Track Step Validity so we can disable the Next button in the parent
   const [isStep1Valid, setIsStep1Valid] = useState(false);
   const [isStep2Valid, setIsStep2Valid] = useState(false);
-  
-  // Temporary state to hold uploaded JSON data until it can be safely applied
-  const [uploadedQuestionData, setUploadedQuestionData] = useState<Partial<Question> | null>(null);
 
-  // Effect to handle staged application of uploaded JSON data
-  useEffect(() => {
-    if (uploadedQuestionData) {
-      // Create a new question object from the uploaded data, preserving the current ID
-      const newQuestionState = {
-        ...initialQuestionState,
-        ...uploadedQuestionData,
-        id: question.id,
-        status: 'draft' as 'draft',
-      };
-      setQuestion(newQuestionState);
-      // Reset the temporary state
-      setUploadedQuestionData(null);
+  // --- DERIVED STATE ---
+  const isStepValid = useMemo(() => {
+    switch (currentStep) {
+        case 1: return isStep1Valid;
+        case 2: return isStep2Valid;
+        // Add other steps here
+        default: return true;
     }
-  }, [uploadedQuestionData, question.id]);
-
+  }, [currentStep, isStep1Valid, isStep2Valid]);
 
   // ---------------------------------------------------------------------------
   // NAVIGATION HANDLERS
@@ -74,14 +67,6 @@ export function QuestionBuilderWizard() {
   const handleBack = () => {
     setCurrentStep((prev) => Math.max(1, prev - 1));
   };
-  
-  const isNextDisabled = () => {
-    switch (currentStep) {
-        case 1: return !isStep1Valid;
-        case 2: return !isStep2Valid;
-        default: return false;
-    }
-  }
 
   // ---------------------------------------------------------------------------
   // RENDER
@@ -103,17 +88,15 @@ export function QuestionBuilderWizard() {
         {currentStep === 1 && (
           <Step1Metadata 
             question={question} 
-            setQuestion={setQuestion}
-            onValidityChange={setIsStep1Valid}
-            setUploadedQuestionData={setUploadedQuestionData}
+            setQuestion={setQuestion} 
+            onValidityChange={setIsStep1Valid} 
           />
         )}
 
         {currentStep === 2 && (
-          <Step2SolutionBuilder
-            question={question}
-            setQuestion={setQuestion}
-            onValidityChange={setIsStep2Valid}
+           <Step2Sequence 
+            question={question} 
+            setQuestion={setQuestion} 
           />
         )}
 
@@ -136,14 +119,14 @@ export function QuestionBuilderWizard() {
 
         <Button 
             onClick={handleNext} 
-            disabled={isNextDisabled()}
+            disabled={!isStepValid}
             className="bg-violet-600 hover:bg-violet-700 text-white"
         >
             Next Step →
         </Button>
       </div>
 
-      {/* DEBUG DATA VIEW (Optional) */}
+      {/* DEBUG DATA VIEW (Optional - Helpful for testing) */}
       <div className="mt-12 p-4 bg-slate-900 text-slate-400 text-xs rounded overflow-auto h-32">
         <pre>{JSON.stringify(question, null, 2)}</pre>
       </div>
