@@ -32,6 +32,9 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
     const { toast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const searchParams = useSearchParams();
+    
+    // ✅ FIX: State to hold uploaded JSON data temporarily to resolve race condition
+    const [uploadedData, setUploadedData] = useState<Partial<Question> | null>(null);
 
     // Set initial values from URL params if available and not already in question state
     useEffect(() => {
@@ -60,12 +63,30 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
 
     const categoriesQuery = useMemoFirebase(() => {
         if (!firestore || !units || units.length === 0) return null;
-        // ✅ FIX: Query for categories across ALL units of the selected subject
         const unitIds = units.map(u => u.id);
-        // Firestore 'in' queries are limited to 30 items per query.
         return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
     }, [firestore, units]);
     const { data: categories, isLoading: categoriesLoading } = useCollection<Category>(categoriesQuery);
+
+     // ✅ FIX: Effect to apply uploaded data in stages as dropdowns become available
+    useEffect(() => {
+        if (uploadedData) {
+            // Apply subject when subjects are loaded
+            if (subjects && uploadedData.subjectId && !question.subjectId) {
+                setQuestion(prev => ({ ...prev, subjectId: uploadedData.subjectId }));
+            }
+            // Apply unit when units are loaded
+            if (units && uploadedData.unitId && !question.unitId) {
+                setQuestion(prev => ({ ...prev, unitId: uploadedData.unitId }));
+            }
+            // Apply category when categories are loaded
+            if (categories && uploadedData.categoryId && !question.categoryId) {
+                setQuestion(prev => ({ ...prev, categoryId: uploadedData.categoryId }));
+                // This is the last step, so we can clear the temporary data
+                setUploadedData(null);
+            }
+        }
+    }, [subjects, units, categories, uploadedData, question, setQuestion]);
 
     const handleClassChange = (newClassId: string) => {
         setQuestion(prev => ({...prev, classId: newClassId, subjectId: '', unitId: '', categoryId: ''}));
@@ -75,7 +96,6 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
         setQuestion(prev => ({...prev, subjectId: newSubjectId, unitId: '', categoryId: ''}));
     }
     
-    // ✅ FIX: When unit changes, only update the category if it's no longer valid
     const handleUnitChange = (newUnitId: string) => {
         const selectedCategoryIsValid = categories?.some(c => c.id === question.categoryId && c.unitId === newUnitId);
         setQuestion(prev => ({
@@ -85,9 +105,8 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
         }));
     }
 
-    // ✅ FIX: Categories for the dropdown should be filtered by the selected unit
     const categoriesForSelectedUnit = useMemo(() => {
-        if (!categories || !question.unitId) return categories || []; // Show all if no unit selected
+        if (!categories || !question.unitId) return categories || [];
         return categories.filter(c => c.unitId === question.unitId);
     }, [categories, question.unitId]);
 
@@ -110,8 +129,12 @@ function Step1Metadata({ onValidityChange, question, setQuestion }: { onValidity
                 try {
                     const content = e.target?.result as string;
                     const jsonData = JSON.parse(content);
-                    // Overwrite the existing question state with the uploaded JSON data
-                    setQuestion(jsonData);
+                    
+                    // ✅ FIX: Instead of setting state directly, start the staged update
+                    const { classId, subjectId, unitId, categoryId, ...restOfData } = jsonData;
+                    setQuestion({ ...restOfData, classId });
+                    setUploadedData({ subjectId, unitId, categoryId });
+
 
                     toast({
                         title: 'Success',
