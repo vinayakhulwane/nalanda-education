@@ -13,16 +13,24 @@ interface Step5Props {
   question: Question;
 }
 
+// ✅ HELPER: Convert "Sticky" spaces (&nbsp;) to normal spaces
+// This fixes the issue where text refuses to wrap to the next line.
+const cleanHtml = (html: string = '') => {
+  if (!html) return '';
+  // Replace &nbsp; with a normal space
+  return html.replace(/&nbsp;/g, ' ');
+};
+
 export function Step5Preview({ question }: Step5Props) {
   
   const isAiGraded = question.gradingMode === 'ai';
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-20">
+    <div className="max-w-4xl mx-auto space-y-8 pb-20 w-full">
       
       {/* HEADER SUMMARY */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
-        <div>
+        <div className="w-full">
           <div className="flex items-center gap-2 mb-2">
             <Badge variant="outline" className="text-slate-500 border-slate-300">
               {question.currencyType.toUpperCase()} REWARD
@@ -37,23 +45,32 @@ export function Step5Preview({ question }: Step5Props) {
               </Badge>
             )}
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">{question.name || 'Untitled Question'}</h1>
+          {/* ✅ ADDED: break-words to title */}
+          <h1 className="text-3xl font-bold text-slate-900 break-words">{question.name || 'Untitled Question'}</h1>
           <p className="text-slate-500 text-sm mt-1">ID: <span className="font-mono text-xs">{question.id}</span></p>
         </div>
       </div>
 
       {/* PROBLEM STATEMENT CARD */}
-      <Card className="p-8 shadow-sm border-slate-200">
+      <Card className="p-8 shadow-sm border-slate-200 overflow-hidden">
         <div className="flex items-center gap-2 mb-4 text-slate-400 uppercase tracking-wider text-xs font-bold">
             <FileText className="w-4 h-4" /> Problem Statement
         </div>
-        <div 
-            className="prose prose-slate max-w-none prose-p:leading-relaxed prose-headings:font-bold text-lg text-slate-800"
-            dangerouslySetInnerHTML={{ __html: question.mainQuestionText }}
-        />
+        
+        {/* ✅ FIXED CONTAINER: 
+            1. 'w-full' ensures it uses available width
+            2. 'overflow-x-auto' handles wide tables/images gracefully (scrolls inside card)
+            3. 'cleanHtml' removes the non-breaking spaces 
+        */}
+        <div className="w-full overflow-x-auto">
+            <div 
+                className="prose prose-slate max-w-none prose-p:leading-relaxed prose-headings:font-bold text-lg text-slate-800 break-words whitespace-pre-wrap min-w-0"
+                dangerouslySetInnerHTML={{ __html: cleanHtml(question.mainQuestionText) }}
+            />
+        </div>
       </Card>
 
-      {/* SOLUTION PATH (Visualizing the Steps) */}
+      {/* SOLUTION PATH */}
       <div className="space-y-6">
         <div className="flex items-center gap-2 text-slate-800 font-bold text-lg">
             <Layers className="w-5 h-5 text-violet-600" />
@@ -62,52 +79,60 @@ export function Step5Preview({ question }: Step5Props) {
 
         <div className="relative border-l-2 border-slate-200 ml-3 space-y-8 pl-8 py-2">
             {question.solutionSteps.map((step, index) => (
-                <div key={step.id} className="relative">
+                <div key={step.id} className="relative max-w-full">
                     {/* Step Number Badge */}
                     <div className="absolute -left-[41px] top-0 w-6 h-6 rounded-full bg-white border-2 border-violet-600 text-violet-600 flex items-center justify-center text-xs font-bold z-10 shadow-sm">
                         {index + 1}
                     </div>
 
-                    <div className="mb-4">
-                        <h4 className="text-lg font-bold text-slate-800">{step.title}</h4>
+                    <div className="mb-4 max-w-full">
+                        <h4 className="text-lg font-bold text-slate-800 break-words">{step.title}</h4>
                         {step.stepQuestion && (
-                            <div className="text-slate-500 mt-1 text-sm italic" dangerouslySetInnerHTML={{ __html: step.stepQuestion }} />
+                            <div className="w-full overflow-x-auto">
+                                <div 
+                                    className="text-slate-500 mt-1 text-sm italic break-words whitespace-pre-wrap" 
+                                    dangerouslySetInnerHTML={{ __html: cleanHtml(step.stepQuestion) }} 
+                                />
+                            </div>
                         )}
                     </div>
 
                     {/* Sub-Questions Grid */}
-                    <div className="grid gap-4">
+                    <div className="grid gap-4 max-w-full">
                         {step.subQuestions.map((sub) => (
-                            <Card key={sub.id} className="p-4 bg-slate-50/50 border-slate-200 hover:border-violet-200 transition-colors">
-                                <div className="flex justify-between items-start gap-4">
-                                    <div className="flex-1">
-                                        {/* Metadata Row */}
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Badge variant="secondary" className="bg-white border-slate-200 text-slate-500 text-[10px] h-5 px-1.5">
-                                                {sub.answerType === 'numerical' ? <Hash className="w-3 h-3 mr-1"/> : <ListChecks className="w-3 h-3 mr-1"/>}
-                                                {sub.answerType.toUpperCase()}
-                                            </Badge>
-                                            <span className="text-xs font-bold text-slate-400">({sub.marks} Mark{sub.marks > 1 ? 's' : ''})</span>
-                                        </div>
-                                        
-                                        {/* Question Text */}
-                                        <div className="text-sm font-medium text-slate-700 mb-3" dangerouslySetInnerHTML={{ __html: sub.questionText }} />
-                                        
-                                        {/* CORRECT ANSWER PREVIEW (The "Key") */}
-                                        <div className="text-xs bg-white p-2 rounded border border-slate-200 inline-flex items-center gap-2 shadow-sm">
-                                            <CheckCircle2 className="w-3 h-3 text-green-600" />
-                                            <span className="font-bold text-slate-500 uppercase">Answer:</span>
-                                            {sub.answerType === 'numerical' ? (
-                                                <span className="font-mono text-violet-700 font-bold">
-                                                    {sub.numericalAnswer?.correctValue} 
-                                                    <span className="text-slate-400 ml-1">{sub.numericalAnswer?.baseUnit}</span>
-                                                </span>
-                                            ) : (
-                                                <span className="font-mono text-orange-600 font-bold">
-                                                    {sub.mcqAnswer?.options.find(o => sub.mcqAnswer?.correctOptions.includes(o.id))?.text || 'Invalid Option'}
-                                                </span>
-                                            )}
-                                        </div>
+                            <Card key={sub.id} className="p-4 bg-slate-50/50 border-slate-200 hover:border-violet-200 transition-colors overflow-hidden">
+                                <div className="flex flex-col gap-2">
+                                    {/* Metadata */}
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="secondary" className="bg-white border-slate-200 text-slate-500 text-[10px] h-5 px-1.5 shrink-0">
+                                            {sub.answerType === 'numerical' ? <Hash className="w-3 h-3 mr-1"/> : <ListChecks className="w-3 h-3 mr-1"/>}
+                                            {sub.answerType.toUpperCase()}
+                                        </Badge>
+                                        <span className="text-xs font-bold text-slate-400 shrink-0">({sub.marks} Mark{sub.marks > 1 ? 's' : ''})</span>
+                                    </div>
+                                    
+                                    {/* Question Text */}
+                                    <div className="w-full overflow-x-auto">
+                                        <div 
+                                            className="text-sm font-medium text-slate-700 break-words whitespace-pre-wrap prose prose-sm max-w-none" 
+                                            dangerouslySetInnerHTML={{ __html: cleanHtml(sub.questionText) }} 
+                                        />
+                                    </div>
+                                    
+                                    {/* Correct Answer */}
+                                    <div className="mt-2 text-xs bg-white p-2 rounded border border-slate-200 inline-flex items-center gap-2 shadow-sm w-fit max-w-full flex-wrap">
+                                        <CheckCircle2 className="w-3 h-3 text-green-600 shrink-0" />
+                                        <span className="font-bold text-slate-500 uppercase shrink-0">Answer:</span>
+                                        {sub.answerType === 'numerical' ? (
+                                            <span className="font-mono text-violet-700 font-bold break-all">
+                                                {sub.numericalAnswer?.correctValue} 
+                                                <span className="text-slate-400 ml-1">{sub.numericalAnswer?.baseUnit}</span>
+                                            </span>
+                                        ) : (
+                                            <span className="font-mono text-orange-600 font-bold break-words">
+                                                {sub.mcqAnswer?.options.find(o => sub.mcqAnswer?.correctOptions.includes(o.id))?.text || 'Invalid Option'}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </Card>

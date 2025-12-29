@@ -1,6 +1,4 @@
-"use client"
-
-// Inspired by react-hot-toast library
+// Adapted from shadcn/ui
 import * as React from "react"
 
 import type {
@@ -67,7 +65,7 @@ const addToRemoveQueue = (toastId: string) => {
     toastTimeouts.delete(toastId)
     dispatch({
       type: "REMOVE_TOAST",
-      toastId: toastId,
+      toastId,
     })
   }, TOAST_REMOVE_DELAY)
 
@@ -106,7 +104,7 @@ export const reducer = (state: State, action: Action): State => {
       return {
         ...state,
         toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined
+          t.id === toastId || action.toastId === undefined
             ? {
                 ...t,
                 open: false,
@@ -165,7 +163,7 @@ function toast({ ...props }: Toast) {
   })
 
   return {
-    id: id,
+    id,
     dismiss,
     update,
   }
