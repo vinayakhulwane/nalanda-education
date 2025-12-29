@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea"; 
-import { Plus, Trash2, ArrowUp, ArrowDown, GripVertical, X } from 'lucide-react';
+import { Switch } from "@/components/ui/switch"; 
+import { Plus, Trash2, ArrowUp, ArrowDown, GripVertical, CheckCircle2, Circle } from 'lucide-react'; // Removed X, added Trash2
 import { v4 as uuidv4 } from 'uuid';
 import { Question, SolutionStep, SubQuestion } from "@/types";
 
@@ -18,8 +19,9 @@ interface Step2Props {
 export function Step2Sequence({ question, setQuestion }: Step2Props) {
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
 
-  // --- STEP MANAGEMENT ---
-
+  // ===========================================================================
+  // MAIN STEP LOGIC
+  // ===========================================================================
   const addStep = () => {
     const newStep: SolutionStep = {
       id: uuidv4(),
@@ -44,7 +46,6 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
     const newSteps = [...question.solutionSteps];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= newSteps.length) return;
-
     [newSteps[index], newSteps[targetIndex]] = [newSteps[targetIndex], newSteps[index]];
     setQuestion({ ...question, solutionSteps: newSteps });
   };
@@ -57,8 +58,9 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
     setQuestion({ ...question, solutionSteps: updatedSteps });
   };
 
-  // --- SUB-QUESTION MANAGEMENT ---
-
+  // ===========================================================================
+  // SUB-QUESTION LOGIC (Updated with Reordering)
+  // ===========================================================================
   const addSubQuestion = () => {
     if (!activeStepId) return;
     const newSub: SubQuestion = {
@@ -67,6 +69,7 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
       marks: 1,
       answerType: 'numerical', 
       numericalAnswer: { correctValue: 0, toleranceValue: 0, baseUnit: '' },
+      mcqAnswer: { options: [], correctOptions: [], isMultiCorrect: false, shuffleOptions: true }
     };
     
     const updatedSteps = question.solutionSteps.map(s => {
@@ -75,6 +78,43 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
       }
       return s;
     });
+    setQuestion({ ...question, solutionSteps: updatedSteps });
+  };
+
+  const deleteSubQuestion = (subId: string) => {
+    if (!activeStepId) return;
+    const updatedSteps = question.solutionSteps.map(s => {
+        if (s.id === activeStepId) {
+            return { ...s, subQuestions: s.subQuestions.filter(sq => sq.id !== subId) };
+        }
+        return s;
+    });
+    setQuestion({ ...question, solutionSteps: updatedSteps });
+  };
+
+  // ✅ NEW: Move Sub-Question Up/Down
+  const moveSubQuestion = (subId: string, direction: 'up' | 'down') => {
+    if (!activeStepId) return;
+
+    const updatedSteps = question.solutionSteps.map(s => {
+        if (s.id === activeStepId) {
+            const subIndex = s.subQuestions.findIndex(sq => sq.id === subId);
+            if (subIndex === -1) return s;
+
+            const newSubs = [...s.subQuestions];
+            const targetIndex = direction === 'up' ? subIndex - 1 : subIndex + 1;
+
+            // Boundary Check
+            if (targetIndex < 0 || targetIndex >= newSubs.length) return s;
+
+            // Swap
+            [newSubs[subIndex], newSubs[targetIndex]] = [newSubs[targetIndex], newSubs[subIndex]];
+
+            return { ...s, subQuestions: newSubs };
+        }
+        return s;
+    });
+
     setQuestion({ ...question, solutionSteps: updatedSteps });
   };
 
@@ -92,6 +132,7 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
     setQuestion({ ...question, solutionSteps: updatedSteps });
   };
 
+  // --- NUMERICAL HANDLERS ---
   const updateNumericalAnswer = (subId: string, field: string, value: any) => {
     if (!activeStepId) return;
     const updatedSteps = question.solutionSteps.map(s => {
@@ -112,19 +153,145 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
     setQuestion({ ...question, solutionSteps: updatedSteps });
   };
 
-  const deleteSubQuestion = (subId: string) => {
+  // --- MCQ HANDLERS ---
+  const addMcqOption = (subId: string) => {
     if (!activeStepId) return;
     const updatedSteps = question.solutionSteps.map(s => {
         if (s.id === activeStepId) {
-            return { ...s, subQuestions: s.subQuestions.filter(sq => sq.id !== subId) };
+            return {
+                ...s,
+                subQuestions: s.subQuestions.map(sub => {
+                    if (sub.id === subId) {
+                        const currentMcq = sub.mcqAnswer || { options: [], correctOptions: [], isMultiCorrect: false, shuffleOptions: true };
+                        return {
+                            ...sub,
+                            mcqAnswer: {
+                                ...currentMcq,
+                                options: [...currentMcq.options, { id: uuidv4(), text: '' }]
+                            }
+                        };
+                    }
+                    return sub;
+                })
+            };
         }
         return s;
     });
     setQuestion({ ...question, solutionSteps: updatedSteps });
   };
 
-  // --- RENDER HELPERS ---
+  const updateMcqOptionText = (subId: string, optionId: string, text: string) => {
+    if (!activeStepId) return;
+    const updatedSteps = question.solutionSteps.map(s => {
+        if (s.id === activeStepId) {
+            return {
+                ...s,
+                subQuestions: s.subQuestions.map(sub => {
+                    if (sub.id === subId && sub.mcqAnswer) {
+                        return {
+                            ...sub,
+                            mcqAnswer: {
+                                ...sub.mcqAnswer,
+                                options: sub.mcqAnswer.options.map(opt => 
+                                    opt.id === optionId ? { ...opt, text } : opt
+                                )
+                            }
+                        };
+                    }
+                    return sub;
+                })
+            };
+        }
+        return s;
+    });
+    setQuestion({ ...question, solutionSteps: updatedSteps });
+  };
 
+  const deleteMcqOption = (subId: string, optionId: string) => {
+    if (!activeStepId) return;
+    const updatedSteps = question.solutionSteps.map(s => {
+        if (s.id === activeStepId) {
+            return {
+                ...s,
+                subQuestions: s.subQuestions.map(sub => {
+                    if (sub.id === subId && sub.mcqAnswer) {
+                        return {
+                            ...sub,
+                            mcqAnswer: {
+                                ...sub.mcqAnswer,
+                                options: sub.mcqAnswer.options.filter(opt => opt.id !== optionId),
+                                correctOptions: sub.mcqAnswer.correctOptions.filter(id => id !== optionId)
+                            }
+                        };
+                    }
+                    return sub;
+                })
+            };
+        }
+        return s;
+    });
+    setQuestion({ ...question, solutionSteps: updatedSteps });
+  };
+
+  const toggleMcqCorrect = (subId: string, optionId: string) => {
+    if (!activeStepId) return;
+    const updatedSteps = question.solutionSteps.map(s => {
+        if (s.id === activeStepId) {
+            return {
+                ...s,
+                subQuestions: s.subQuestions.map(sub => {
+                    if (sub.id === subId && sub.mcqAnswer) {
+                        const isMulti = sub.mcqAnswer.isMultiCorrect;
+                        let newCorrect = [...sub.mcqAnswer.correctOptions];
+                        if (isMulti) {
+                            if (newCorrect.includes(optionId)) {
+                                newCorrect = newCorrect.filter(id => id !== optionId);
+                            } else {
+                                newCorrect.push(optionId);
+                            }
+                        } else {
+                            newCorrect = [optionId]; 
+                        }
+                        return {
+                            ...sub,
+                            mcqAnswer: { ...sub.mcqAnswer, correctOptions: newCorrect }
+                        };
+                    }
+                    return sub;
+                })
+            };
+        }
+        return s;
+    });
+    setQuestion({ ...question, solutionSteps: updatedSteps });
+  };
+
+  const toggleMcqSetting = (subId: string, setting: 'isMultiCorrect' | 'shuffleOptions') => {
+    if (!activeStepId) return;
+    const updatedSteps = question.solutionSteps.map(s => {
+        if (s.id === activeStepId) {
+            return {
+                ...s,
+                subQuestions: s.subQuestions.map(sub => {
+                    if (sub.id === subId && sub.mcqAnswer) {
+                        return {
+                            ...sub,
+                            mcqAnswer: { ...sub.mcqAnswer, [setting]: !sub.mcqAnswer[setting] }
+                        };
+                    }
+                    return sub;
+                })
+            };
+        }
+        return s;
+    });
+    setQuestion({ ...question, solutionSteps: updatedSteps });
+  };
+
+
+  // ===========================================================================
+  // RENDER
+  // ===========================================================================
   const activeStep = question.solutionSteps.find(s => s.id === activeStepId);
 
   return (
@@ -231,12 +398,34 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
 
                     {activeStep.subQuestions.map((sub, idx) => (
                         <div key={sub.id} className="bg-white p-4 rounded-lg border shadow-sm relative group">
-                            <button 
-                                onClick={() => deleteSubQuestion(sub.id)}
-                                className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            
+                            {/* ✅ NEW: Sub-Question Controls (Move Up/Down/Delete) */}
+                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1 rounded shadow-sm border">
+                                <button 
+                                    onClick={() => moveSubQuestion(sub.id, 'up')}
+                                    disabled={idx === 0}
+                                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-30 text-slate-500"
+                                    title="Move Up"
+                                >
+                                    <ArrowUp className="w-3 h-3" />
+                                </button>
+                                <button 
+                                    onClick={() => moveSubQuestion(sub.id, 'down')}
+                                    disabled={idx === activeStep.subQuestions.length - 1}
+                                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-30 text-slate-500"
+                                    title="Move Down"
+                                >
+                                    <ArrowDown className="w-3 h-3" />
+                                </button>
+                                <div className="w-px h-3 bg-slate-200 mx-1"></div>
+                                <button 
+                                    onClick={() => deleteSubQuestion(sub.id)}
+                                    className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded"
+                                    title="Delete"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
+                            </div>
                             
                             <div className="grid grid-cols-12 gap-4 mb-4">
                                 <div className="col-span-8 space-y-1">
@@ -271,7 +460,7 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                 </div>
                             </div>
 
-                            {/* Conditional Answer Inputs */}
+                            {/* --- CONDITIONAL: NUMERICAL EDITOR --- */}
                             {sub.answerType === 'numerical' && (
                                 <div className="p-3 bg-violet-50 rounded border border-violet-100 grid grid-cols-3 gap-4">
                                     <div className="space-y-1">
@@ -304,9 +493,67 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                 </div>
                             )}
 
-                            {sub.answerType === 'mcq' && (
-                                <div className="p-3 bg-orange-50 rounded border border-orange-100 text-center text-sm text-orange-600">
-                                    MCQ Options Editor (Placeholder)
+                            {/* --- CONDITIONAL: MCQ EDITOR --- */}
+                            {sub.answerType === 'mcq' && sub.mcqAnswer && (
+                                <div className="p-4 bg-orange-50 rounded border border-orange-100 space-y-4">
+                                    <div className="flex justify-between items-center border-b border-orange-200 pb-2">
+                                        <Label className="text-xs font-bold text-orange-700 uppercase">MCQ Options</Label>
+                                        <div className="flex gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <Switch 
+                                                    checked={sub.mcqAnswer.isMultiCorrect} 
+                                                    onCheckedChange={() => toggleMcqSetting(sub.id, 'isMultiCorrect')} 
+                                                />
+                                                <span className="text-xs text-orange-800">Multi-Select</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Switch 
+                                                    checked={sub.mcqAnswer.shuffleOptions} 
+                                                    onCheckedChange={() => toggleMcqSetting(sub.id, 'shuffleOptions')} 
+                                                />
+                                                <span className="text-xs text-orange-800">Shuffle</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        {sub.mcqAnswer.options.map((opt) => {
+                                            const isCorrect = sub.mcqAnswer!.correctOptions.includes(opt.id);
+                                            return (
+                                                <div key={opt.id} className="flex gap-2 items-center">
+                                                    <button 
+                                                        onClick={() => toggleMcqCorrect(sub.id, opt.id)}
+                                                        className={`p-1 rounded transition-colors ${
+                                                            isCorrect ? 'text-green-600 bg-green-100' : 'text-slate-300 hover:text-green-400'
+                                                        }`}
+                                                        title="Mark as Correct"
+                                                    >
+                                                        {isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                                                    </button>
+                                                    <Input 
+                                                        value={opt.text}
+                                                        onChange={(e) => updateMcqOptionText(sub.id, opt.id, e.target.value)}
+                                                        placeholder={`Option text...`}
+                                                        className={`bg-white border-orange-200 ${isCorrect ? 'ring-1 ring-green-500 border-green-500' : ''}`}
+                                                    />
+                                                    <button 
+                                                        onClick={() => deleteMcqOption(sub.id, opt.id)}
+                                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <Button 
+                                        size="sm" variant="outline" 
+                                        onClick={() => addMcqOption(sub.id)} 
+                                        className="w-full border-dashed border-orange-300 text-orange-700 hover:bg-orange-100"
+                                    >
+                                        <Plus className="w-3 h-3 mr-2" /> Add Option
+                                    </Button>
                                 </div>
                             )}
                         </div>
