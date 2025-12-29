@@ -35,7 +35,7 @@ const feedbackPatterns: { id: any, label: string }[] = [
     { id: 'unitsDimensions', label: 'Units & Dimensions' },
     { id: 'commonPitfalls', label: 'Common Pitfalls' },
     { id: 'answerPresentation', label: 'Final Answer Presentation' },
-    { id: 'nextSteps', label: 'Next Steps / Further Learning' }, // ✨ Added Here
+    { id: 'nextSteps', label: 'How you can improve?' }, // ✨ Added Here
 ];
 
 

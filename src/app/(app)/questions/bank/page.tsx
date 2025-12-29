@@ -19,12 +19,38 @@ function QuestionBankPageContent() {
   const classId = searchParams.get('classId');
   const subjectId = searchParams.get('subjectId');
 
-  // Filter States - now arrays for multi-select
-  const [unitFilter, setUnitFilter] = useState<string[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [currencyFilter, setCurrencyFilter] = useState<string[]>([]);
-  const [searchFilter, setSearchFilter] = useState<string>('');
+  // Helper to get initial state from sessionStorage
+  const getInitialState = <T,>(key: string, defaultValue: T): T => {
+    if (typeof window === 'undefined') return defaultValue;
+    try {
+      const item = window.sessionStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.warn(`Error reading sessionStorage key “${key}”:`, error);
+      return defaultValue;
+    }
+  };
+
+  // Filter States - now initialized from sessionStorage
+  const [unitFilter, setUnitFilter] = useState<string[]>(() => getInitialState('qb_unitFilter', []));
+  const [categoryFilter, setCategoryFilter] = useState<string[]>(() => getInitialState('qb_categoryFilter', []));
+  const [statusFilter, setStatusFilter] = useState<string[]>(() => getInitialState('qb_statusFilter', []));
+  const [currencyFilter, setCurrencyFilter] = useState<string[]>(() => getInitialState('qb_currencyFilter', []));
+  const [searchFilter, setSearchFilter] = useState<string>(() => getInitialState('qb_searchFilter', ''));
+
+  // Effect to save filters to sessionStorage on change
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem('qb_unitFilter', JSON.stringify(unitFilter));
+      window.sessionStorage.setItem('qb_categoryFilter', JSON.stringify(categoryFilter));
+      window.sessionStorage.setItem('qb_statusFilter', JSON.stringify(statusFilter));
+      window.sessionStorage.setItem('qb_currencyFilter', JSON.stringify(currencyFilter));
+      window.sessionStorage.setItem('qb_searchFilter', JSON.stringify(searchFilter));
+    } catch (error) {
+      console.warn('Error writing to sessionStorage:', error);
+    }
+  }, [unitFilter, categoryFilter, statusFilter, currencyFilter, searchFilter]);
+
 
   // Data Fetching
   const subjectDocRef = useMemoFirebase(() => (firestore && subjectId ? doc(firestore, 'subjects', subjectId) : null), [firestore, subjectId]);

@@ -25,7 +25,6 @@ oauth2Client.setCredentials({
 
 const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-// ✅ NEW: Mapping IDs to Clear AI Instructions
 const PATTERN_MAPPING: Record<string, string> = {
     'givenRequiredMapping': 'Given Data & Required Mapping',
     'conceptualMisconception': 'Conceptual Understanding & Misconceptions',
@@ -34,8 +33,11 @@ const PATTERN_MAPPING: Record<string, string> = {
     'unitsDimensions': 'Units & Dimensions',
     'commonPitfalls': 'Common Pitfalls',
     'answerPresentation': 'Final Answer Presentation',
-    'nextSteps': 'Next Steps for Improvement / Future Learning', // Explicit Label
+    'nextSteps': 'How you can improve?', 
 };
+
+// Helper to normalize keys for matching (e.g. "Calculation Accuracy" == "calculationAccuracy")
+const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export async function POST(request: Request) {
   try {
@@ -48,23 +50,22 @@ export async function POST(request: Request) {
     if (!imageFile) return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
 
     // --- STEP 1: Process Rubric ---
-    let parsedRubric;
+    let parsedRubric: Record<string, number> = {};
     try {
         parsedRubric = JSON.parse(rubricJson);
     } catch (e) {
-        parsedRubric = { "General Accuracy": "100%" }; 
+        parsedRubric = { "General Accuracy": 100 }; 
     }
 
     const rubricInstructions = Object.entries(parsedRubric)
         .map(([category, weight]) => `- ${category}: Weightage ${weight}`)
         .join("\n");
 
-    // --- STEP 2: Process Feedback Patterns (The Fix) ---
+    // --- STEP 2: Process Feedback Patterns ---
     let feedbackFocusList = "";
     try {
         const patterns = JSON.parse(feedbackPatternsJson || '[]');
         if (Array.isArray(patterns) && patterns.length > 0) {
-            // Map IDs to readable labels, falling back to the ID if no label exists
             feedbackFocusList = patterns
                 .map(p => `- ${PATTERN_MAPPING[p] || p}`)
                 .join("\n");
@@ -121,26 +122,21 @@ export async function POST(request: Request) {
       RUBRIC CRITERIA (For Scoring):
       ${rubricInstructions}
 
-      FEEDBACK SECTIONS (You MUST include these in your feedback):
+      FEEDBACK SECTIONS:
       ${feedbackFocusList}
 
       INSTRUCTIONS:
       1. **Scoring:** Assign a score (0-100) for each Rubric Criterion.
-      2. **Total Score:** Calculate the weighted percentage (0-100).
-      3. **Feedback Format (CRITICAL):** - Output a structured Markdown list.
-         - You MUST create a bullet point for EVERY item listed in "FEEDBACK SECTIONS" above.
-         - Use bold for the section title, followed by a colon and a space (e.g., "**Next Steps:** ...").
-         - Ensure spaces are used correctly in titles (e.g., "**Given Data:**" NOT "**GivenData:**").
-         - If a section like "Next Steps" is requested, provide actionable advice on what the student should study next.
-
+      2. **Feedback Format:** - Output a structured Markdown list.
+         - For every item in "FEEDBACK SECTIONS", provide a specific comment.
+         - Use bold for the section title followed by a colon (e.g., "**How you can improve?:** ...").
+         
       OUTPUT FORMAT (STRICT JSON ONLY):
       {
-        "totalScore": number, 
-        "isCorrect": boolean,
-        "feedback": "string (Markdown formatted list)",
         "breakdown": { 
            "Criteria Name": number 
-        }
+        },
+        "feedback": "string (Markdown formatted list)"
       }
     `;
 
@@ -178,19 +174,63 @@ export async function POST(request: Request) {
 
     if (!completion) throw lastError || new Error("All AI models failed");
 
-    // --- STEP 7: Parse Response ---
+    // --- STEP 7: Parse & Recalculate Score (THE FIX) ---
     const content = completion.choices[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     
     if (!jsonMatch) throw new Error("AI output format error: " + content);
     
     const rawResult = JSON.parse(jsonMatch[0]);
+    const breakdown = rawResult.breakdown || {};
+
+    // ✅ ROBUST SCORE RE-CALCULATION
+    // We ignore AI's "totalScore" and calculate it ourselves based on the Rubric weights.
+    let calculatedTotalScore = 0;
+    let totalWeight = 0;
+
+    // Normalize keys to ensure we match "CalculationAccuracy" with "Calculation Accuracy"
+    const normalizedBreakdown: Record<string, number> = {};
+    Object.keys(breakdown).forEach(k => {
+        normalizedBreakdown[normalizeKey(k)] = Number(breakdown[k] || 0);
+    });
+
+    Object.entries(parsedRubric).forEach(([rubricKey, weight]) => {
+        const normKey = normalizeKey(rubricKey);
+        
+        // Find matching score in breakdown (fuzzy match)
+        // 1. Try exact key match
+        // 2. Try normalized key match
+        // 3. Try partial match (e.g. "Calculation" matches "CalculationAccuracy")
+        let score = normalizedBreakdown[normKey];
+
+        if (score === undefined) {
+             // Fallback: If AI named it slightly differently, look for it
+             const foundKey = Object.keys(normalizedBreakdown).find(k => k.includes(normKey) || normKey.includes(k));
+             score = foundKey ? normalizedBreakdown[foundKey] : 0;
+        }
+
+        const numericWeight = Number(weight);
+        totalWeight += numericWeight;
+        calculatedTotalScore += (score / 100) * numericWeight; // Weighted sum
+    });
+
+    // If weights don't sum to 100, normalize the result
+    if (totalWeight > 0 && totalWeight !== 100) {
+        calculatedTotalScore = (calculatedTotalScore / totalWeight) * 100;
+    }
+    
+    // Fallback if rubric matching completely failed but AI gave a breakdown
+    if (calculatedTotalScore === 0 && Object.values(breakdown).length > 0) {
+        const scores = Object.values(breakdown).map(v => Number(v));
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        calculatedTotalScore = avg;
+    }
 
     const cleanResult = {
-        totalScore: Number(rawResult.totalScore ?? rawResult.score ?? rawResult.Score ?? 0),
-        isCorrect: Boolean(rawResult.isCorrect),
+        totalScore: Math.round(calculatedTotalScore), // ✅ Used our Calculated Score
+        isCorrect: calculatedTotalScore >= 50,
         feedback: rawResult.feedback || "Grading complete.",
-        breakdown: rawResult.breakdown || {},
+        breakdown: breakdown,
         driveLink 
     };
 
