@@ -22,7 +22,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Progress } from '@/components/ui/progress';
 import { WorksheetResults, type AnswerState } from '@/components/worksheet-results';
 import { AIAnswerUploader } from '@/components/solve/ai-answer-uploader';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 
 // Helper Formatters

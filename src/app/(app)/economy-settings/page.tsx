@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { doc } from 'firebase/firestore';
 import type { EconomySettings } from '@/types';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function EconomySettingsPage() {
   const { userProfile, isUserProfileLoading } = useUser();
