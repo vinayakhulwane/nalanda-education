@@ -1,4 +1,94 @@
 'use client';
+// ==========================================
+// 1. CORE ENUMS & CONSTANTS
+// ==========================================
+export type CurrencyType = 'spark' | 'coin' | 'gold' | 'diamond';
+
+export type GradingMode = 'system' | 'ai';
+
+export type QuestionStatus = 'draft' | 'published' | 'archived';
+
+export type AnswerType = 'numerical' | 'text' | 'mcq'; // Added MCQ for Step 1 logic
+
+// ==========================================
+// 2. RUBRIC STRUCTURE (For AI Grading)
+// ==========================================
+export interface AiRubric {
+  problemUnderstanding: number; // %
+  formulaSelection: number;     // %
+  substitution: number;         // %
+  calculationAccuracy: number;  // %
+  finalAnswer: number;          // %
+  presentationClarity: number;  // %
+}
+
+// ==========================================
+// 3. STEP & SUB-QUESTION STRUCTURE
+// ==========================================
+export interface NumericalAnswer {
+  correctValue: number;
+  toleranceValue: number; // Mandatory for numerical
+  baseUnit: string;
+}
+
+export interface McqAnswer {
+  options: { id: string; text: string }[];
+  correctOptions: string[]; // UUIDs
+  isMultiCorrect: boolean;
+  shuffleOptions: boolean;
+}
+
+export interface SubQuestion {
+  id: string;
+  questionText: string;
+  marks: number;
+  answerType: AnswerType;
+  // One of these must be populated based on answerType
+  numericalAnswer?: NumericalAnswer;
+  mcqAnswer?: McqAnswer; 
+  textAnswerKeywords?: string[]; // For text matching
+}
+
+export interface SolutionStep {
+  id: string;
+  title: string;
+  description: string; // "Step Description"
+  stepQuestion: string; // "Step Question"
+  subQuestions: SubQuestion[];
+}
+
+// ==========================================
+// 4. THE MASTER QUESTION OBJECT
+// ==========================================
+export interface Question {
+  // Metadata (Step 1)
+  id: string;
+  name: string; // Internal Name
+  mainQuestionText: string; // Problem Statement
+  authorId: string;
+  classId: string;
+  subjectId: string;
+  unitId: string;
+  categoryId: string;
+  currencyType: CurrencyType;
+  
+  // The Solution Engine (Step 2)
+  solutionSteps: SolutionStep[];
+
+  // Grading Logic (Step 4)
+  gradingMode: GradingMode;
+  aiRubric?: AiRubric; // Required if gradingMode === 'ai'
+  aiFeedbackPatterns: string[]; // e.g., ['calculation_error', 'conceptual_misconception']
+
+  // System State (Step 3 & 5)
+  status: QuestionStatus;
+  createdAt: { seconds: number; nanoseconds: number };
+  updatedAt: { seconds: number; nanoseconds: number };
+  publishedAt?: { seconds: number; nanoseconds: number };
+}
+
+// --- Other existing types ---
+
 export type UserRole = 'student' | 'teacher' | 'admin';
 
 export interface User {
@@ -76,82 +166,6 @@ export interface Teacher extends User {
   classes: string[];
 }
 
-export type CurrencyType = 'spark' | 'coin' | 'gold' | 'diamond';
-export type SubQuestionType = 'numerical' | 'text' | 'mcq';
-export type GradingMode = 'system' | 'ai';
-
-export interface McqOption {
-  id: string;
-  text: string;
-}
-
-export interface SubQuestion {
-  id: string;
-  questionText: string;
-  image?: string;
-  answerType: SubQuestionType;
-  marks: number;
-  // Numerical Answer
-  numericalAnswer?: {
-    baseUnit: string;
-    correctValue: number;
-    allowedUnits: string[];
-    defaultUnit: string;
-    toleranceType: 'absolute' | 'percentage';
-    toleranceValue: number;
-  };
-  // Text Answer
-  textAnswer?: {
-    keywords: string[];
-    matchLogic: 'any' | 'all' | 'exact';
-    caseSensitive: boolean;
-  };
-  // MCQ Answer
-  mcqAnswer?: {
-    options: McqOption[];
-    correctOptions: string[]; // array of option ids
-    isMultiCorrect: boolean;
-    shuffleOptions: boolean;
-  };
-}
-
-export interface SolutionStep {
-  id: string;
-  title: string;
-  description: string;
-  stepImage?: string;
-  stepQuestion: string;
-  subQuestions: SubQuestion[];
-}
-
-export type AIRubricKey = 'problemUnderstanding' | 'formulaSelection' | 'substitution' | 'calculationAccuracy' | 'finalAnswer' | 'presentationClarity';
-
-export type AIRubric = Record<AIRubricKey, number>;
-
-export type AIFeedbackPattern = 'consistency' | 'examReadiness' | 'calculationError' | 'conceptualMisconception' | 'alternativeMethods' | 'commonPitfalls' | 'realWorldConnection' | 'nextSteps';
-
-
-export interface Question {
-  id: string;
-  // Step 1: Metadata
-  name: string;
-  mainQuestionText: string;
-  mainImage?: string;
-  classId: string;
-  subjectId: string;
-  unitId: string;
-  categoryId: string;
-  currencyType: CurrencyType;
-  // Step 2: Steps
-  solutionSteps: SolutionStep[];
-  // Step 4: Grading
-  gradingMode: GradingMode;
-  aiRubric?: AIRubric;
-  aiFeedbackPatterns?: AIFeedbackPattern[];
-  // Status
-  status: 'draft' | 'published';
-  authorId: string;
-}
 
 export type QuestionFilter = 'unit' | 'category' | 'status' | 'currency';
 
@@ -196,16 +210,16 @@ export interface WorksheetAttempt {
 
 export interface EconomySettings {
   // Exchange Rates
-  coinToGold: number;      // Renamed from 'coinsPerGold' to match new code
-  goldToDiamond: number;   // Renamed from 'goldPerDiamond' to match new code
+  coinToGold: number;
+  goldToDiamond: number;
 
   // Creation Costs
-  costPerMark: number;     // NEW: Controls the 50% cost rule
+  costPerMark: number;
 
   // Reward Multipliers
-  rewardPractice: number;   // NEW: Controls 100% reward for own tests
-  rewardClassroom: number;  // NEW: Controls 50% reward for assignments
-  rewardSpark: number;      // NEW: Controls Spark conversion rate
+  rewardPractice: number;
+  rewardClassroom: number;
+  rewardSpark: number;
 }
 
 export interface Transaction {

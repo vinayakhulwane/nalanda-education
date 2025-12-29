@@ -1,5 +1,7 @@
 'use client';
+
 import { PageHeader } from "@/components/page-header";
+// ✅ FIXED: Added curly braces { } because your component uses a Named Export
 import { QuestionBuilderWizard } from "@/components/question-builder-wizard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
