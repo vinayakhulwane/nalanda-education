@@ -13,14 +13,12 @@ export type AnswerType = 'numerical' | 'text' | 'mcq'; // Added MCQ for Step 1 l
 // ==========================================
 // 2. RUBRIC STRUCTURE (For AI Grading)
 // ==========================================
-export interface AiRubric {
-  problemUnderstanding: number; // %
-  formulaSelection: number;     // %
-  substitution: number;         // %
-  calculationAccuracy: number;  // %
-  finalAnswer: number;          // %
-  presentationClarity: number;  // %
-}
+export type AIRubricKey = 'problemUnderstanding' | 'formulaSelection' | 'substitution' | 'calculationAccuracy' | 'finalAnswer' | 'presentationClarity';
+
+export type AIRubric = Record<AIRubricKey, number>;
+
+export type AIFeedbackPattern = 'givenRequiredMapping' | 'conceptualMisconception' | 'stepSequence' | 'calculationMistake' | 'unitsDimensions' | 'commonPitfalls' | 'answerPresentation' | 'nextSteps';
+
 
 // ==========================================
 // 3. STEP & SUB-QUESTION STRUCTURE
@@ -31,8 +29,13 @@ export interface NumericalAnswer {
   baseUnit: string;
 }
 
+export interface McqOption {
+    id: string;
+    text: string;
+}
+
 export interface McqAnswer {
-  options: { id: string; text: string }[];
+  options: McqOption[];
   correctOptions: string[]; // UUIDs
   isMultiCorrect: boolean;
   shuffleOptions: boolean;
@@ -77,8 +80,8 @@ export interface Question {
 
   // Grading Logic (Step 4)
   gradingMode: GradingMode;
-  aiRubric?: AiRubric; // Required if gradingMode === 'ai'
-  aiFeedbackPatterns: string[]; // e.g., ['calculation_error', 'conceptual_misconception']
+  aiRubric?: AIRubric; // Required if gradingMode === 'ai'
+  aiFeedbackPatterns: AIFeedbackPattern[]; // e.g., ['calculation_error', 'conceptual_misconception']
 
   // System State (Step 3 & 5)
   status: QuestionStatus;

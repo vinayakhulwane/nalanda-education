@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, Dispatch, SetStateAction, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation'; // ✅ NEW: To read URL params
+import React, { useEffect, useState, Dispatch, SetStateAction } from 'react';
+import { useSearchParams } from 'next/navigation'; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,15 +20,16 @@ interface Step1Props {
 
 export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1Props) {
   const firestore = useFirestore();
-  const searchParams = useSearchParams(); // ✅ NEW: Hook to get URL params
+  const searchParams = useSearchParams(); 
+  
+  // ✅ FORCE REFRESH STATE: Used to force-reload inputs after import
+  const [formVersion, setFormVersion] = useState(0);
 
-  // --- 1. AUTO-SELECT FROM URL (NEW) ---
+  // --- AUTO-SELECT FROM URL ---
   useEffect(() => {
-    // Only run if question is empty (new) so we don't overwrite user changes
     if (!question.classId && searchParams) {
       const urlClassId = searchParams.get('classId');
       const urlSubjectId = searchParams.get('subjectId');
-
       if (urlClassId || urlSubjectId) {
         setQuestion(prev => ({
           ...prev,
@@ -39,7 +40,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
     }
   }, [searchParams, setQuestion, question.classId]);
 
-  // --- JSON Upload Logic ---
+  // --- JSON FILE READER ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -48,31 +49,57 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
     reader.onload = (event) => {
       try {
         const content = event.target?.result as string;
-        const jsonData = JSON.parse(content);
+        const json = JSON.parse(content);
 
-        if (!jsonData.mainQuestionText) {
-          alert("Invalid file: Missing main question text.");
-          return;
-        }
-        
-        // Preserve ID if editing, otherwise allow new
-        const importedQuestion: Question = {
-           ...question, // Keep current state defaults
-           ...jsonData,
-           id: question.id,
-           status: 'draft'
+        // Explicitly Map Data to ensure structure match
+        const mappedQuestion: Question = {
+            id: question.id, // Keep current session ID
+            status: 'draft',
+            
+            // Map Basic Fields
+            name: json.name || '', 
+            mainQuestionText: json.mainQuestionText || '',
+            authorId: json.authorId || '',
+
+            // Map Dropdowns
+            classId: json.classId || '',
+            subjectId: json.subjectId || '',
+            unitId: json.unitId || '',
+            categoryId: json.categoryId || '',
+
+            // Map Settings
+            currencyType: json.currencyType || 'spark',
+            gradingMode: json.gradingMode || 'system',
+            aiFeedbackPatterns: json.aiFeedbackPatterns || [],
+
+            // Map Steps (Critical)
+            solutionSteps: Array.isArray(json.solutionSteps) ? json.solutionSteps : [],
+
+            createdAt: { seconds: 0, nanoseconds: 0 },
+            updatedAt: { seconds: 0, nanoseconds: 0 }
         };
 
-        setQuestion(importedQuestion);
+        // 1. Update Data
+        setQuestion(mappedQuestion);
+
+        // 2. Force UI Refresh (Crucial for Name Input)
+        setFormVersion(v => v + 1);
+        
+        // 3. Feedback
+        alert(`Import Successful!\n\nName: ${mappedQuestion.name}\nSteps Found: ${mappedQuestion.solutionSteps.length}\n\n(Click OK to view)`);
+        
+        // Reset file input
+        e.target.value = ''; 
+
       } catch (error) {
         console.error("Import Error:", error);
-        alert("Failed to parse JSON.");
+        alert("Failed to parse JSON. Please check the file format.");
       }
     };
     reader.readAsText(file);
   };
 
-  // --- Data Fetching ---
+  // --- DATA FETCHING ---
   const { data: classes } = useCollection<Class>(useMemoFirebase(() => firestore ? collection(firestore, 'classes') : null, [firestore]));
   
   const subjectsQuery = useMemoFirebase(() => {
@@ -93,12 +120,12 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
   }, [firestore]);
   const { data: allCategories } = useCollection<Category>(allCategoriesQuery);
 
-  const categoriesForUnit = useMemo(() => {
+  const categoriesForUnit = React.useMemo(() => {
     if (!allCategories || !question.unitId) return [];
     return allCategories.filter(c => c.unitId === question.unitId);
   }, [allCategories, question.unitId]);
   
-  // --- Form Validation ---
+  // --- VALIDATION ---
   const isFormValid = !!(
       question.name && 
       question.mainQuestionText && 
@@ -115,7 +142,6 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
 
   const onFieldChange = (field: keyof Question, value: any) => {
     const updatedQuestion = { ...question, [field]: value };
-    // Waterfall Reset
     if (field === 'classId') {
         updatedQuestion.subjectId = ''; updatedQuestion.unitId = ''; updatedQuestion.categoryId = '';
     } else if (field === 'subjectId') {
@@ -127,7 +153,9 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
   }
 
   return (
-    <div className="space-y-6">
+    // ✅ KEY ADDED HERE: Forces entire form to re-render when import happens
+    <div className="space-y-6" key={formVersion}>
+      
       <div className="flex justify-between items-center border-b pb-4">
         <div>
           <h2 className="text-xl font-bold">Metadata</h2>
@@ -139,7 +167,13 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
                 <div><Upload className="mr-2 h-4 w-4" /> Import JSON</div>
             </Button>
           </Label>
-          <Input id="json-upload" type="file" accept=".json" className="hidden" onChange={handleFileUpload} />
+          <Input 
+            id="json-upload" 
+            type="file" 
+            accept=".json" 
+            className="hidden" 
+            onChange={handleFileUpload} 
+          />
         </div>
       </div>
 
