@@ -107,6 +107,7 @@ export interface User {
   enrollments?: string[];
   completedWorksheets?: string[];
   unlockedTabs?: string[];
+  unlockedSolutions?: string[];
 }
 
 export interface Class {
@@ -218,6 +219,7 @@ export interface EconomySettings {
 
   // Creation Costs
   costPerMark: number;
+  solutionCostPercentage: number; // New setting
 
   // Reward Multipliers
   rewardPractice: number;

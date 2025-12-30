@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ export default function EconomySettingsPage() {
     rewardPractice: 1.0,
     rewardClassroom: 0.5,
     rewardSpark: 0.5,
+    solutionCostPercentage: 25, // New default value
   });
 
   // Updated path to match where your app likely stores global settings
@@ -127,18 +128,18 @@ export default function EconomySettingsPage() {
           </CardContent>
         </Card>
 
-        {/* SECTION 2: CREATION COSTS */}
+        {/* SECTION 2: CREATION & UNLOCK COSTS */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <ScrollText className="h-5 w-5 text-primary" />
-              <CardTitle>Worksheet Creation Costs</CardTitle>
+              <CardTitle>Content Costs</CardTitle>
             </div>
-            <CardDescription>Control how much students pay to build practice tests.</CardDescription>
+            <CardDescription>Control how much students pay to build tests or unlock content.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div className="space-y-2">
-                <Label htmlFor="costPerMark">Cost Multiplier (per Mark)</Label>
+                <Label htmlFor="costPerMark">Practice Test Cost Multiplier (per Mark)</Label>
                 <div className="flex gap-4 items-center">
                   <Input 
                     id="costPerMark"
@@ -149,7 +150,23 @@ export default function EconomySettingsPage() {
                     onChange={(e) => setSettings({...settings, costPerMark: parseFloat(e.target.value)})} 
                   />
                   <span className="text-sm text-muted-foreground">
-                      Example: <strong>0.5</strong> means a 10-mark question costs 5 Currency.
+                      Example: <strong>0.5</strong>x cost.
+                  </span>
+                </div>
+              </div>
+               <div className="space-y-2">
+                <Label htmlFor="solutionCostPercentage">AI Solution Cost (% of Marks)</Label>
+                <div className="flex gap-4 items-center">
+                  <Input 
+                    id="solutionCostPercentage"
+                    className="max-w-[150px]"
+                    type="number" 
+                    step="1"
+                    value={settings.solutionCostPercentage ?? 25} 
+                    onChange={(e) => setSettings({...settings, solutionCostPercentage: parseFloat(e.target.value)})} 
+                  />
+                  <span className="text-sm text-muted-foreground">
+                      Example: <strong>25</strong>% of marks.
                   </span>
                 </div>
               </div>
