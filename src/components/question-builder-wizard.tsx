@@ -16,7 +16,7 @@ import { collection, doc, addDoc, updateDoc, getDoc, serverTimestamp } from 'fir
 
 // --- HELPER: CLEAN DATA ---
 const cleanPayload = (obj: any): any => {
-    if (obj === undefined) return null; // Return null for top-level undefined
+    if (obj === undefined) return undefined; // Return undefined to have Firestore ignore it
     if (obj === null) return null;
     if (Array.isArray(obj)) return obj.map(v => cleanPayload(v));
 
@@ -25,7 +25,6 @@ const cleanPayload = (obj: any): any => {
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 const value = obj[key];
-                // ✅ FIX: Only include the key if the value is NOT undefined.
                 if (value !== undefined) {
                     newObj[key] = cleanPayload(value);
                 }
@@ -35,6 +34,7 @@ const cleanPayload = (obj: any): any => {
     }
     return obj;
 };
+
 
 const initialQuestionState: Question = {
   id: '', name: '', mainQuestionText: '', authorId: '', classId: '', subjectId: '', unitId: '', categoryId: '', currencyType: 'spark',
