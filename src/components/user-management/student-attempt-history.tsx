@@ -1,7 +1,7 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { User, Worksheet, WorksheetAttempt } from '@/types';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where, orderBy, documentId } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -13,21 +13,25 @@ interface StudentAttemptHistoryProps {
 
 export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
     const firestore = useFirestore();
+    const { userProfile } = useUser();
+    const userIsAdminOrTeacher = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
     const attemptsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
+        // Only run the query if the current user is an admin/teacher OR if viewing own progress
+        if (!firestore || !student.id || (!userIsAdminOrTeacher && student.id !== userProfile?.id)) {
+            return null;
+        }
         return query(
             collection(firestore, 'worksheet_attempts'),
             where('userId', '==', student.id),
             orderBy('attemptedAt', 'desc')
         );
-    }, [firestore, student.id]);
+    }, [firestore, student.id, userIsAdminOrTeacher, userProfile?.id]);
 
     const { data: attempts, isLoading: areAttemptsLoading } = useCollection<WorksheetAttempt>(attemptsQuery);
     
     const worksheetIds = useMemo(() => {
         if (!attempts) return [];
-        // Get unique worksheet IDs from attempts
         return [...new Set(attempts.map(a => a.worksheetId))];
     }, [attempts]);
 
@@ -49,7 +53,6 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
             attemptsMap.set(attempt.worksheetId, [...existing, attempt]);
         });
 
-        // Sort worksheets by the most recent attempt date
         const sortedWs = [...worksheets].sort((a, b) => {
             const lastAttemptA = attemptsMap.get(a.id)?.[0]?.attemptedAt?.toMillis() || 0;
             const lastAttemptB = attemptsMap.get(b.id)?.[0]?.attemptedAt?.toMillis() || 0;
@@ -60,6 +63,11 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
     }, [attempts, worksheets]);
     
     const isLoading = areAttemptsLoading || areWorksheetsLoading;
+
+    // Do not render the component for non-admins if they are trying to view another student's history
+    if (!userIsAdminOrTeacher && student.id !== userProfile?.id) {
+        return null;
+    }
 
     return (
         <Card>
@@ -81,8 +89,7 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
                                     key={ws.id}
                                     worksheet={ws}
                                     view="list"
-                                    attemptId={latestAttempt?.id}
-                                    // ✅ ADDED: Specify the source is the progress page
+                                    attempt={latestAttempt}
                                     from="progress"
                                 />
                             )
