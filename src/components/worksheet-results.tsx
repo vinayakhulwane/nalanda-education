@@ -23,6 +23,15 @@ export type AnswerState = {
   };
 };
 
+export type ResultState = {
+  [subQuestionId: string]: {
+    isCorrect: boolean;
+    score?: number;       // ✅ Added: Optional score for AI grading
+    feedback?: string;    // ✅ Added: Optional text feedback from AI
+  }
+};
+
+
 interface WorksheetResultsProps {
   worksheet: Worksheet;
   questions: Question[];
@@ -138,7 +147,7 @@ const getCorrectAnswerText = (subQ: SubQuestion) => {
       const { correctValue, baseUnit } = subQ.numericalAnswer || {};
       if (!baseUnit || baseUnit.toLowerCase() === 'unitless') return `${correctValue ?? 'N/A'}`;
       return `${correctValue ?? 'N/A'}${baseUnit ? ` ${baseUnit}` : ''}`;
-    case 'text': return subQ.textAnswer?.keywords.join(', ') || 'N/A';
+    case 'text': return subQ.textAnswerKeywords?.join(', ') || 'N/A';
     case 'mcq':
       return subQ.mcqAnswer?.options
         .filter(opt => subQ.mcqAnswer?.correctOptions.includes(opt.id))
@@ -205,7 +214,7 @@ export function WorksheetResults({
                     });
                     score += calculatedSum;
                 } else {
-                    let val = Number(result.score || 0);
+                    let val = Number((result as any).score || 0);
                     if (val > qTotalMarks) val = (val / 100) * qTotalMarks;
                     score += val;
                 }
@@ -388,15 +397,15 @@ export function WorksheetResults({
             </div>
           </div>
 
-          <div className="mt-8 mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="mt-8 mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 no-print">
             <Button
-              className="w-full h-12 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed no-print"
+              className="w-full h-12 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
               onClick={handleClaimRewards}
               disabled={isClaiming || hasClaimed || !calculatedRewards || Object.values(calculatedRewards).every(a => a === 0)}
             >
               {isClaiming ? <Loader2 className="h-6 w-6 animate-spin" /> : hasClaimed ? 'Rewards Claimed' : 'Claim Rewards'}
             </Button>
-            <Button variant="outline" className="w-full h-12 text-lg no-print" onClick={handlePrint}>
+            <Button variant="outline" className="w-full h-12 text-lg" onClick={handlePrint}>
                 <Printer className="mr-2 h-5 w-5" /> Export to PDF
             </Button>
           </div>
@@ -411,7 +420,7 @@ export function WorksheetResults({
                 const firstSub = question.solutionSteps[0]?.subQuestions[0];
                 const result = results[firstSub?.id];
                 const breakdown = (result as any)?.aiBreakdown;
-                const feedback = result?.feedback; 
+                const feedback = (result as any)?.feedback; 
                 const driveLink = answers[firstSub?.id]?.answer;
                 const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
         
