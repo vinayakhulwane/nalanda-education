@@ -118,13 +118,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    /**
-     * Questions Collection
-     * ⚠️ TEMPORARY DEBUGGING RULE: ALLOW EVERYTHING
-     */
     match /questions/{questionId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
     }
 
     match /worksheets/{worksheetId} {
@@ -143,9 +139,9 @@ service cloud.firestore {
       // A user can create their own attempt.
       allow create: if isOwner(request.resource.data.userId);
       
-      // A user can read their own attempts, but only if they query by their own userId
-      allow list: if request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) &&
-                   request.query.userId == request.auth.uid;
+      // Admins can list all attempts. A user can only read their own attempts.
+      allow list: if (request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) &&
+                   request.query.userId == request.auth.uid) || isAdmin();
       allow get: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
 
       // No one can update or delete attempts to preserve history.
