@@ -13,10 +13,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Check, Loader2, ChevronRight, ChevronLeft, Save, Rocket, RefreshCw } from 'lucide-react'; 
 import { useFirestore, useUser } from '@/firebase'; 
 import { collection, doc, addDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { cn } from '@/lib/utils';
 
 // --- HELPER: CLEAN DATA ---
 const cleanPayload = (obj: any): any => {
-    if (obj === undefined) return undefined; // Return undefined to have Firestore ignore it
     if (obj === null) return null;
     if (Array.isArray(obj)) return obj.map(v => cleanPayload(v));
 
@@ -25,7 +25,7 @@ const cleanPayload = (obj: any): any => {
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 const value = obj[key];
-                if (value !== undefined) {
+                if (value !== undefined) { // Only copy if value is not undefined
                     newObj[key] = cleanPayload(value);
                 }
             }
@@ -56,7 +56,10 @@ export function QuestionBuilderWizard() {
   const [question, setQuestion] = useState<Question>(initialQuestionState);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false); 
-  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // State for button click visual feedback
+  const [isClicked, setIsClicked] = useState(false);
 
   // Validation
   const [isStep1Valid, setIsStep1Valid] = useState(false);
@@ -95,59 +98,48 @@ export function QuestionBuilderWizard() {
   }, [firestore, searchParams, toast]);
 
   // --- SAVE ENGINE ---
-  // Replace your existing saveToDatabase function with this one
-const saveToDatabase = async (status: 'draft' | 'published') => {
-    if (!firestore || !user) {
-        toast({ variant: "destructive", title: "Error", description: "You must be logged in to save." });
-        return false; // Return false to indicate failure
-    }
-    
-    setIsSaving(true);
+  const saveToDatabase = async (status: 'draft' | 'published') => {
+      if (!firestore || !user) {
+          toast({ variant: "destructive", title: "Error", description: "You must be logged in to save." });
+          return false;
+      }
+      
+      setIsSaving(true);
 
-    try {
-        // ✅ STEP 1: Clean the question data purely (removes undefined)
-        const cleanedQuestion = cleanPayload(question);
+      try {
+          const cleanedQuestion = cleanPayload(question);
+          const payload = {
+              ...cleanedQuestion,
+              authorId: user.uid,
+              status,
+              updatedAt: serverTimestamp(),
+              ...(status === 'published' && question.status !== 'published' ? { publishedAt: serverTimestamp() } : {})
+          };
+          delete payload.id;
 
-        // ✅ STEP 2: Construct payload. 
-        // We add serverTimestamp() HERE, outside of cleanPayload, 
-        // so the cleaner doesn't destroy the Firestore Sentinel object.
-        const payload = {
-            ...cleanedQuestion,
-            authorId: user.uid,
-            status,
-            updatedAt: serverTimestamp(),
-            // Only add publishedAt if we are switching to published for the first time
-            ...(status === 'published' && question.status !== 'published' ? { publishedAt: serverTimestamp() } : {})
-        };
-
-        delete payload.id; // Ensure ID is not saved as a field within the document
-
-        if (!question.id) {
-            // Create New
-            const docRef = await addDoc(collection(firestore, 'questions'), { 
-                ...payload, 
-                createdAt: serverTimestamp() 
-            });
-            setQuestion(prev => ({ ...prev, id: docRef.id, status }));
-            window.history.replaceState(null, '', `/questions/new?questionId=${docRef.id}`);
-            toast({ title: 'Success!', description: `Question "${payload.name}" saved.` });
-        } else {
-            // Update Existing
-            const docRef = doc(firestore, 'questions', question.id);
-            await updateDoc(docRef, payload);
-            setQuestion(prev => ({ ...prev, status }));
-            toast({ title: 'Success!', description: `Question "${payload.name}" updated.` });
-        }
-        return true; // Return true to indicate success
-
-    } catch (error: any) {
-        console.error("Save Error:", error);
-        toast({ variant: "destructive", title: "Save Failed", description: error.message });
-        return false; // Return false on error
-    } finally {
-        setIsSaving(false);
-    }
-};
+          if (!question.id) {
+              const docRef = await addDoc(collection(firestore, 'questions'), { 
+                  ...payload, 
+                  createdAt: serverTimestamp() 
+              });
+              setQuestion(prev => ({ ...prev, id: docRef.id, status }));
+              window.history.replaceState(null, '', `/questions/new?questionId=${docRef.id}`);
+              toast({ title: 'Success!', description: `Question "${payload.name}" saved.` });
+          } else {
+              const docRef = doc(firestore, 'questions', question.id);
+              await updateDoc(docRef, payload);
+              setQuestion(prev => ({ ...prev, status }));
+              toast({ title: 'Success!', description: `Question "${payload.name}" updated.` });
+          }
+          return true;
+      } catch (error: any) {
+          console.error("Save Error:", error);
+          toast({ variant: "destructive", title: "Save Failed", description: error.message });
+          return false;
+      } finally {
+          setIsSaving(false);
+      }
+  };
 
   const handleNext = () => setCurrentStep((prev) => prev + 1);
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
@@ -160,16 +152,17 @@ const saveToDatabase = async (status: 'draft' | 'published') => {
   };
 
   const handlePublish = async () => {
+    // Flash button for visual feedback
+    setIsClicked(true);
+    setTimeout(() => setIsClicked(false), 200);
+
     const isUpdate = question.status === 'published';
     const msg = isUpdate 
       ? "Update this live question? Changes will be visible immediately." 
       : "Publish this question? It will become visible to students.";
-
-    // Note: window.confirm can sometimes be blocked by browsers, 
-    // but assuming it works, this is fine.
+    
     if (!confirm(msg)) return;
 
-    // ✅ FIX: Wait for result. Only redirect if save returns true.
     const success = await saveToDatabase('published');
     
     if (success && !isUpdate) {
@@ -260,7 +253,10 @@ const saveToDatabase = async (status: 'draft' | 'published') => {
                         <Button 
                             onClick={handlePublish} 
                             disabled={isSaving}
-                            className="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white shadow-md gap-2"
+                            className={cn(
+                                "bg-green-600 hover:bg-green-700 text-white shadow-md gap-2 transition-colors",
+                                isClicked && "bg-purple-600"
+                            )}
                         >
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : (isPublished ? <RefreshCw className="w-4 h-4"/> : <Rocket className="w-4 h-4"/>)}
                             {isPublished ? "Update Question" : "Publish Question"}
