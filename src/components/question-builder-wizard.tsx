@@ -151,7 +151,7 @@ export function QuestionBuilderWizard() {
   };
 
   const handlePublish = async () => {
-    await saveToDatabase('published');
+    alert("Button click was detected!");
   };
 
   const isNextDisabled = () => {
@@ -235,7 +235,7 @@ export function QuestionBuilderWizard() {
                             {isPublished ? "Revert to Draft" : "Save Draft"}
                         </Button>
                         <Button 
-                            onClick={() => alert("Button click was detected!")}
+                            onClick={handlePublish}
                             disabled={isSaving}
                             className={cn(
                                 "bg-green-600 hover:bg-green-700 text-white shadow-md gap-2 transition-colors"
