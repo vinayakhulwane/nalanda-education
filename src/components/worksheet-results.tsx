@@ -1,3 +1,4 @@
+
 'use client';
 import ReactMarkdown from 'react-markdown';
 import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, EconomySettings, Class, Subject } from "@/types";
@@ -362,6 +363,9 @@ export function WorksheetResults({
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
