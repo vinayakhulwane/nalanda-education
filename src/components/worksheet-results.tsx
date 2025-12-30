@@ -1,12 +1,12 @@
 'use client';
 import ReactMarkdown from 'react-markdown';
-import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, ResultState, EconomySettings } from "@/types";
+import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, EconomySettings, Class, Subject } from "@/types";
 import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2, ExternalLink, FileImage, ArrowLeft } from "lucide-react";
+import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2, ExternalLink, FileImage, ArrowLeft, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { calculateAttemptRewards } from "@/lib/wallet";
 import confetti from "canvas-confetti";
+import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
+
 
 export type AnswerState = {
   [subQuestionId: string]: {
@@ -157,19 +159,24 @@ export function WorksheetResults({
   const router = useRouter();
   const searchParams = useSearchParams();
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, userProfile } = useUser();
   const { toast } = useToast();
-
-  // ✅ ADDED: State for back button logic
+  
   const from = searchParams.get('from');
 
   const [isClaiming, setIsClaiming] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
-
+  
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
   const { data: settings } = useDoc<EconomySettings>(settingsRef);
+  
+  // Data for PDF Header
+  const classRef = useMemoFirebase(() => (firestore && worksheet ? doc(firestore, 'classes', worksheet.classId) : null), [firestore, worksheet]);
+  const { data: classData } = useDoc<Class>(classRef);
+  const subjectRef = useMemoFirebase(() => (firestore && worksheet ? doc(firestore, 'subjects', worksheet.subjectId) : null), [firestore, worksheet]);
+  const { data: subjectData } = useDoc<Subject>(subjectRef);
 
-  // ✅ SCORE CALCULATION: Re-Calculates Sum of Rubric Parts
+
   const { totalMarks, score, calculatedRewards } = useMemo(() => {
     let totalMarks = 0;
     let score = 0;
@@ -178,11 +185,9 @@ export function WorksheetResults({
         const isAiGraded = q.gradingMode === 'ai';
 
         if (isAiGraded) {
-            // 1. Calculate Max Marks
             const qTotalMarks = q.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
             totalMarks += qTotalMarks;
 
-            // 2. Re-calculate score from Rubric Breakdown (Source of Truth)
             const firstSubId = q.solutionSteps[0]?.subQuestions[0]?.id;
             const result = results[firstSubId];
             
@@ -191,29 +196,21 @@ export function WorksheetResults({
                 const breakdown = (result as any).aiBreakdown || {};
                 const rubric = q.aiRubric || {};
 
-                // If we have breakdown data, sum it up manually to ensure accuracy
                 if (Object.keys(breakdown).length > 0 && Object.keys(rubric).length > 0) {
                     Object.entries(rubric).forEach(([key, weight]) => {
                         const cleanKey = formatCriterionKey(key);
                         const scoreVal = breakdown[key] ?? breakdown[cleanKey] ?? 0;
                         const weightVal = typeof weight === 'string' ? parseFloat(weight) : (weight as number);
-                        
-                        // Formula: (Score / 100) * (Weight / 100) * MaxMarks
                         calculatedSum += (scoreVal / 100) * (weightVal / 100) * qTotalMarks;
                     });
                     score += calculatedSum;
                 } else {
-                    // Fallback: Use saved score if breakdown is missing
-                    // With safety check for percentages
                     let val = Number(result.score || 0);
-                    if (val > qTotalMarks) {
-                        val = (val / 100) * qTotalMarks;
-                    }
+                    if (val > qTotalMarks) val = (val / 100) * qTotalMarks;
                     score += val;
                 }
             }
         } else {
-            // System Grading
             q.solutionSteps.forEach(step => {
                 step.subQuestions.forEach(subQ => {
                     totalMarks += subQ.marks;
@@ -281,7 +278,6 @@ export function WorksheetResults({
     }
   }
   
-  // ✅ ADDED: Dynamic back button logic
   const handleBackClick = () => {
     if (from === 'progress') {
         router.push('/progress');
@@ -290,15 +286,71 @@ export function WorksheetResults({
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
-      <div className="mb-4">
-        {/* ✅ UPDATED: The back button now uses the dynamic handler */}
-        <Button variant="outline" onClick={handleBackClick}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> 
-          {from === 'progress' ? 'Back to Progress' : 'Back to Subject'}
-        </Button>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto printable-area">
+        {/* Print-only Styles */}
+        <style jsx global>{`
+            @media print {
+                body {
+                    -webkit-print-color-adjust: exact; /* Chrome, Safari */
+                    color-adjust: exact; /* Firefox */
+                }
+                .printable-area {
+                    box-shadow: none !important;
+                    border: none !important;
+                    padding: 0 !important;
+                }
+                .no-print {
+                    display: none !important;
+                }
+                .print-only {
+                    display: block !important;
+                }
+                .page-break {
+                    page-break-after: always;
+                }
+                .print-watermark {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%) rotate(-45deg);
+                    font-size: 10vw;
+                    font-weight: bold;
+                    color: rgba(100, 116, 139, 0.08); /* slate-500 with opacity */
+                    z-index: -1;
+                    pointer-events: none;
+                    text-align: center;
+                }
+            }
+        `}</style>
+
+        {/* Watermark Element */}
+        <div className="print-watermark hidden print-only">
+            Nalanda Education
+        </div>
+
+        <div className="no-print mb-4">
+            <Button variant="outline" onClick={handleBackClick}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> 
+            {from === 'progress' ? 'Back to Progress' : 'Back to Subject'}
+            </Button>
       </div>
+
+       {/* Print-only Header */}
+       <header className="hidden print-only mb-8 border-b pb-4">
+            <h1 className="text-3xl font-bold">{worksheet.title} - Performance Report</h1>
+            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <p><strong>Student:</strong> {userProfile?.name}</p>
+                <p><strong>Class:</strong> {classData?.name}</p>
+                <p><strong>Subject:</strong> {subjectData?.name}</p>
+                <p><strong>Date:</strong> {format(new Date(), 'PP')}</p>
+            </div>
+      </header>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl md:text-3xl text-center">{isReview ? 'Worksheet Review' : 'Worksheet Complete!'}</CardTitle>
@@ -316,7 +368,6 @@ export function WorksheetResults({
             </div>
             <div className="p-4 bg-muted/50 rounded-lg">
               <CheckCircle className="h-6 w-6 mx-auto text-muted-foreground" />
-              {/* Score Display */}
               <p className="text-2xl font-bold mt-2">{Number(score).toFixed(2)} / {totalMarks}</p>
               <p className="text-xs text-muted-foreground">Marks Scored</p>
             </div>
@@ -337,13 +388,16 @@ export function WorksheetResults({
             </div>
           </div>
 
-          <div className="mt-8 mb-6 relative flex justify-center">
+          <div className="mt-8 mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Button
-              className="w-full h-14 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
+              className="w-full h-12 text-lg font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg transform hover:scale-105 transition-transform duration-200 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed no-print"
               onClick={handleClaimRewards}
               disabled={isClaiming || hasClaimed || !calculatedRewards || Object.values(calculatedRewards).every(a => a === 0)}
             >
               {isClaiming ? <Loader2 className="h-6 w-6 animate-spin" /> : hasClaimed ? 'Rewards Claimed' : 'Claim Rewards'}
+            </Button>
+            <Button variant="outline" className="w-full h-12 text-lg no-print" onClick={handlePrint}>
+                <Printer className="mr-2 h-5 w-5" /> Export to PDF
             </Button>
           </div>
 
@@ -363,7 +417,6 @@ export function WorksheetResults({
         
                 return (
                     <div key={question.id} className="border rounded-lg overflow-hidden">
-                        {/* ✅ ADDED: Display Question Text for Context */}
                         <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words border-b">
                             <div className="flex gap-2">
                                 <span className="font-bold">Q{qIndex + 1}.</span>
@@ -371,7 +424,6 @@ export function WorksheetResults({
                             </div>
                         </div>
 
-                        {/* Grading Breakdown Section */}
                         <div className="p-4 space-y-4">
                             <AIRubricBreakdown 
                                 rubric={question.aiRubric || null} 
@@ -379,7 +431,6 @@ export function WorksheetResults({
                                 maxMarks={qMaxMarks} 
                             />
         
-                            {/* Feedback Rendering with ReactMarkdown */}
                             {feedback && (
                                 <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-lg">
                                     <div className="flex items-start gap-3">
@@ -404,14 +455,13 @@ export function WorksheetResults({
                                 </div>
                             )}
         
-                            {/* Drive Link Section */}
                             {driveLink && (
                                 <div className="flex justify-end pt-2">
                                     <a 
                                         href={driveLink} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="text-xs flex items-center text-muted-foreground hover:text-primary transition-colors"
+                                        className="text-xs flex items-center text-muted-foreground hover:text-primary transition-colors no-print"
                                     >
                                         <ExternalLink className="h-3 w-3 mr-1" /> View Original Submission
                                     </a>
@@ -461,7 +511,7 @@ export function WorksheetResults({
             })}
           </div>
 
-          <div className="text-center mt-8">
+          <div className="text-center mt-8 no-print">
             <Button onClick={handleBackClick}>
               <Home className="mr-2 h-4 w-4" /> 
                {from === 'progress' ? 'Back to Progress' : 'Back to Subject'}
