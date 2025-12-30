@@ -209,6 +209,9 @@ export interface WorksheetAttempt {
     timeTaken: number;
     attemptedAt: any; // Firestore ServerTimestamp
     rewardsClaimed?: boolean;
+    
+    // ✅ NEW: Track purchased solutions (QuestionID -> Solution Text)
+    unlockedSolutions?: Record<string, string>; 
 }
 
 
@@ -219,7 +222,11 @@ export interface EconomySettings {
 
   // Creation Costs
   costPerMark: number;
-  solutionCostPercentage: number; // New setting
+  solutionCostPercentage?: number; // kept for legacy support if needed
+
+  // ✅ NEW: Flat cost settings for AI Solutions
+  solutionCost?: number; 
+  solutionCurrency?: CurrencyType;
 
   // Reward Multipliers
   rewardPractice: number;

@@ -11,9 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { doc } from 'firebase/firestore';
-import type { EconomySettings } from '@/types';
+import type { EconomySettings, CurrencyType } from '@/types';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/components/ui/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function EconomySettingsPage() {
   const { userProfile, isUserProfileLoading } = useUser();
@@ -21,7 +22,6 @@ export default function EconomySettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  // Updated state to include ALL settings (Exchange, Costs, Rewards)
   const [settings, setSettings] = useState<Partial<EconomySettings>>({
     coinToGold: 10,
     goldToDiamond: 10,
@@ -29,13 +29,13 @@ export default function EconomySettingsPage() {
     rewardPractice: 1.0,
     rewardClassroom: 0.5,
     rewardSpark: 0.5,
-    solutionCostPercentage: 25, // New default value
+    solutionCost: 5,        // ✅ New Flat Cost
+    solutionCurrency: 'coin' // ✅ New Currency Type
   });
 
-  // Updated path to match where your app likely stores global settings
   const settingsDocRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    return doc(firestore, 'settings', 'economy'); // Keeping your existing path
+    return doc(firestore, 'settings', 'economy');
   }, [firestore]);
 
   const { data: remoteSettings, isLoading: areSettingsLoading } = useDoc<EconomySettings>(settingsDocRef);
@@ -84,7 +84,6 @@ export default function EconomySettingsPage() {
       
       <div className="space-y-6 max-w-4xl mt-6">
         
-        {/* Warning Alert */}
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Global Impact Warning</AlertTitle>
@@ -137,7 +136,7 @@ export default function EconomySettingsPage() {
             </div>
             <CardDescription>Control how much students pay to build tests or unlock content.</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CardContent className="space-y-6">
              <div className="space-y-2">
                 <Label htmlFor="costPerMark">Practice Test Cost Multiplier (per Mark)</Label>
                 <div className="flex gap-4 items-center">
@@ -154,21 +153,42 @@ export default function EconomySettingsPage() {
                   </span>
                 </div>
               </div>
-               <div className="space-y-2">
-                <Label htmlFor="solutionCostPercentage">AI Solution Cost (% of Marks)</Label>
-                <div className="flex gap-4 items-center">
-                  <Input 
-                    id="solutionCostPercentage"
-                    className="max-w-[150px]"
-                    type="number" 
-                    step="1"
-                    value={settings.solutionCostPercentage ?? 25} 
-                    onChange={(e) => setSettings({...settings, solutionCostPercentage: parseFloat(e.target.value)})} 
-                  />
-                  <span className="text-sm text-muted-foreground">
-                      Example: <strong>25</strong>% of marks.
-                  </span>
-                </div>
+
+              <div className="p-4 border rounded-lg bg-muted/20">
+                 <div className="flex items-center gap-2 mb-4">
+                    <BrainCircuit className="h-5 w-5 text-purple-600" />
+                    <h3 className="font-semibold text-sm">AI Solution Unlock Cost</h3>
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Cost Amount</Label>
+                        <Input 
+                            type="number" 
+                            min="0"
+                            value={settings.solutionCost ?? 5} 
+                            onChange={(e) => setSettings({...settings, solutionCost: parseInt(e.target.value)})} 
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Currency Type</Label>
+                        <Select 
+                            value={settings.solutionCurrency ?? 'coin'} 
+                            onValueChange={(val: CurrencyType) => setSettings({...settings, solutionCurrency: val})}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select currency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="coin">Coins</SelectItem>
+                                <SelectItem value="gold">Gold</SelectItem>
+                                <SelectItem value="diamond">Diamonds</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                 </div>
+                 <p className="text-xs text-muted-foreground mt-2">
+                    Students will pay this flat fee to view the AI-generated solution for any question.
+                 </p>
               </div>
           </CardContent>
         </Card>
