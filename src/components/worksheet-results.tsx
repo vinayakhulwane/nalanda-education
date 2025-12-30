@@ -410,9 +410,12 @@ export function WorksheetResults({
             >
               {isClaiming ? <Loader2 className="h-6 w-6 animate-spin" /> : hasClaimed ? 'Rewards Claimed' : 'Claim Rewards'}
             </Button>
-            <Button variant="outline" className="w-full h-12 text-lg" onClick={() => window.print()}>
-                <Printer className="mr-2 h-5 w-5" /> Export to PDF
-            </Button>
+            <button
+              onClick={() => window.print()}
+              className="no-print inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-lg font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground w-full h-12"
+            >
+              <Printer className="mr-2 h-5 w-5" /> Export to PDF
+            </button>
           </div>
 
           <Separator className="my-8" />
