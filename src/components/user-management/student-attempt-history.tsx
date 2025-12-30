@@ -91,6 +91,7 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
                                     view="list"
                                     attempt={latestAttempt}
                                     from="progress"
+                                    studentId={student.id}
                                 />
                             )
                         })}

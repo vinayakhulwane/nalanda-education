@@ -172,6 +172,7 @@ export function WorksheetResults({
   const { toast } = useToast();
   
   const from = searchParams.get('from');
+  const studentId = searchParams.get('studentId');
 
   const [isClaiming, setIsClaiming] = useState(false);
   const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
@@ -290,7 +291,9 @@ export function WorksheetResults({
   }
   
   const handleBackClick = () => {
-    if (from === 'progress') {
+    if (studentId) {
+        router.push(`/user-management/${studentId}/progress`);
+    } else if (from === 'progress') {
         router.push('/progress');
     } else {
         router.push(`/academics/${worksheet.classId}/${worksheet.subjectId}`);

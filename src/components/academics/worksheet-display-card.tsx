@@ -21,6 +21,7 @@ interface WorksheetDisplayCardProps {
     view?: 'card' | 'list';
     attempt?: WorksheetAttempt;
     from?: 'progress' | 'academics';
+    studentId?: string;
 }
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
@@ -38,7 +39,7 @@ const currencyColors: Record<CurrencyType, string> = {
 };
 
 
-export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [], view = 'card', attempt, from = 'academics' }: WorksheetDisplayCardProps) {
+export function WorksheetDisplayCard({ worksheet, isPractice = false, completedAttempts = [], view = 'card', attempt, from = 'academics', studentId }: WorksheetDisplayCardProps) {
     const router = useRouter();
     const firestore = useFirestore();
 
@@ -86,7 +87,12 @@ export function WorksheetDisplayCard({ worksheet, isPractice = false, completedA
 
     const handleReviewClick = () => {
         if (attempt?.id) {
-            router.push(`/worksheets/review/${attempt.id}?from=${from}`);
+            const url = new URL(window.location.origin + `/worksheets/review/${attempt.id}`);
+            url.searchParams.set('from', from);
+            if (studentId) {
+                url.searchParams.set('studentId', studentId);
+            }
+            router.push(url.toString());
         } else {
             router.push(`/worksheets/preview/${worksheet.id}`);
         }
