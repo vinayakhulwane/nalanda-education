@@ -95,44 +95,59 @@ export function QuestionBuilderWizard() {
   }, [firestore, searchParams, toast]);
 
   // --- SAVE ENGINE ---
-  const saveToDatabase = async (status: 'draft' | 'published') => {
+  // Replace your existing saveToDatabase function with this one
+const saveToDatabase = async (status: 'draft' | 'published') => {
     if (!firestore || !user) {
         toast({ variant: "destructive", title: "Error", description: "You must be logged in to save." });
-        return;
+        return false; // Return false to indicate failure
     }
     
     setIsSaving(true);
 
     try {
-        const payload = cleanPayload({
-            ...question,
+        // ✅ STEP 1: Clean the question data purely (removes undefined)
+        const cleanedQuestion = cleanPayload(question);
+
+        // ✅ STEP 2: Construct payload. 
+        // We add serverTimestamp() HERE, outside of cleanPayload, 
+        // so the cleaner doesn't destroy the Firestore Sentinel object.
+        const payload = {
+            ...cleanedQuestion,
             authorId: user.uid,
             status,
             updatedAt: serverTimestamp(),
+            // Only add publishedAt if we are switching to published for the first time
             ...(status === 'published' && question.status !== 'published' ? { publishedAt: serverTimestamp() } : {})
-        });
-        delete payload.id; 
+        };
+
+        delete payload.id; // Ensure ID is not saved as a field within the document
 
         if (!question.id) {
+            // Create New
             const docRef = await addDoc(collection(firestore, 'questions'), { 
-                ...payload, createdAt: serverTimestamp() 
+                ...payload, 
+                createdAt: serverTimestamp() 
             });
             setQuestion(prev => ({ ...prev, id: docRef.id, status }));
             window.history.replaceState(null, '', `/questions/new?questionId=${docRef.id}`);
-            toast({ title: 'Success!', description: `Question "${payload.name}" saved as a draft.` });
+            toast({ title: 'Success!', description: `Question "${payload.name}" saved.` });
         } else {
+            // Update Existing
             const docRef = doc(firestore, 'questions', question.id);
             await updateDoc(docRef, payload);
             setQuestion(prev => ({ ...prev, status }));
-            toast({ title: 'Success!', description: `Question "${payload.name}" has been updated.` });
+            toast({ title: 'Success!', description: `Question "${payload.name}" updated.` });
         }
+        return true; // Return true to indicate success
+
     } catch (error: any) {
         console.error("Save Error:", error);
         toast({ variant: "destructive", title: "Save Failed", description: error.message });
+        return false; // Return false on error
     } finally {
         setIsSaving(false);
     }
-  };
+};
 
   const handleNext = () => setCurrentStep((prev) => prev + 1);
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
@@ -145,19 +160,22 @@ export function QuestionBuilderWizard() {
   };
 
   const handlePublish = async () => {
-      const isUpdate = question.status === 'published';
-      const msg = isUpdate 
-        ? "Update this live question? Changes will be visible immediately." 
-        : "Publish this question? It will become visible to students.";
+    const isUpdate = question.status === 'published';
+    const msg = isUpdate 
+      ? "Update this live question? Changes will be visible immediately." 
+      : "Publish this question? It will become visible to students.";
 
-      if (!confirm(msg)) return;
+    // Note: window.confirm can sometimes be blocked by browsers, 
+    // but assuming it works, this is fine.
+    if (!confirm(msg)) return;
 
-      await saveToDatabase('published');
-      
-      if (!isUpdate) {
-         setTimeout(() => router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`), 1500);
-      }
-  };
+    // ✅ FIX: Wait for result. Only redirect if save returns true.
+    const success = await saveToDatabase('published');
+    
+    if (success && !isUpdate) {
+        setTimeout(() => router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`), 1500);
+    }
+};
 
   const isNextDisabled = () => {
     if (currentStep === 1) return !isStep1Valid;
