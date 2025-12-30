@@ -3,48 +3,24 @@
  *
  * ## Core Philosophy
  * This ruleset enforces a strict user-ownership model. All user data is private and stored in a document that can only be accessed by the authenticated user who owns it. The default security posture is to deny all access unless explicitly granted.
- *
- * ## Data Structure
- * The data is organized in a single top-level collection: `/users`. Each user's profile and related data are stored in a document where the document ID matches the user's Authentication UID (e.g., `/users/{userId}`).
- *
- * ## Key Security Decisions
- * - **No User Listing:** To protect user privacy, it is impossible for any client to list all documents in the `/users` collection, unless they are an admin.
- * - **Strict Ownership:** A user can only read, create, update, or delete their own document within the `/users` collection. Admins have broader access.
- * - **Path-Based Security:** Authorization is primarily determined by matching the `request.auth.uid` with the `{userId}` wildcard in the document path.
- *
- * ## Denormalization for Authorization
- * This security model is simple and does not require complex denormalization. The user's role is stored directly on their user document.
- *
- * ## Structural Segregation
- * Not applicable in this model, as all user data is considered private. There is no mix of public and private data within the same collection.
  */
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
+    // ==========================================
+    // 1. HELPER FUNCTIONS
+    // ==========================================
 
-    /**
-     * Checks if the user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Checks if the currently authenticated user's UID matches the provided userId.
-     * This is the primary function for enforcing document ownership.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /**
-     * Checks for ownership on an existing document.
-     * CRITICAL: Ensures update/delete operations target real documents, preventing errors
-     * and unintended behavior on non-existent paths.
-     */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
@@ -61,43 +37,33 @@ service cloud.firestore {
       return isRole('admin');
     }
 
-    /**
-     * Validates critical relational data when a user document is created.
-     * In prototyping mode, we only validate fields essential for authorization and
-     * path consistency, not the entire data shape.
-     */
     function hasValidAndConsistentUserDataOnCreate(userId) {
-      // Enforces that the document's internal `id` field matches its path ID (`userId`).
-      // This creates a consistent and reliable link between the path and the data.
       return request.resource.data.id == userId;
     }
 
-    /**
-     * Enforces immutability for critical fields on update.
-     * Prevents a user from changing their own document ID or Google ID after creation,
-     * which are fundamental to their identity within the system.
-     */
     function hasImmutableUserDataOnUpdate() {
       let incomingData = request.resource.data;
       let existingData = resource.data;
       return incomingData.id == existingData.id;
     }
 
+
+    // ==========================================
+    // 2. COLLECTION RULES
+    // ==========================================
+
     /**
-     * @description Rules for a user's own profile document.
-     * @path /users/{userId}
+     * Users Collection
      */
     match /users/{userId} {
-      // READ Rules: A user can only get their own document. Listing is disabled for non-admins.
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-
-      // WRITE Rules: A user can create, update, and delete their own document. Admins can update any.
       allow create: if isOwner(userId) && hasValidAndConsistentUserDataOnCreate(userId);
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isExistingOwner(userId);
     }
-    
+     
+    // Static Metadata Collections
     match /classes/{classId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -118,46 +84,65 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    /**
+     * Questions Collection
+     * ✅ Teachers must be able to write here
+     */
     match /questions/{questionId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isTeacher();
-    }
-
-    match /worksheets/{worksheetId} {
-      // A user can read a specific worksheet if they are its author. Admins can read any worksheet.
-      allow get: if isOwner(resource.data.authorId) || isAdmin() || isSignedIn();
-      
-      // A user can list worksheets if their query is filtering by their own authorId, OR if they are querying by subjectId. Admins can list all.
-      allow list: if isAdmin() ||
-                   (
-                     (request.query.keys().hasOnly(['authorId', 'subjectId', 'orderBy'])) ||
-                     (request.query.keys().hasAny(['authorId', 'subjectId'])) && isSignedIn()
-                   );
-      
-      // Teachers and Admins are allowed to create, update, and delete worksheets.
       allow write: if isTeacher() || isAdmin();
     }
 
-    match /worksheet_attempts/{attemptId} {
-      // READ: Admins/teachers can read any attempt. Users can only read their own.
-      allow get: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
+    /**
+     * Worksheets Collection
+     */
+    match /worksheets/{worksheetId} {
+      // Read: Author can read own, Admins can read all, Signed in users can read.
+      allow get: if isOwner(resource.data.authorId) || isAdmin() || isSignedIn();
       
-      // LIST: Admins can list all attempts. Users can only list attempts matching their own UID.
-      allow list: if isAdmin() || (request.query.userId == request.auth.uid);
+      // List: Admins can see all. Users can list if filtering by authorId or subjectId
+      allow list: if isAdmin() || 
+                     ((request.query.keys().hasOnly(['authorId', 'subjectId', 'orderBy'])) ||
+                      (request.query.keys().hasAny(['authorId', 'subjectId'])) && isSignedIn());
+      
+      // Create: 
+      // - Teachers/Admins can create any type.
+      // - Students can ONLY create 'practice' worksheets for themselves.
+      allow create: if (isTeacher() || isAdmin()) ||
+                       (request.resource.data.worksheetType == 'practice' && isOwner(request.resource.data.authorId));
 
-      // WRITE: Users can create their own attempt. No one can update/delete.
+      // Update & Delete: Only Teachers and Admins can modify existing worksheets.
+      allow update, delete: if isTeacher() || isAdmin();
+    }
+
+    /**
+     * Worksheet Attempts
+     * ✅ Renamed from /attempts to match your App Code
+     */
+    match /worksheet_attempts/{attemptId} {
+      // 1. Create: Must match the user's ID
       allow create: if isOwner(request.resource.data.userId);
+
+      // 2. Read (Get & List): 
+      // - Students can see ONLY their own data
+      // - Teachers/Admins can see everything.
+      allow read: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
+      allow list: if (request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) && request.query.userId == request.auth.uid) || isTeacher() || isAdmin();
+
+      // 3. No updates or deletes allowed (History is permanent)
       allow update, delete: if false;
     }
 
+    /**
+     * Global Settings
+     */
     match /settings/{settingId} {
         allow read: if isSignedIn();
         allow write: if isAdmin();
     }
 
     match /transactions/{transactionId} {
-      // A user can create their own transactions (e.g. through a server-side function)
-      // For now, let's restrict client-side creation for safety
+      // A user can create their own transactions.
       allow create: if isOwner(request.resource.data.userId);
       
       // A user can only list/read their own transactions.
