@@ -18,7 +18,9 @@ import { cn } from '@/lib/utils';
 // --- HELPER: CLEAN DATA ---
 const cleanPayload = (obj: any): any => {
     if (obj === null) return null;
-    if (Array.isArray(obj)) return obj.map(v => cleanPayload(v));
+    if (Array.isArray(obj)) {
+        return obj.map(v => cleanPayload(v));
+    }
 
     if (typeof obj === 'object' && obj.constructor === Object) {
         const newObj: { [key: string]: any } = {};
@@ -149,7 +151,7 @@ export function QuestionBuilderWizard() {
   };
 
   const handlePublish = async () => {
-    console.log("--- DEBUG: 'Publish' button was clicked! ---");
+    await saveToDatabase('published');
   };
 
   const isNextDisabled = () => {
@@ -233,10 +235,10 @@ export function QuestionBuilderWizard() {
                             {isPublished ? "Revert to Draft" : "Save Draft"}
                         </Button>
                         <Button 
-                            onClick={handlePublish} 
+                            onClick={() => alert("Button click was detected!")}
                             disabled={isSaving}
                             className={cn(
-                                "bg-green-600 hover:bg-green-700 text-white shadow-md gap-2 transition-colors relative z-[9999]"
+                                "bg-green-600 hover:bg-green-700 text-white shadow-md gap-2 transition-colors"
                             )}
                         >
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : (isPublished ? <RefreshCw className="w-4 h-4"/> : <Rocket className="w-4 h-4"/>)}
