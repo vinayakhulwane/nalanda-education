@@ -151,18 +151,19 @@ export function QuestionBuilderWizard() {
   };
 
   const handlePublish = async () => {
-      const isNew = !question.id;
-      const success = await saveToDatabase('published');
-      if (success) {
-          toast({
-              title: "Question Published!",
-              description: "It is now available in the question bank."
-          });
-          if (isNew && question.classId && question.subjectId) {
-            router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`);
-          }
-      }
+    const isNew = !question.id;
+    const success = await saveToDatabase('published');
+    if (success) {
+        toast({
+            title: "Question Published!",
+            description: "It is now available in the question bank."
+        });
+        if (isNew && question.classId && question.subjectId) {
+          router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`);
+        }
+    }
   };
+
 
   const isNextDisabled = () => {
     if (currentStep === 1) return !isStep1Valid;
@@ -195,7 +196,7 @@ export function QuestionBuilderWizard() {
           </div>
       </div>
 
-      <div className="pb-40"> {/* New wrapper with padding */}
+      <div>
         {/* PROGRESS STEPS */}
         <div className="mb-8 flex justify-between items-center relative">
           <div className="absolute left-0 right-0 top-[15px] h-0.5 bg-slate-200 -z-10" />
@@ -224,12 +225,9 @@ export function QuestionBuilderWizard() {
               {currentStep === 5 && <Step5Preview question={question} />} 
           </div>
         </div>
-      </div>
 
-
-      {/* FOOTER */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t p-4 z-50">
-        <div className="max-w-5xl mx-auto flex justify-between items-center">
+         {/* FOOTER BUTTONS */}
+         <div className="mt-8 border-t pt-6 flex justify-between items-center">
             <div>
                 <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
                     <ChevronLeft className="w-4 h-4 mr-2" /> Back
