@@ -19,7 +19,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { generateSolutionAction } from '@/app/actions/ai-solution'; 
 
-// --- TYPES (Unchanged) ---
+// --- TYPES ---
 export type AnswerState = {
   [subQuestionId: string]: {
     answer: any;
@@ -54,17 +54,20 @@ const currencyIcons: Record<string, React.ElementType> = {
 };
 
 const currencyColors: Record<string, string> = {
-  spark: 'text-gray-400',
-  coin: 'text-yellow-500',
-  gold: 'text-amber-500',
-  diamond: 'text-blue-500',
+  spark: 'text-slate-500',
+  coin: 'text-yellow-600 dark:text-yellow-400',
+  gold: 'text-amber-600 dark:text-amber-400',
+  diamond: 'text-blue-600 dark:text-blue-400',
 };
 
+// ✅ UPDATED: More vibrant cost display
 const CurrencyDisplay = ({ type, amount }: { type: string, amount: number }) => {
     const Icon = currencyIcons[type] || Coins;
+    const colorClass = currencyColors[type] || 'text-slate-500';
+    
     return (
-        <span className={cn("inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full bg-opacity-10 text-xs", currencyColors[type], `bg-${type === 'coin' ? 'yellow' : type === 'gold' ? 'amber' : 'blue'}-500`)}>
-            <Icon className="h-3 w-3" /> {amount}
+        <span className={cn("inline-flex items-center gap-1 font-extrabold px-2 py-0.5 rounded-md bg-opacity-10 text-xs tracking-wide", colorClass, type === 'coin' ? 'bg-yellow-100 dark:bg-yellow-900/30' : type === 'gold' ? 'bg-amber-100 dark:bg-amber-900/30' : type === 'diamond' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-slate-100')}>
+            <Icon className="h-3.5 w-3.5 fill-current" /> {amount}
         </span>
     );
 };
@@ -84,8 +87,6 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
         ? rubric 
         : Object.keys(breakdown).reduce((acc, key) => ({ ...acc, [key]: "N/A" }), {} as Record<string, any>);
     return (
-        // ✅ NOTE: The 'animate-in' class here is what caused the PDF issue. 
-        // We will strip it programmatically in handleDirectDownload.
         <div className="space-y-4 my-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border animate-in fade-in duration-700">
             <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
                 <Zap className="h-3 w-3" /> Skill Breakdown
@@ -269,7 +270,7 @@ export function WorksheetResults({
       await updateDoc(attemptRef, { rewardsClaimed: true });
       await Promise.all(transactionPromises);
       triggerCelebration();
-      toast({ title: "Waw! Rewards Claimed!", description: "Your wallet has been updated." });
+      toast({ title: "Rewards Claimed!", description: "Your wallet has been updated." });
       setHasClaimed(true);
     } catch (error) {
       console.error("Error claiming rewards:", error);
@@ -359,19 +360,16 @@ export function WorksheetResults({
         const canvas = await html2canvas(reportElement, {
             scale: 2, 
             useCORS: true, 
-            scrollY: -window.scrollY, // Help capture full height
+            scrollY: -window.scrollY, 
             onclone: (clonedDoc) => {
                 const doc = clonedDoc;
                 
-                // 1. Handle Print Classes
                 doc.getElementById('printable-report-area')?.classList.remove('no-print');
                 const printOnlyElements = doc.querySelectorAll('.print-only');
                 printOnlyElements.forEach(el => (el as HTMLElement).style.display = 'block');
                 const noPrintElements = doc.querySelectorAll('.no-print');
                 noPrintElements.forEach(el => (el as HTMLElement).style.display = 'none');
 
-                // 2. ✅ FIX: Remove all 'animate-in' and 'fade-in' classes
-                // This ensures html2canvas sees the element as fully opaque immediately
                 const animatedElements = doc.querySelectorAll('.animate-in');
                 animatedElements.forEach(el => {
                     el.classList.remove('animate-in', 'fade-in', 'duration-700', 'slide-in-from-bottom-2');
@@ -496,7 +494,7 @@ export function WorksheetResults({
 
                 {/* 3. REWARDS CARD */}
                 <Card className="border-none shadow-md bg-gradient-to-br from-white to-amber-50 dark:from-slate-900 dark:to-amber-950/20 overflow-hidden relative group">
-                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform text-amber-500">
+                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform text-amber-500">
                         <Award className="h-16 w-16" />
                     </div>
                     <CardHeader className="pb-2">
@@ -649,17 +647,16 @@ export function WorksheetResults({
                                         </div>
                                     ) : (
                                         <div className="flex justify-end no-print pt-2">
+                                            {/* ✅ UPDATED BUTTON: MORE VISIBLE COST */}
                                             <Button 
                                                 variant="outline"
                                                 onClick={() => handleGetSolution(question)}
                                                 disabled={isSolutionLoading}
-                                                className="border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 shadow-sm"
+                                                className="border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 shadow-sm h-auto py-2 px-4"
                                             >
                                                 {isSolutionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-3.5 w-3.5 opacity-70" />}
                                                 Unlock Expert Solution 
-                                                <span className="bg-white dark:bg-slate-950 px-2 py-0.5 rounded-full text-xs shadow-sm border">
-                                                    <CurrencyDisplay type={currency} amount={cost} />
-                                                </span>
+                                                <CurrencyDisplay type={currency} amount={cost} />
                                             </Button>
                                         </div>
                                     )}
@@ -734,17 +731,16 @@ export function WorksheetResults({
                                         </div>
                                     ) : (
                                         <div className="flex justify-end no-print">
+                                            {/* ✅ UPDATED BUTTON: MORE VISIBLE COST */}
                                             <Button 
                                                 variant="outline"
                                                 onClick={() => handleGetSolution(question)}
                                                 disabled={isSolutionLoading}
-                                                className="border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 shadow-sm"
+                                                className="border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 shadow-sm h-auto py-2 px-4"
                                             >
                                                 {isSolutionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-3.5 w-3.5 opacity-70" />}
                                                 Unlock Expert Solution 
-                                                <span className="bg-white dark:bg-slate-950 px-2 py-0.5 rounded-full text-xs shadow-sm border">
-                                                    <CurrencyDisplay type={currency} amount={cost} />
-                                                </span>
+                                                <CurrencyDisplay type={currency} amount={cost} />
                                             </Button>
                                         </div>
                                     )}

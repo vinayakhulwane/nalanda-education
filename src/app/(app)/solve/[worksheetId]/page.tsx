@@ -14,7 +14,10 @@ import {
   X, 
   Sparkles, 
   FileImage, 
-  Award 
+  Award,
+  Clock,
+  HelpCircle,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
@@ -24,6 +27,7 @@ import { WorksheetResults, type AnswerState } from '@/components/worksheet-resul
 import { AIAnswerUploader } from '@/components/solve/ai-answer-uploader';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 // Helper Formatters
 function formatTime(seconds: number) {
@@ -51,16 +55,17 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
         : Object.keys(breakdown).reduce((acc, key) => ({ ...acc, [key]: "N/A" }), {} as Record<string, any>);
 
     return (
-        <div className="space-y-4 my-6 animate-in fade-in duration-700">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Skill Assessment Breakdown</h4>
+        <div className="space-y-4 my-6 animate-in fade-in duration-700 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
+                <Award className="h-4 w-4" />
+                Skill Assessment
+            </h4>
             <div className="space-y-5">
                 {Object.entries(activeRubric).map(([rawKey, rawWeight], index) => {
                     const criterion = formatCriterionKey(rawKey);
-                    // Handle case mismatch or raw key
                     const percentageScore = breakdown[rawKey] ?? breakdown[criterion] ?? 0; 
                     const weightPct = typeof rawWeight === 'string' ? parseFloat(rawWeight) : (rawWeight as number);
                     
-                    // MATH: (AI Score / 100) * (Weight / 100) * Total Question Marks
                     const maxCategoryMarks = (weightPct / 100) * maxMarks;
                     const earnedCategoryMarks = (percentageScore / 100) * maxCategoryMarks;
 
@@ -68,27 +73,26 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
                         <div key={index} className="space-y-2">
                             <div className="flex justify-between text-xs sm:text-sm items-end">
                                 <div className="flex items-center gap-2">
-                                    <div className="p-1.5 bg-primary/10 rounded text-primary">
-                                       {criterion.toLowerCase().includes('understanding') && <Sparkles className="h-3 w-3"/>}
-                                       {criterion.toLowerCase().includes('formula') && <FileImage className="h-3 w-3"/>}
-                                       {criterion.toLowerCase().includes('calculation') && <Timer className="h-3 w-3"/>}
-                                       {!['understanding', 'formula', 'calculation'].some(s => criterion.toLowerCase().includes(s)) && <Award className="h-3 w-3"/>}
-                                    </div>
-                                    <span className="font-semibold">{criterion}</span>
-                                    <span className="text-muted-foreground text-[10px]">({weightPct}%)</span>
+                                    {criterion.toLowerCase().includes('understanding') && <Sparkles className="h-3.5 w-3.5 text-indigo-500"/>}
+                                    {criterion.toLowerCase().includes('formula') && <FileImage className="h-3.5 w-3.5 text-blue-500"/>}
+                                    {criterion.toLowerCase().includes('calculation') && <Timer className="h-3.5 w-3.5 text-emerald-500"/>}
+                                    {!['understanding', 'formula', 'calculation'].some(s => criterion.toLowerCase().includes(s)) && <CheckCircle className="h-3.5 w-3.5 text-slate-500"/>}
+                                    
+                                    <span className="font-semibold text-slate-700 dark:text-slate-200">{criterion}</span>
+                                    <span className="text-muted-foreground text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">{weightPct}% Weight</span>
                                 </div>
-                                <div className="font-mono font-bold">
-                                    <span className={percentageScore < 50 ? "text-red-500" : "text-green-600"}>
+                                <div className="font-mono font-bold text-xs">
+                                    <span className={percentageScore < 50 ? "text-red-500" : "text-emerald-600"}>
                                         {earnedCategoryMarks.toFixed(2)}
                                     </span>
                                     <span className="text-muted-foreground ml-1">/ {maxCategoryMarks.toFixed(2)}</span>
                                 </div>
                             </div>
-                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                            <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                 <div 
                                     className={cn(
-                                        "h-full transition-all duration-1000 ease-out",
-                                        percentageScore < 40 ? "bg-red-500" : percentageScore < 70 ? "bg-amber-500" : "bg-green-500"
+                                        "h-full transition-all duration-1000 ease-out rounded-full",
+                                        percentageScore < 40 ? "bg-red-500" : percentageScore < 70 ? "bg-amber-500" : "bg-emerald-500"
                                     )}
                                     style={{ width: `${percentageScore}%` }}
                                 />
@@ -158,7 +162,7 @@ export default function SolveWorksheetPage() {
     return worksheet.questions.map(id => questionsMap.get(id)).filter(Boolean) as Question[];
   }, [worksheet?.questions, questions]);
 
-  // ✅ TIMER LOGIC: +40s for AI
+  // Timer Logic
   const { totalMarks, totalDuration } = useMemo(() => {
     if (!orderedQuestions) return { totalMarks: 0, totalDuration: 0 };
     
@@ -218,7 +222,6 @@ export default function SolveWorksheetPage() {
     }
   }
 
-  // ✅ FIXED: SUMMATION LOGIC FOR SCORING
   const handleAICheck = async (question: Question) => {
     const imageFile = aiImages[question.id];
     if (!imageFile) {
@@ -228,13 +231,10 @@ export default function SolveWorksheetPage() {
     setIsAiGrading(true);
     
     try {
-        console.log("🚀 STARTING AI CHECK (FINAL V3)...");
-
         const formData = new FormData();
         formData.append('image', imageFile);
         formData.append('questionText', question.mainQuestionText);
         
-        // Calculate max marks
         const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
         formData.append('totalMarks', qMaxMarks.toString());
 
@@ -249,8 +249,6 @@ export default function SolveWorksheetPage() {
         const newResults: ResultState = {};
         const newAnswers: AnswerState = {};
         
-        // ✅ CALCULATION: Exact Sum of Rubric Parts
-        // (Matches your Visual Component Logic)
         let calculatedSum = 0;
         const rubric = question.aiRubric || {};
         const breakdown = aiResult.breakdown || {};
@@ -258,34 +256,24 @@ export default function SolveWorksheetPage() {
         if (Object.keys(rubric).length > 0) {
             Object.entries(rubric).forEach(([key, weight]) => {
                 const cleanKey = formatCriterionKey(key);
-                // Try both key formats to be safe
                 const scoreVal = breakdown[key] ?? breakdown[cleanKey] ?? 0;
-                
                 const weightVal = typeof weight === 'string' ? parseFloat(weight) : (weight as number);
-                
-                // Formula: (Score% / 100) * (Weight% / 100) * TotalMarks
                 const partMarks = (scoreVal / 100) * (weightVal / 100) * qMaxMarks;
                 calculatedSum += partMarks;
             });
         } else {
-            // Fallback only if no rubric exists
             calculatedSum = (parseFloat(aiResult.totalScore) / 100) * qMaxMarks;
         }
 
-        // Round to 2 decimals
         const finalActualMarks = Math.round(calculatedSum * 100) / 100;
-
-        console.log(`🧮 CALCULATION: Summed Score = ${finalActualMarks} / ${qMaxMarks}`);
 
         subQuestionIds.forEach(id => {
             newResults[id] = {
-                // Correct if score > 50% of total
                 isCorrect: finalActualMarks >= (qMaxMarks / 2),
                 score: finalActualMarks, 
                 feedback: aiResult.feedback,
                 aiBreakdown: aiResult.breakdown 
             } as any; 
-            
             newAnswers[id] = { answer: aiResult.driveLink };
         });
 
@@ -305,8 +293,14 @@ export default function SolveWorksheetPage() {
     }
   };
 
-  if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  if (!worksheet || orderedQuestions.length === 0) return <div className="text-center py-10"><p>Worksheet could not be loaded.</p><Button variant="link" onClick={() => router.back()}>Go Back</Button></div>;
+  if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+  if (!worksheet || orderedQuestions.length === 0) return (
+        <div className="flex flex-col items-center justify-center h-screen space-y-4">
+            <AlertCircle className="h-12 w-12 text-destructive" />
+            <p className="text-lg font-medium text-muted-foreground">Worksheet could not be loaded.</p>
+            <Button onClick={() => router.back()}>Go Back</Button>
+        </div>
+  );
 
   const activeQuestion = orderedQuestions[currentQuestionIndex];
   const progressPercentage = ((currentQuestionIndex + 1) / orderedQuestions.length) * 100;
@@ -314,14 +308,37 @@ export default function SolveWorksheetPage() {
 
   if (isFinished) return <WorksheetResults worksheet={worksheet} questions={orderedQuestions} answers={answers} results={results} timeTaken={timeTaken} attempt={attempt ?? undefined} />;
 
+  // --- START SCREEN ---
   if (!startTime) return (
-        <div className="flex flex-col h-screen p-4 sm:p-6 lg:p-8 items-center justify-center">
-             <Card className="max-w-2xl text-center">
-                <CardHeader>
-                    <CardTitle>{worksheet.title}</CardTitle>
-                    <CardDescription>Ready? {formatTime(totalDuration)} for {orderedQuestions.length} questions.</CardDescription>
+        <div className="flex flex-col h-screen bg-slate-50/50 dark:bg-slate-950/50 items-center justify-center p-4">
+             <Card className="w-full max-w-lg shadow-xl border-none">
+                <div className="h-2 w-full bg-gradient-to-r from-primary to-indigo-500 rounded-t-xl" />
+                <CardHeader className="text-center pb-2">
+                    <div className="mx-auto bg-primary/10 p-4 rounded-full mb-4 w-fit">
+                        <Timer className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle className="text-2xl font-bold">{worksheet.title}</CardTitle>
+                    <CardDescription className="text-base">
+                        You are about to start a timed worksheet.
+                    </CardDescription>
                 </CardHeader>
-                <CardContent><Button size="lg" onClick={handleStart}>Start Attempt</Button></CardContent>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg text-center">
+                            <p className="text-xs text-muted-foreground uppercase font-bold">Duration</p>
+                            <p className="text-xl font-mono font-semibold">{formatTime(totalDuration)}</p>
+                        </div>
+                        <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg text-center">
+                            <p className="text-xs text-muted-foreground uppercase font-bold">Questions</p>
+                            <p className="text-xl font-mono font-semibold">{orderedQuestions.length}</p>
+                        </div>
+                    </div>
+                </CardContent>
+                <CardFooter className="pt-2 pb-8">
+                    <Button size="lg" className="w-full text-lg font-semibold shadow-lg shadow-primary/20" onClick={handleStart}>
+                        Start Attempt <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                </CardFooter>
             </Card>
         </div>
   );
@@ -333,37 +350,78 @@ export default function SolveWorksheetPage() {
   const qMaxMarks = activeQuestion.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
 
   return (
-    <div className="flex flex-col h-screen p-4 sm:p-6 lg:p-8">
-        <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b h-16 flex items-center px-6">
-            <div className="ml-auto flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                    <Timer className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-lg font-semibold font-mono">{formatTime(timeLeft)}</span>
+    <div className="flex flex-col h-screen bg-slate-50/30 dark:bg-slate-950/30">
+        {/* --- MODERN HEADER --- */}
+        <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm">
+            <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => router.back()}>
+                    <X className="h-5 w-5" />
+                </Button>
+                <div className="hidden sm:block">
+                    <h1 className="text-sm font-semibold truncate max-w-[200px]">{worksheet.title}</h1>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Question {currentQuestionIndex + 1} of {orderedQuestions.length}</span>
+                        <span className="h-1 w-1 rounded-full bg-slate-300" />
+                        <span>{Math.round(progressPercentage)}% Complete</span>
+                    </div>
                 </div>
-                <Button variant="destructive" onClick={handleFinish}><X className="mr-2" /> End Attempt</Button>
+            </div>
+
+            <div className="flex items-center gap-3 sm:gap-6">
+                <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full font-mono font-medium border", timeLeft < 60 ? "bg-red-50 text-red-600 border-red-200 animate-pulse" : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700")}>
+                    <Clock className="h-4 w-4" />
+                    <span>{formatTime(timeLeft)}</span>
+                </div>
+                <Button onClick={handleFinish} variant="destructive" size="sm" className="hidden sm:flex">
+                    Submit Attempt
+                </Button>
             </div>
         </header>
 
-        <main className="flex-grow mt-16 flex flex-col">
-            <Card className="flex-grow flex flex-col">
-                    <CardHeader>
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <CardTitle>{worksheet.title}</CardTitle>
-                                <CardDescription>Question {currentQuestionIndex + 1} of {orderedQuestions.length}</CardDescription>
+        <main className="flex-grow flex flex-col items-center p-4 sm:p-6 overflow-y-auto">
+            <div className="w-full max-w-4xl space-y-6 pb-20">
+                {/* --- QUESTION CARD --- */}
+                <Card className="border-none shadow-md overflow-hidden">
+                    <div className="h-1.5 bg-slate-100 dark:bg-slate-800 w-full">
+                        <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }} />
+                    </div>
+                    <CardHeader className="pb-4">
+                        <div className="flex justify-between items-start gap-4">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Badge variant="outline" className="text-xs font-mono text-muted-foreground">Q{currentQuestionIndex + 1}</Badge>
+                                    {isAIGradingMode && (
+                                        <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 gap-1">
+                                            <Sparkles className="h-3 w-3" /> AI Graded
+                                        </Badge>
+                                    )}
+                                </div>
+                                <CardTitle className="text-xl leading-tight">
+                                    Question {currentQuestionIndex + 1}
+                                </CardTitle>
                             </div>
-                            {isAIGradingMode && <div className="flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-xs font-semibold border border-purple-100"><Sparkles className="h-3 w-3" /> AI Graded</div>}
+                            <div className="text-right">
+                                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{qMaxMarks} Marks</span>
+                            </div>
                         </div>
-                        <Progress value={progressPercentage} className="mt-2" />
                     </CardHeader>
                     
-                    <CardContent className="flex-grow overflow-y-auto">
-                        <div className="mb-4 prose dark:prose-invert max-w-none w-full min-w-0 break-words whitespace-pre-wrap">
+                    <CardContent>
+                        <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-base leading-relaxed bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-100 dark:border-slate-800">
                             <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(activeQuestion.mainQuestionText) }} />
                         </div>
+                    </CardContent>
+                </Card>
 
-                        {isAIGradingMode ? (
-                            <div className="space-y-6">
+                {/* --- ANSWER SECTION --- */}
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {isAIGradingMode ? (
+                        <Card className="border-none shadow-md">
+                            <CardHeader>
+                                <CardTitle className="text-lg">Your Answer</CardTitle>
+                                <CardDescription>Upload a clear photo of your solution for AI grading.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
                                 <AIAnswerUploader 
                                     questionId={activeQuestion.id}
                                     isGrading={isAiGrading}
@@ -373,79 +431,85 @@ export default function SolveWorksheetPage() {
                                 />
                                 
                                 {isQuestionGraded && (
-                                     <div className="animate-in fade-in slide-in-from-bottom-3 space-y-4">
-                                        <div>
-                                            <AIRubricBreakdown 
-                                                rubric={activeQuestion.aiRubric || {}} 
-                                                breakdown={(currentResult as any)?.aiBreakdown || {}} 
-                                                maxMarks={qMaxMarks}
-                                            />
-                                        </div>
-{/* REPLACED FEEDBACK BLOCK */}
-{currentFeedback && (
-            <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-lg">
-                <div className="flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-purple-600 mt-0.5 shrink-0" />
-                    <div className="flex-1">
-                        <h4 className="font-semibold text-purple-800 mb-1">AI Feedback</h4>
-                        
-                        <div className="text-sm text-purple-800 leading-relaxed">
-                            <ReactMarkdown
-                                components={{
-                                    // Style bold text (**text**)
-                                    strong: ({node, ...props}) => <span className="font-bold text-purple-900" {...props} />,
-                                    
-                                    // Style lists
-                                    ul: ({node, ...props}) => <ul className="list-disc pl-4 space-y-1 mt-1" {...props} />,
-                                    li: ({node, ...props}) => <li className="pl-1" {...props} />,
-                                    
-                                    // Style paragraphs to maintain spacing
-                                    p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />
-                                }}
-                            >
-                                {currentFeedback}
-                            </ReactMarkdown>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )}
-                                     </div>
+                                    <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6">
+                                        <AIRubricBreakdown 
+                                            rubric={activeQuestion.aiRubric || {}} 
+                                            breakdown={(currentResult as any)?.aiBreakdown || {}} 
+                                            maxMarks={qMaxMarks}
+                                        />
+                                        
+                                        {currentFeedback && (
+                                            <div className="bg-white dark:bg-slate-900 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm overflow-hidden">
+                                                <div className="bg-indigo-50/50 dark:bg-indigo-950/30 px-4 py-3 border-b border-indigo-100 dark:border-indigo-900/50 flex items-center gap-2">
+                                                    <Sparkles className="h-4 w-4 text-indigo-600" />
+                                                    <h4 className="font-semibold text-sm text-indigo-900 dark:text-indigo-200">AI Feedback</h4>
+                                                </div>
+                                                <div className="p-5 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                                                    <ReactMarkdown
+                                                        components={{
+                                                            strong: ({node, ...props}) => <span className="font-bold text-indigo-700 dark:text-indigo-400" {...props} />,
+                                                            ul: ({node, ...props}) => <ul className="list-disc pl-4 space-y-1 my-2" {...props} />,
+                                                            li: ({node, ...props}) => <li className="pl-1" {...props} />,
+                                                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />
+                                                        }}
+                                                    >
+                                                        {currentFeedback}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
 
                                 {!isQuestionGraded && (
-                                    <div className="flex justify-end pt-4">
+                                    <div className="flex justify-end pt-2">
                                         <Button 
                                             onClick={() => handleAICheck(activeQuestion)} 
                                             disabled={isAiGrading}
-                                            className="bg-purple-600 hover:bg-purple-700"
+                                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/20"
+                                            size="lg"
                                         >
-                                            {isAiGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2 h-4 w-4" /> Check with AI (Sum)</>}
+                                            {isAiGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2 h-4 w-4" /> Grade My Answer</>}
                                         </Button>
                                     </div>
                                 )}
-                            </div>
-                        ) : (
-                            <QuestionRunner 
-                                key={activeQuestion.id} 
-                                question={activeQuestion}
-                                onAnswerSubmit={(subQuestionId, answer) => setAnswers(prev => ({...prev, [subQuestionId]: { answer }}))}
-                                onResultCalculated={(subQuestionId, isCorrect) => setResults((prev: ResultState) => ({...prev, [subQuestionId]: { isCorrect }}))}
-                                initialAnswers={answers}
-                            />
-                        )}
-                    </CardContent>
-
-                    <CardFooter className="flex justify-between mt-auto border-t pt-6">
-                        <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}><ArrowLeft className="mr-2 h-4 w-4" /> Previous</Button>
-                        {isLastQuestion ? (
-                            <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700"><CheckCircle className="mr-2 h-4 w-4" /> Finish Attempt</Button>
-                        ) : (
-                            <Button onClick={handleNext}>Next <ArrowRight className="ml-2 h-4 w-4" /></Button>
-                        )}
-                    </CardFooter>
-            </Card>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <QuestionRunner 
+                            key={activeQuestion.id} 
+                            question={activeQuestion}
+                            onAnswerSubmit={(subQuestionId, answer) => setAnswers(prev => ({...prev, [subQuestionId]: { answer }}))}
+                            onResultCalculated={(subQuestionId, isCorrect) => setResults((prev: ResultState) => ({...prev, [subQuestionId]: { isCorrect }}))}
+                            initialAnswers={answers}
+                        />
+                    )}
+                </div>
+            </div>
         </main>
+
+        {/* --- BOTTOM NAVIGATION BAR --- */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40">
+            <div className="w-full max-w-4xl flex justify-between items-center">
+                <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0} className="w-32">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+                </Button>
+                
+                <div className="text-xs text-muted-foreground hidden sm:block">
+                    {currentQuestionIndex + 1} / {orderedQuestions.length}
+                </div>
+
+                {isLastQuestion ? (
+                    <Button onClick={handleFinish} className="w-32 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20">
+                        <CheckCircle className="mr-2 h-4 w-4" /> Finish
+                    </Button>
+                ) : (
+                    <Button onClick={handleNext} className="w-32 shadow-lg shadow-primary/20">
+                        Next <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                )}
+            </div>
+        </div>
     </div>
   );
 }

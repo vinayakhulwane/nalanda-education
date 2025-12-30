@@ -140,39 +140,20 @@ export async function POST(request: Request) {
       }
     `;
 
-    // --- STEP 6: Call AI ---
-    const modelsToTry = [
-        "google/gemma-3-12b-it:free",
-        "mistralai/mistral-small-3.1-24b-instruct:free",
-        "google/gemini-2.0-flash-exp:free"
-    ];
-
-    let completion;
-    let lastError;
-
-    for (const modelId of modelsToTry) {
-        try {
-            completion = await openai.chat.completions.create({
-                model: modelId,
-                messages: [
-                    {
-                        role: "user",
-                        content: [
-                            { type: "text", text: systemPrompt },
-                            { type: "image_url", image_url: { url: dataUrl } }
-                        ]
-                    }
-                ],
-                response_format: { type: "json_object" }
-            });
-            break; 
-        } catch (err) {
-            console.log(`Model ${modelId} failed, trying next...`);
-            lastError = err;
-        }
-    }
-
-    if (!completion) throw lastError || new Error("All AI models failed");
+    // --- STEP 6: Call AI (Simplified) ---
+    const completion = await openai.chat.completions.create({
+        model: "google/gemini-2.0-flash-exp:free", // Use a reliable free model
+        messages: [
+            {
+                role: "user",
+                content: [
+                    { type: "text", text: systemPrompt },
+                    { type: "image_url", image_url: { url: dataUrl } }
+                ]
+            }
+        ],
+        response_format: { type: "json_object" }
+    });
 
     // --- STEP 7: Parse & Recalculate Score (THE FIX) ---
     const content = completion.choices[0]?.message?.content || "";
