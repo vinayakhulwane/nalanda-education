@@ -8,22 +8,26 @@ import { Step3Validation } from "@/components/question-builder/step-3-validation
 import { Step4Grading } from "@/components/question-builder/step-4-grading"; 
 import { Step5Preview } from "@/components/question-builder/step-5-preview"; 
 import { Question } from "@/types";
-import { Button } from "@/components/ui/button"; // Keeping standard button for navigation
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast"; 
 import { Check, Loader2, ChevronRight, ChevronLeft, Save, Rocket, RefreshCw } from 'lucide-react'; 
-import { useFirestore } from '@/firebase'; 
-import { useUser } from '@/hooks/use-user'; 
+import { useFirestore, useUser } from '@/firebase'; 
 import { collection, doc, addDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 // --- HELPER: CLEAN DATA ---
 const cleanPayload = (obj: any): any => {
+    if (obj === undefined) return null; // Return null for top-level undefined
+    if (obj === null) return null;
     if (Array.isArray(obj)) return obj.map(v => cleanPayload(v));
-    if (obj !== null && typeof obj === 'object') {
+
+    if (typeof obj === 'object' && obj.constructor === Object) {
         const newObj: { [key: string]: any } = {};
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 const value = obj[key];
-                newObj[key] = value === undefined ? null : cleanPayload(value);
+                if (value !== undefined) {
+                    newObj[key] = cleanPayload(value);
+                }
             }
         }
         return newObj;
@@ -91,12 +95,8 @@ export function QuestionBuilderWizard() {
 
   // --- SAVE ENGINE ---
   const saveToDatabase = async (status: 'draft' | 'published') => {
-    // 1. Force Alert to prove function ran
-    alert(`🚀 TRIGGERED: Saving as ${status}...`); 
-    console.log(`[ENGINE] Attempting to save as ${status}...`); 
-    
     if (!firestore || !user) {
-        alert("❌ Error: Missing Database Connection or User Login");
+        toast({ variant: "destructive", title: "Error", description: "You must be logged in to save." });
         return;
     }
     
@@ -118,16 +118,16 @@ export function QuestionBuilderWizard() {
             });
             setQuestion(prev => ({ ...prev, id: docRef.id, status }));
             window.history.replaceState(null, '', `/questions/new?questionId=${docRef.id}`);
-            alert("✅ Success: Created New Question!");
+            toast({ title: 'Success!', description: `Question "${payload.name}" saved as a draft.` });
         } else {
             const docRef = doc(firestore, 'questions', question.id);
             await updateDoc(docRef, payload);
             setQuestion(prev => ({ ...prev, status }));
-            alert("✅ Success: Updated Question!");
+            toast({ title: 'Success!', description: `Question "${payload.name}" has been updated.` });
         }
     } catch (error: any) {
         console.error("Save Error:", error);
-        alert(`❌ SAVE FAILED: ${error.message}`);
+        toast({ variant: "destructive", title: "Save Failed", description: error.message });
     } finally {
         setIsSaving(false);
     }
@@ -137,7 +137,6 @@ export function QuestionBuilderWizard() {
   const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
 
   const handleSaveDraft = async () => {
-      console.log("🖱️ CLICK DETECTED: Save Draft"); 
       if (question.status === 'published') {
           if (!confirm("⚠️ Warning: This question is currently LIVE.\n\nSaving as Draft will UNPUBLISH it.\n\nAre you sure?")) return;
       }
@@ -145,7 +144,6 @@ export function QuestionBuilderWizard() {
   };
 
   const handlePublish = async () => {
-      console.log("🖱️ CLICK DETECTED: Publish"); 
       const isUpdate = question.status === 'published';
       const msg = isUpdate 
         ? "Update this live question? Changes will be visible immediately." 
@@ -156,7 +154,7 @@ export function QuestionBuilderWizard() {
       await saveToDatabase('published');
       
       if (!isUpdate) {
-         setTimeout(() => router.push('/questions'), 1500);
+         setTimeout(() => router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`), 1500);
       }
   };
 
@@ -220,59 +218,35 @@ export function QuestionBuilderWizard() {
         </div>
       </div>
 
-      {/* 🟢 FOOTER - THE HAMMER FIX 🟢 */}
-      {/* Fixed Position + Z-Index 99999 + Pointer Events Auto */}
-      <div 
-        style={{ zIndex: 99999, pointerEvents: 'auto' }}
-        className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-between items-center shadow-[0_-5px_20px_rgba(0,0,0,0.2)]"
-      >
-        <div className="max-w-5xl mx-auto w-full flex justify-between items-center px-4">
-            {/* 1. LEFT: Back Button */}
-            <Button variant="outline" onClick={handleBack} disabled={currentStep === 1} className="gap-2">
-                <ChevronLeft className="w-4 h-4" /> Back
-            </Button>
+      {/* FOOTER */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t p-4 z-50">
+        <div className="max-w-5xl mx-auto flex justify-between items-center">
+            <div>
+                <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
+                    <ChevronLeft className="w-4 h-4 mr-2" /> Back
+                </Button>
+            </div>
             
-            {/* 2. RIGHT SIDE */}
             <div className="flex items-center gap-3">
                 {currentStep < 5 ? (
-                    <Button onClick={handleNext} disabled={isNextDisabled()} className="bg-violet-600 hover:bg-violet-700 text-white gap-2">
-                        Next Step <ChevronRight className="w-4 h-4" />
+                    <Button onClick={handleNext} disabled={isNextDisabled()} className="bg-violet-600 hover:bg-violet-700 text-white">
+                        Next Step <ChevronRight className="w-4 h-4 ml-2" />
                     </Button>
                 ) : (
-                    // 🔴 HAMMER BUTTONS
-                    <div className="flex gap-4">
-                        {/* OPTION 1: SAVE DRAFT */}
-                        <button 
-                            type="button"
-                            // Using MouseDown because it triggers faster than Click and ignores some overlays
-                            onMouseDown={(e) => { e.preventDefault(); handleSaveDraft(); }}
-                            onClick={handleSaveDraft}
-                            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold border-2 transition-all cursor-pointer select-none
-                                ${isSaving ? 'bg-slate-100 text-slate-400' : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-200 hover:border-slate-400'}`}
-                        >
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : <Save className="w-4 h-4" />} 
+                    <>
+                        <Button variant="outline" onClick={handleSaveDraft} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <Save className="w-4 h-4 mr-2" />} 
                             {isPublished ? "Revert to Draft" : "Save Draft"}
-                        </button>
-
-                        {/* OPTION 2: PUBLISH */}
-                        <button 
-                            type="button"
-                            // Using MouseDown here too
-                            onMouseDown={(e) => { e.preventDefault(); handlePublish(); }}
+                        </Button>
+                        <Button 
                             onClick={handlePublish} 
-                            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-white shadow-lg transition-all transform hover:scale-105 cursor-pointer select-none
-                                ${isSaving ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={isSaving}
+                            className="bg-green-600 hover:bg-green-700 text-white shadow-md gap-2"
                         >
-                            {isSaving ? (
-                                <Loader2 className="w-4 h-4 animate-spin"/>
-                            ) : isPublished ? (
-                                <RefreshCw className="w-4 h-4" /> 
-                            ) : (
-                                <Rocket className="w-4 h-4" />
-                            )} 
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : (isPublished ? <RefreshCw className="w-4 h-4"/> : <Rocket className="w-4 h-4"/>)}
                             {isPublished ? "Update Question" : "Publish Question"}
-                        </button>
-                    </div>
+                        </Button>
+                    </>
                 )}
             </div>
         </div>
