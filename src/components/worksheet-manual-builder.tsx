@@ -230,6 +230,7 @@ export function WorksheetManualBuilder({
         return viewingQuestion.mainQuestionText.replace(/&nbsp;/g, ' ');
     }, [viewingQuestion]);
 
+    const hasSelectedAiQuestion = useMemo(() => selectedQuestions.some(q => q.gradingMode === 'ai'), [selectedQuestions]);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
@@ -388,11 +389,16 @@ export function WorksheetManualBuilder({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {filteredQuestions.map(q => {
                         const isSelected = selectedQuestions.some(sq => sq.id === q.id);
+                        const isAiAndDisabled = q.gradingMode === 'ai' && hasSelectedAiQuestion && !isSelected;
                         const CurrencyIcon = currencyIcons[q.currencyType];
                         const styles = currencyStyles[q.currencyType];
                         
                         return (
-                            <Card key={q.id} className={cn("group flex flex-col relative transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 overflow-hidden", isSelected ? "ring-2 ring-emerald-500 border-emerald-500/20" : "")}>
+                            <Card key={q.id} className={cn(
+                                "group flex flex-col relative transition-all duration-300 overflow-hidden",
+                                isSelected ? "ring-2 ring-emerald-500 border-emerald-500/20" : "hover:shadow-md hover:-translate-y-0.5",
+                                isAiAndDisabled && "opacity-50 bg-slate-50 dark:bg-slate-900 cursor-not-allowed"
+                            )}>
                                 {isSelected && (
                                     <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-bl from-emerald-500 to-transparent -mr-6 -mt-6 rotate-45 z-10" />
                                 )}
@@ -412,9 +418,18 @@ export function WorksheetManualBuilder({
 
                                             {/* AI Badge */}
                                             {q.gradingMode === 'ai' && (
-                                                <Badge variant="secondary" className="text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 gap-1">
-                                                    <Bot className="h-3 w-3" /> AI
-                                                </Badge>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Badge variant="secondary" className="text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 gap-1">
+                                                                <Bot className="h-3 w-3" /> AI
+                                                            </Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>This is an AI-graded question.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                             )}
                                         </div>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary -mt-1 -mr-2" onClick={() => handleViewClick(q)}>
@@ -428,7 +443,6 @@ export function WorksheetManualBuilder({
                                 
                                 <CardContent className="pb-3 flex-grow">
                                     <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                                        {/* ✅ FIXED: Uses getCleanText to fix the 'secret code' issue */}
                                         <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
                                             {getCleanText(q.mainQuestionText).substring(0, 150) || "No preview text available."}...
                                         </p>
@@ -438,13 +452,17 @@ export function WorksheetManualBuilder({
                                 <CardFooter className="pt-0 pb-4">
                                     <Button 
                                         onClick={() => addQuestion(q, 'manual')} 
-                                        disabled={isSelected} 
+                                        disabled={isSelected || isAiAndDisabled} 
                                         className={cn("w-full transition-all font-medium", isSelected ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary dark:bg-white/10 dark:text-white dark:hover:bg-white/20")}
                                         variant="ghost"
                                     >
                                         {isSelected ? (
                                             <>
                                                 <CheckCircle2 className="mr-2 h-4 w-4" /> Added to Worksheet
+                                            </>
+                                        ) : isAiAndDisabled ? (
+                                            <>
+                                                <Bot className="mr-2 h-4 w-4" /> AI Limit Reached
                                             </>
                                         ) : (
                                             <>
