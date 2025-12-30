@@ -1,8 +1,8 @@
 'use client';
-import type { Question, Unit, Category, CurrencyType, Worksheet, WalletTransaction, EconomySettings } from '@/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
+import type { Question, Unit, Category, CurrencyType, EconomySettings } from '@/types';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
-import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X, Eye } from 'lucide-react';
+import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Shuffle, Filter, X, Eye, CheckCircle2 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
@@ -189,11 +189,16 @@ export function WorksheetManualBuilder({
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
             <div className="lg:col-span-2 space-y-4">
-                <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-semibold">{filteredQuestions.length} Questions Available</h3>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border shadow-sm">
+                    <div>
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            {filteredQuestions.length} 
+                            <span className="text-muted-foreground font-normal text-base">Questions Available</span>
+                        </h3>
+                    </div>
                     <Popover>
                         <PopoverTrigger asChild>
-                            <Button variant="outline">
+                            <Button variant="outline" className="gap-2">
                                 <Filter className="mr-2 h-4 w-4" />
                                 Filter
                                 {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2 rounded-full h-5 w-5 p-0 justify-center">{activeFilterCount}</Badge>}
@@ -256,24 +261,24 @@ export function WorksheetManualBuilder({
                 </div>
                 
                  {isFilterActive && (
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold">Active:</span>
+                    <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-dashed">
+                        <span className="text-sm font-semibold text-muted-foreground ml-1">Active:</span>
                         {filters.units.map(id => (
-                          <Badge key={id} variant="outline" className="pl-2 capitalize">
+                          <Badge key={id} variant="secondary" className="pl-2 capitalize gap-1 hover:bg-slate-200">
                             {unitMap.get(id) || id}
-                            <button onClick={() => handleFilterChange('units', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                            <button onClick={() => handleFilterChange('units', id, false)} className="rounded-full hover:bg-black/10 p-0.5"><X className="h-3 w-3" /></button>
                           </Badge>
                         ))}
                         {filters.categories.map(id => (
-                          <Badge key={id} variant="outline" className="pl-2 capitalize">
+                          <Badge key={id} variant="secondary" className="pl-2 capitalize gap-1 hover:bg-slate-200">
                             {categoryMap.get(id) || id}
-                            <button onClick={() => handleFilterChange('categories', id, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                            <button onClick={() => handleFilterChange('categories', id, false)} className="rounded-full hover:bg-black/10 p-0.5"><X className="h-3 w-3" /></button>
                           </Badge>
                         ))}
                         {filters.currencies.map(c => (
-                          <Badge key={c} variant="outline" className="pl-2 capitalize">
+                          <Badge key={c} variant="secondary" className="pl-2 capitalize gap-1 hover:bg-slate-200">
                             {c}
-                            <button onClick={() => handleFilterChange('currencies', c, false)} className="ml-1 rounded-full hover:bg-muted/50 p-0.5"><X className="h-3 w-3" /></button>
+                            <button onClick={() => handleFilterChange('currencies', c, false)} className="rounded-full hover:bg-black/10 p-0.5"><X className="h-3 w-3" /></button>
                           </Badge>
                         ))}
                     </div>
@@ -285,218 +290,144 @@ export function WorksheetManualBuilder({
                         const CurrencyIcon = currencyIcons[q.currencyType];
                         const currencyColor = currencyColors[q.currencyType];
                         return (
-                            <Card key={q.id} className="flex flex-col">
+                            <Card key={q.id} className={cn("flex flex-col transition-all hover:shadow-md", isSelected && "ring-2 ring-primary border-primary/50 bg-primary/5")}>
                                 <CardHeader className="pb-2 flex-row items-start justify-between">
-                                    <CardTitle className="text-base line-clamp-1">{q.name}</CardTitle>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 -mr-2 -mt-2" onClick={() => handleViewClick(q)}>
-                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                    <div className="space-y-1">
+                                        <CardTitle className="text-base line-clamp-1 leading-snug">{q.name}</CardTitle>
+                                        <div className="flex flex-wrap gap-2">
+                                            <TooltipProvider>
+                                                <Badge variant="outline" className={cn("capitalize flex items-center gap-1 text-[10px]", currencyColor)}>
+                                                    <CurrencyIcon className="h-3 w-3" /> {q.currencyType}
+                                                </Badge>
+                                                {q.gradingMode === 'ai' && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Badge variant="secondary" className="p-1 px-2 text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                                                <Bot className="h-3 w-3 mr-1" /> AI
+                                                            </Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent><p>AI Graded Question</p></TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                                <Badge variant="secondary" className="text-[10px]">{getQuestionMarks(q)} Marks</Badge>
+                                            </TooltipProvider>
+                                        </div>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-2 text-muted-foreground hover:text-primary" onClick={() => handleViewClick(q)}>
+                                        <Eye className="h-4 w-4" />
                                     </Button>
                                 </CardHeader>
                                 <CardContent className="space-y-2 flex-grow">
-                                    <div className="flex items-center gap-2">
-                                        <TooltipProvider>
-                                            {q.gradingMode === 'ai' && (
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild><Badge variant="outline" className="p-1"><Bot className="h-3 w-3" /></Badge></TooltipTrigger>
-                                                    <TooltipContent><p>AI Graded</p></TooltipContent>
-                                                </Tooltip>
-                                            )}
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Badge variant="outline" className={cn("capitalize flex items-center gap-1", currencyColor)}><CurrencyIcon className="h-3 w-3" /> {q.currencyType}</Badge>
-                                                </TooltipTrigger>
-                                                <TooltipContent><p className="capitalize">{q.currencyType}</p></TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                        <Badge variant="secondary">{getQuestionMarks(q)} Marks</Badge>
-                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                        {q.mainQuestionText?.replace(/<[^>]*>/g, '').substring(0, 100)}...
+                                    </p>
                                 </CardContent>
-                                <CardFooter>
-                                    <Button onClick={() => addQuestion(q, 'manual')} disabled={isSelected} className="w-full">
-                                        <PlusCircle className="mr-2 h-4 w-4" />
-                                        {isSelected ? 'Added' : 'Add'}
+                                <CardFooter className="pt-2">
+                                    <Button 
+                                        onClick={() => addQuestion(q, 'manual')} 
+                                        disabled={isSelected} 
+                                        className={cn("w-full transition-all", isSelected ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "")}
+                                        variant={isSelected ? "default" : "secondary"}
+                                    >
+                                        {isSelected ? (
+                                            <>
+                                                <CheckCircle2 className="mr-2 h-4 w-4" /> Added
+                                            </>
+                                        ) : (
+                                            <>
+                                                <PlusCircle className="mr-2 h-4 w-4" /> Add Question
+                                            </>
+                                        )}
                                     </Button>
                                 </CardFooter>
                             </Card>
                         )
                     })}
                     {filteredQuestions.length === 0 && (
-                        <div className="md:col-span-2 text-center py-10 text-sm text-muted-foreground border-2 border-dashed rounded-lg">
-                            No questions match your current filters.
+                        <div className="md:col-span-2 flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
+                            <Filter className="h-10 w-10 text-muted-foreground mb-3 opacity-20" />
+                            <p className="text-muted-foreground font-medium">No questions match your filters.</p>
+                            <Button variant="link" onClick={() => setFilters({ units: [], categories: [], currencies: [] })}>Clear Filters</Button>
                         </div>
                     )}
                 </div>
             </div>
-            <div className="lg:col-span-1">
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <div className="fixed bottom-6 right-6 lg:relative lg:bottom-auto lg:right-auto">
-                            <Button 
-                                size="lg" 
-                                className={cn("rounded-full h-16 w-16 shadow-xl lg:w-full lg:h-auto lg:rounded-md", animateCart && "animate-pulse-once")}
-                                disabled={selectedQuestions.length === 0}
-                            >
-                                <ShoppingCart className="h-6 w-6 lg:mr-2" />
-                                <span className="hidden lg:inline">Review & Create</span>
-                                <Badge className="absolute -top-1 -right-1 lg:static lg:ml-auto">{selectedQuestions.length}</Badge>
-                            </Button>
-                        </div>
-                    </SheetTrigger>
-                    <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
-                        <SheetHeader className="p-6 pb-2">
-                            <SheetTitle>Review & Blueprint</SheetTitle>
-                            <SheetDescription>
-                                A detailed summary of your current selections before finalizing the worksheet.
-                            </SheetDescription>
-                            {userIsEditor && (
-                                <div className="flex items-center space-x-2 pt-4">
-                                    <Label htmlFor="worksheet-type-manual" className={cn("text-muted-foreground", worksheetType === 'sample' && 'font-semibold text-foreground')}>
-                                        Sample Worksheet
-                                    </Label>
-                                    <Switch id="worksheet-type-manual" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
-                                    <Label htmlFor="worksheet-type-manual" className={cn("text-muted-foreground", worksheetType === 'classroom' && 'font-semibold text-foreground')}>
-                                        Classroom Assignment
-                                    </Label>
+            
+            {/* SIDEBAR FOR DESKTOP (or hidden on mobile) is now the Floating Sheet trigger */}
+            <div className="hidden lg:block lg:col-span-1">
+                 {/* This section intentionally left essentially blank because we are using the Floating Sheet 
+                     for the 'Cart' to keep the UI consistent between Random/Manual modes. 
+                     However, we can put a sticky summary here if desired. */}
+                 <div className="sticky top-24 space-y-4">
+                    <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <ShoppingCart className="h-5 w-5" /> Current Draft
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-baseline">
+                                    <span className="text-3xl font-bold">{selectedQuestions.length}</span>
+                                    <span className="text-slate-400">Questions</span>
                                 </div>
-                            )}
-                        </SheetHeader>
-                        <div className="flex-grow overflow-y-auto">
-                            <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
-                                <TabsList className="mx-6">
-                                    <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
-                                    <TabsTrigger value="review">Review</TabsTrigger>
-                                </TabsList>
-                                <div className="flex-grow overflow-y-auto">
-                                    <TabsContent value="blueprint" className="mt-4 px-6 pb-6">
-                                        <div className="space-y-6">
-                                            <Card>
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-base">Core Summary</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="flex justify-around">
-                                                    <div className="text-center">
-                                                        <p className="text-2xl font-bold">{selectedQuestions.length}</p>
-                                                        <p className="text-xs text-muted-foreground">Total Questions</p>
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <p className="text-2xl font-bold">{totalMarks}</p>
-                                                        <p className="text-xs text-muted-foreground">Total Marks</p>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-
-                                            <Card>
-                                                <CardHeader>
-                                                    <CardTitle className="text-base">Content Breakdown</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-4">
-                                                    <div>
-                                                        <h4 className="text-sm font-semibold mb-2">By Unit</h4>
-                                                        <div className="space-y-3">
-                                                            {Object.entries(breakdownByUnit).map(([name, data]) => (
-                                                                <div key={name}>
-                                                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                                        <span>{name}</span>
-                                                                        <span>{data.count} Qs, {data.marks} Marks</span>
-                                                                    </div>
-                                                                    <Progress value={(data.count / selectedQuestions.length) * 100} />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="text-sm font-semibold mb-2">By Category</h4>
-                                                        <div className="space-y-3">
-                                                            {Object.entries(breakdownByCategory).map(([name, data]) => (
-                                                                <div key={name}>
-                                                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                                        <span>{name}</span>
-                                                                        <span>{data.count} Qs, {data.marks} Marks</span>
-                                                                    </div>
-                                                                    <Progress value={(data.count / selectedQuestions.length) * 100} />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </div>
-                                    </TabsContent>
-                                    <TabsContent value="review" className="mt-4 px-6 pb-6">
-                                        <div className="space-y-3">
-                                            {selectedQuestions.map(q => {
-                                                const CurrencyIcon = currencyIcons[q.currencyType] || Sparkles;
-                                                const currencyColor = currencyColors[q.currencyType];
-                                                return (
-                                                    <Card key={q.id} className="p-3">
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="flex-grow">
-                                                                {q.source === 'manual' && <p className="font-semibold text-sm">{q.name}</p>}
-                                                                <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
-                                                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                                    {q.gradingMode === 'ai' && (
-                                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3" /> AI Graded</Badge>
-                                                                    )}
-                                                                    {q.source === 'random' && (
-                                                                        <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3" /> Random</Badge>
-                                                                    )}
-                                                                    <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
-                                                                    <Badge variant="outline" className={cn("flex items-center gap-1 text-xs capitalize", currencyColor)}>
-                                                                        <CurrencyIcon className="h-3 w-3" /> {q.currencyType}
-                                                                    </Badge>
-                                                                </div>
-                                                            </div>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeQuestion(q.id)}>
-                                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                                            </Button>
-                                                        </div>
-                                                    </Card>
-                                                )
-                                            })}
-                                            {selectedQuestions.length === 0 && (
-                                                <div className="text-center py-10 text-sm text-muted-foreground">
-                                                    No questions selected.
-                                                </div>
-                                            )}
-                                        </div>
-                                    </TabsContent>
+                                <Progress value={(selectedQuestions.length / 10) * 100} className="h-1.5 bg-slate-700" />
+                                <div className="text-xs text-slate-400">
+                                    Total Marks: <span className="text-white font-mono">{totalMarks}</span>
                                 </div>
-                            </Tabs>
-                        </div>
-                        <SheetFooter className="bg-card border-t px-6 py-4 mt-auto">
-                            <div className="flex justify-between items-center w-full">
-                                <div className="text-sm font-semibold">
-                                    <p>Est. Time: {estimatedTime} mins</p>
-                                    {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0) && (
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <p>Cost:</p>
-                                            {creationCost.coins > 0 && <span className="flex items-center text-yellow-600 dark:text-yellow-400"><Coins className="mr-1 h-4 w-4" />{creationCost.coins}</span>}
-                                            {creationCost.gold > 0 && <span className="flex items-center text-amber-600 dark:text-amber-400"><Crown className="mr-1 h-4 w-4" />{creationCost.gold}</span>}
-                                            {creationCost.diamonds > 0 && <span className="flex items-center text-blue-600 dark:text-blue-400"><Gem className="mr-1 h-4 w-4" />{creationCost.diamonds}</span>}
-                                        </div>
-                                    )}
-                                </div>
-                                <Button onClick={handleCreateClick} disabled={!canAfford}>
-                                    {!canAfford ? 'Insufficient Funds' : 'Create Worksheet'}
-                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
                             </div>
-                        </SheetFooter>
-                    </SheetContent>
-                </Sheet>
+                        </CardContent>
+                        <CardFooter>
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button className="w-full bg-white text-slate-900 hover:bg-slate-200" disabled={selectedQuestions.length === 0}>
+                                        Review & Create
+                                    </Button>
+                                </SheetTrigger>
+                                {/* Sheet content is shared/rendered by the Sheet component in the parent page or duplicated structure here if needed. 
+                                    Since we have the floating button, this is just an alternative trigger. 
+                                    For simplicity, the main interaction is the Floating Button. */}
+                            </Sheet>
+                        </CardFooter>
+                    </Card>
+                 </div>
             </div>
             
+            {/* VIEW MODAL */}
             <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-              <DialogContent className="sm:max-w-[625px]">
+              <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>{viewingQuestion?.name}</DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
+                      <span className="bg-primary/10 p-1.5 rounded text-primary text-sm font-bold">Q</span>
+                      {viewingQuestion?.name}
+                  </DialogTitle>
                    <DialogDescription>
-                    Question Preview
+                    Full question preview
                   </DialogDescription>
                 </DialogHeader>
-                <div className="py-4 prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: processedQuestionText }} />
+                <div className="py-4 space-y-6">
+                    <div className="prose dark:prose-invert max-w-none border p-4 rounded-lg bg-slate-50 dark:bg-slate-900/50" dangerouslySetInnerHTML={{ __html: processedQuestionText }} />
+                    
+                    {/* Solution Preview (if available/desired) */}
+                    {viewingQuestion?.solutionSteps && (
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-semibold text-muted-foreground">Marking Scheme</h4>
+                            <div className="grid gap-2">
+                                {viewingQuestion.solutionSteps.map((step, i) => (
+                                    <div key={i} className="flex justify-between text-sm p-2 border-b last:border-0">
+                                        <span>Step {i+1}</span>
+                                        <span className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{step.subQuestions.reduce((a,b)=>a+b.marks,0)} marks</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close</Button>
+                  <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close Preview</Button>
+                  <Button onClick={() => { if(viewingQuestion) addQuestion(viewingQuestion, 'manual'); setIsViewModalOpen(false); }} disabled={selectedQuestions.some(sq => sq.id === viewingQuestion?.id)}>
+                      {selectedQuestions.some(sq => sq.id === viewingQuestion?.id) ? 'Already Added' : 'Add to Worksheet'}
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

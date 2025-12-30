@@ -1,10 +1,10 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import type { Question, CurrencyType, Unit, Category, WalletTransaction, EconomySettings } from '@/types';
+import type { Question, CurrencyType, Unit, Category, EconomySettings } from '@/types';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ShoppingCart, PlusCircle, Filter, X, ArrowRight, Trash2, Bot, Shuffle, Coins, Gem, Crown, Sparkles } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Filter, Trash2, Bot, Coins, Gem, Crown, Sparkles, Wand2, PieChart, ArrowRight, X, Eye, CheckCircle2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase'; 
 import { doc } from 'firebase/firestore'; 
 import { calculateWorksheetCost } from '@/lib/wallet';
-import { useToast } from "@/hooks/use-toast"; // ✅ Added Toast Hook
+import { useToast } from "@/components/ui/use-toast";
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
 
@@ -37,11 +37,32 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
     diamond: Gem,
 };
 
-const currencyColors: Record<CurrencyType, string> = {
-    spark: 'text-gray-400',
-    coin: 'text-yellow-500',
-    gold: 'text-amber-500',
-    diamond: 'text-blue-500',
+// New styles map for the premium card look
+const currencyStyles: Record<CurrencyType, { bg: string, text: string, border: string, iconBg: string }> = {
+    spark: {
+        bg: 'bg-slate-100 dark:bg-slate-800',
+        text: 'text-slate-600 dark:text-slate-300',
+        border: 'border-slate-200 dark:border-slate-700',
+        iconBg: 'text-slate-300/50 dark:text-slate-600/50'
+    },
+    coin: {
+        bg: 'bg-yellow-50 dark:bg-yellow-950/30',
+        text: 'text-yellow-700 dark:text-yellow-400',
+        border: 'border-yellow-200 dark:border-yellow-800',
+        iconBg: 'text-yellow-300/50 dark:text-yellow-600/50'
+    },
+    gold: {
+        bg: 'bg-amber-50 dark:bg-amber-950/30',
+        text: 'text-amber-700 dark:text-amber-400',
+        border: 'border-amber-200 dark:border-amber-800',
+        iconBg: 'text-amber-300/50 dark:text-amber-600/50'
+    },
+    diamond: {
+        bg: 'bg-blue-50 dark:bg-blue-950/30',
+        text: 'text-blue-700 dark:text-blue-400',
+        border: 'border-blue-200 dark:border-blue-800',
+        iconBg: 'text-blue-300/50 dark:text-blue-600/50'
+    },
 };
 
 
@@ -54,6 +75,7 @@ export function WorksheetRandomBuilder({
   onCreateWorksheet,
   removeQuestion,
 }: WorksheetRandomBuilderProps) {
+  // ... (state and hooks remain unchanged)
   const [filters, setFilters] = useState<{
     units: string[];
     categories: string[];
@@ -66,7 +88,7 @@ export function WorksheetRandomBuilder({
   const [worksheetType, setWorksheetType] = useState<'classroom' | 'sample'>('classroom');
   const { userProfile } = useUser();
   const firestore = useFirestore(); 
-  const { toast } = useToast(); // ✅ Initialize Toast
+  const { toast } = useToast();
   const userIsEditor = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
     // Animation state
@@ -106,6 +128,7 @@ export function WorksheetRandomBuilder({
     });
   }, [availableQuestions, filters]);
 
+  // ... (rest of the useMemo hooks for calculations remain unchanged)
   const questionsByUnit = useMemo(() => {
     return filteredQuestions.reduce((acc, q) => {
       const unitName = unitMap.get(q.unitId) || q.unitId;
@@ -167,7 +190,6 @@ export function WorksheetRandomBuilder({
     };
   }, [selectedQuestions, unitMap, categoryMap, settings]); 
 
-  // ✅ MODIFIED: Random Picker with AI Limit
   const addRandomQuestion = (currency: CurrencyType) => {
     const candidates = availableQuestions.filter(q => 
         q.currencyType === currency && 
@@ -175,27 +197,22 @@ export function WorksheetRandomBuilder({
     );
 
     if (candidates.length > 0) {
-      // Shuffle candidates to ensure randomness
       const shuffled = candidates.sort(() => 0.5 - Math.random());
       let questionToAdd: Question | null = null;
 
-      // Check existing AI count
       const hasAiQuestion = selectedQuestions.some(q => q.gradingMode === 'ai');
 
-      // Try to find a valid question
       for (const candidate of shuffled) {
           if (candidate.gradingMode === 'ai' && hasAiQuestion) {
-              // Skip this candidate if we already have an AI question
               continue; 
           }
           questionToAdd = candidate;
-          break; // Found one!
+          break;
       }
 
       if (questionToAdd) {
           setSelectedQuestions([...selectedQuestions, {...questionToAdd, source: 'random'}]);
       } else {
-          // If we couldn't find one (likely because only AI questions were left and limit is hit)
           toast({
               variant: "destructive",
               title: "AI Limit Reached",
@@ -218,11 +235,6 @@ export function WorksheetRandomBuilder({
 
   const allCurrencyTypes: CurrencyType[] = ['spark', 'coin', 'gold', 'diamond'];
   
-  const getQuestionMarks = (question: Question): number => {
-      return question.solutionSteps?.reduce((stepSum, step) => 
-            stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
-  }
-  
   const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
   
   const handleCreateClick = () => {
@@ -243,295 +255,306 @@ export function WorksheetRandomBuilder({
 
 
   return (
-    <div className="space-y-6 mt-4">
-      <div className="flex justify-end items-start">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-              {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2 rounded-full h-5 w-5 p-0 justify-center">{activeFilterCount}</Badge>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80" align="end">
-             <Tabs defaultValue="unit" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="unit">Unit</TabsTrigger>
-                    <TabsTrigger value="category" disabled={filters.units.length > 0 && availableCategories.length === 0}>Category</TabsTrigger>
-                    <TabsTrigger value="currency">Currency</TabsTrigger>
-                </TabsList>
-                <TabsContent value="unit" className="mt-2">
-                  <div className="space-y-2">
-                    {units.map(unit => (
-                      <div key={unit.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`filter-unit-${unit.id}`}
-                          checked={filters.units.includes(unit.id)}
-                          onCheckedChange={(checked) => handleFilterChange('units', unit.id, !!checked)}
-                        />
-                        <Label htmlFor={`filter-unit-${unit.id}`} className="capitalize">{unit.name}</Label>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-                 <TabsContent value="category" className="mt-2">
-                  <div className="space-y-2">
-                    {availableCategories.map(cat => (
-                      <div key={cat.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`filter-cat-${cat.id}`}
-                          checked={filters.categories.includes(cat.id)}
-                          onCheckedChange={(checked) => handleFilterChange('categories', cat.id, !!checked)}
-                        />
-                        <Label htmlFor={`filter-cat-${cat.id}`} className="capitalize">{cat.name}</Label>
-                      </div>
-                    ))}
-                     {filters.units.length > 0 && availableCategories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories for selected unit(s).</p>}
-                     {filters.units.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Please select a unit first.</p>}
-                  </div>
-                </TabsContent>
-                <TabsContent value="currency" className="mt-2">
-                  <div className="space-y-2">
-                    {allCurrencyTypes.map(currency => (
-                      <div key={currency} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`filter-currency-${currency}`}
-                          checked={filters.currencies.includes(currency)}
-                          onCheckedChange={(checked) => handleFilterChange('currencies', currency, !!checked)}
-                        />
-                        <Label htmlFor={`filter-currency-${currency}`} className="capitalize">{currency}</Label>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-             </Tabs>
-          </PopoverContent>
-        </Popover>
+    <div className="space-y-6">
+      {/* HEADER SECTION WITH FILTER */}
+      <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-white dark:bg-slate-900 p-4 rounded-xl border shadow-sm">
+          <div className="flex items-center gap-4">
+              <div className="bg-primary/10 p-3 rounded-full">
+                  <Wand2 className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                  <h3 className="font-bold text-lg">Random Generator</h3>
+                  <p className="text-sm text-muted-foreground">Automatically pick questions based on type.</p>
+              </div>
+          </div>
+          
+          <Popover>
+            {/* ... (Popover content remains unchanged) */}
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Filter className="h-4 w-4" />
+                Filter Pool
+                {activeFilterCount > 0 && <Badge variant="secondary" className="rounded-full px-1.5 h-5 min-w-[1.25rem]">{activeFilterCount}</Badge>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="end">
+               <Tabs defaultValue="unit" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="unit">Unit</TabsTrigger>
+                      <TabsTrigger value="category" disabled={filters.units.length > 0 && availableCategories.length === 0}>Category</TabsTrigger>
+                      <TabsTrigger value="currency">Currency</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="unit" className="mt-2 space-y-2">
+                      {units.map(unit => (
+                        <div key={unit.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`filter-unit-${unit.id}`}
+                            checked={filters.units.includes(unit.id)}
+                            onCheckedChange={(checked) => handleFilterChange('units', unit.id, !!checked)}
+                          />
+                          <Label htmlFor={`filter-unit-${unit.id}`} className="capitalize">{unit.name}</Label>
+                        </div>
+                      ))}
+                  </TabsContent>
+                   <TabsContent value="category" className="mt-2 space-y-2">
+                      {availableCategories.map(cat => (
+                        <div key={cat.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`filter-cat-${cat.id}`}
+                            checked={filters.categories.includes(cat.id)}
+                            onCheckedChange={(checked) => handleFilterChange('categories', cat.id, !!checked)}
+                          />
+                          <Label htmlFor={`filter-cat-${cat.id}`} className="capitalize">{cat.name}</Label>
+                        </div>
+                      ))}
+                      {filters.units.length > 0 && availableCategories.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No categories found.</p>}
+                      {filters.units.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Select a unit first.</p>}
+                   </TabsContent>
+                  <TabsContent value="currency" className="mt-2 space-y-2">
+                      {allCurrencyTypes.map(currency => (
+                        <div key={currency} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`filter-currency-${currency}`}
+                            checked={filters.currencies.includes(currency)}
+                            onCheckedChange={(checked) => handleFilterChange('currencies', currency, !!checked)}
+                          />
+                          <Label htmlFor={`filter-currency-${currency}`} className="capitalize">{currency}</Label>
+                        </div>
+                      ))}
+                  </TabsContent>
+               </Tabs>
+            </PopoverContent>
+          </Popover>
       </div>
 
-      <Card>
-        <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">Total Questions Available</p>
-            <p className="text-4xl font-bold">{filteredQuestions.length}</p>
-        </CardContent>
+      {/* 1. TOP ROW: AVAILABLE POOL (Full Width) */}
+      <Card className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white border-none shadow-lg">
+            <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-2 text-indigo-100">
+                    <PieChart className="h-5 w-5" />
+                    <span className="font-medium">Available Pool</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                    <span className="text-6xl font-extrabold tracking-tight">{filteredQuestions.length}</span>
+                    <span className="text-xl text-indigo-200">Questions</span>
+                </div>
+                <p className="text-sm text-indigo-200/70 mt-1">Based on currently selected filters</p>
+            </CardContent>
       </Card>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>By Unit</CardTitle>
+
+      {/* 2. MIDDLE ROW: BREAKDOWNS (Side by Side) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Breakdown by Unit */}
+        <Card className="h-full flex flex-col">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-muted-foreground font-medium">Breakdown by Unit</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+          <CardContent className="space-y-2 overflow-y-auto max-h-[200px] pr-2 custom-scrollbar">
               {Object.entries(questionsByUnit).map(([unitName, count]) => (
-                <div key={unitName} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                  <span>{unitName}</span>
-                  <Badge variant="secondary">{count}</Badge>
+                <div key={unitName} className="flex justify-between items-center text-sm p-3 rounded bg-slate-50 dark:bg-slate-900 border">
+                  <span className="font-medium truncate mr-2">{unitName}</span>
+                  <Badge variant="secondary" className="h-6 px-2.5">{count}</Badge>
                 </div>
               ))}
-               {Object.keys(questionsByUnit).length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No questions for current filters.</p>}
-            </div>
+              {Object.keys(questionsByUnit).length === 0 && <p className="text-sm text-center text-muted-foreground py-8">No data available.</p>}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>By Category</CardTitle>
+        {/* Breakdown by Category */}
+        <Card className="h-full flex flex-col">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-muted-foreground font-medium">Breakdown by Category</CardTitle>
           </CardHeader>
-          <CardContent>
-             <div className="space-y-2">
+          <CardContent className="space-y-2 overflow-y-auto max-h-[200px] pr-2 custom-scrollbar">
               {Object.entries(questionsByCategory).map(([catName, count]) => (
-                <div key={catName} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                  <span>{catName}</span>
-                  <Badge variant="secondary">{count}</Badge>
+                <div key={catName} className="flex justify-between items-center text-sm p-3 rounded bg-slate-50 dark:bg-slate-900 border">
+                  <span className="font-medium truncate mr-2">{catName}</span>
+                  <Badge variant="secondary" className="h-6 px-2.5">{count}</Badge>
                 </div>
               ))}
-               {Object.keys(questionsByCategory).length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No questions for current filters.</p>}
-            </div>
+              {Object.keys(questionsByCategory).length === 0 && <p className="text-sm text-center text-muted-foreground py-8">No data available.</p>}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Add Random by Type</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+      </div>
+      
+      {/* 3. BOTTOM ROW: QUICK ADD (Full Width with Premium Cards) */}
+      <div>
+          <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                <PlusCircle className="h-5 w-5 text-primary" />
+                Quick Add by Type
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {allCurrencyTypes.map(currency => {
               const totalOfType = questionsByCurrency[currency] || 0;
               const selectedOfType = selectedQuestionsByCurrency[currency] || 0;
               const remaining = totalOfType - selectedOfType;
               const CurrencyIcon = currencyIcons[currency];
-              const currencyColor = currencyColors[currency];
+              // Get styles for the current currency
+              const styles = currencyStyles[currency];
+              
               return (
-                <div key={currency} className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-muted/50">
-                  <span className={cn("capitalize flex items-center gap-2", currencyColor)}>
-                    <CurrencyIcon className="h-4 w-4"/>
-                    {currency}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">
-                      {remaining}
-                    </Badge>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => addRandomQuestion(currency)} disabled={remaining <= 0}>
-                      <PlusCircle className="h-5 w-5 text-primary" />
-                    </Button>
+                <div key={currency} className={cn("group relative flex flex-col p-5 rounded-xl border transition-all overflow-hidden", styles.bg, styles.border)}>
+                  {/* Faint Background Icon */}
+                  <CurrencyIcon className={cn("absolute -top-4 -right-4 h-32 w-32 pointer-events-none -rotate-12", styles.iconBg)} />
+                  
+                  {/* Content Container (z-10 to sit above background) */}
+                  <div className="relative z-10 flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            {/* Main Icon */}
+                            <div className={cn("p-2 rounded-lg", styles.bg, "bg-opacity-50 dark:bg-opacity-50 ring-1", styles.border)}>
+                                <CurrencyIcon className={cn("h-8 w-8", styles.text)}/>
+                            </div>
+                            <div>
+                                <p className={cn("capitalize font-bold text-xl", styles.text)}>{currency}</p>
+                            </div>
+                        </div>
+                        {/* Remaining Count Badge */}
+                        <Badge variant="outline" className={cn("bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm", styles.text, styles.border)}>
+                            {remaining} left
+                        </Badge>
+                    </div>
+                    
+                    <div className="mt-auto">
+                        <Button 
+                          className={cn("w-full font-semibold gap-2 bg-white/70 dark:bg-slate-950/70 backdrop-blur-sm shadow-sm", styles.text, styles.border, "hover:bg-slate-200/50 dark:hover:bg-slate-800/50")}
+                          onClick={() => addRandomQuestion(currency)} 
+                          disabled={remaining <= 0}
+                          variant="outline"
+                        >
+                            Add Random <PlusCircle className="h-5 w-5" />
+                        </Button>
+                    </div>
                   </div>
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
       </div>
       
+        {/* REVIEW SHEET (Floating Button) */}
         <Sheet>
             <SheetTrigger asChild>
-                <div className="fixed bottom-6 right-6 lg:relative lg:bottom-auto lg:right-auto">
+                <div className="fixed bottom-6 right-6 z-50">
                     <Button 
                         size="lg" 
-                        className={cn("rounded-full h-16 w-16 shadow-xl lg:w-full lg:h-auto lg:rounded-md", animateCart && "animate-pulse-once")}
+                        className={cn("rounded-full h-16 w-16 shadow-2xl bg-gradient-to-r from-primary to-indigo-600 hover:scale-105 transition-transform", animateCart && "animate-pulse")}
                         disabled={selectedQuestions.length === 0}
                     >
-                        <ShoppingCart className="h-6 w-6 lg:mr-2" />
-                        <span className="hidden lg:inline">Review & Create</span>
-                        <Badge className="absolute -top-1 -right-1 lg:static lg:ml-auto">{selectedQuestions.length}</Badge>
+                        <ShoppingCart className="h-6 w-6 text-white" />
+                        <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-sm border-2 border-white">
+                            {selectedQuestions.length}
+                        </span>
                     </Button>
                 </div>
             </SheetTrigger>
              <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
-                <SheetHeader className="p-6 pb-2">
-                    <SheetTitle>Review & Blueprint</SheetTitle>
+                <SheetHeader className="p-6 pb-2 bg-slate-50 dark:bg-slate-900 border-b">
+                    <SheetTitle>Review Worksheet</SheetTitle>
                     <SheetDescription>
-                        A detailed summary of your current selections before finalizing the worksheet.
+                        Review your selections before finalizing.
                     </SheetDescription>
                     {userIsEditor && (
-                      <div className="flex items-center space-x-2 pt-4">
-                          <Label htmlFor="worksheet-type" className={cn("text-muted-foreground", worksheetType === 'sample' && 'font-semibold text-foreground')}>
-                              Sample Worksheet
+                      <div className="flex items-center space-x-2 pt-4 p-2 bg-white dark:bg-slate-950 rounded-lg border">
+                          <Label htmlFor="worksheet-type" className={cn("text-xs uppercase font-bold tracking-wider", worksheetType === 'sample' ? 'text-primary' : 'text-muted-foreground')}>
+                              Sample
                           </Label>
                           <Switch id="worksheet-type" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
-                          <Label htmlFor="worksheet-type" className={cn("text-muted-foreground", worksheetType === 'classroom' && 'font-semibold text-foreground')}>
-                            Classroom Assignment
+                          <Label htmlFor="worksheet-type" className={cn("text-xs uppercase font-bold tracking-wider", worksheetType === 'classroom' ? 'text-primary' : 'text-muted-foreground')}>
+                            Classroom
                           </Label>
                       </div>
                     )}
                 </SheetHeader>
+                
                 <div className="flex-grow overflow-y-auto">
-                    <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4 overflow-hidden">
-                        <TabsList className="mx-6">
-                            <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
-                            <TabsTrigger value="review">Review</TabsTrigger>
-                        </TabsList>
-                        <div className="flex-grow overflow-y-auto">
-                            <TabsContent value="blueprint" className="mt-4 px-6 pb-6">
-                                <div className="space-y-6">
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-base">Core Summary</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="flex justify-around">
-                                            <div className="text-center">
-                                                <p className="text-2xl font-bold">{selectedQuestions.length}</p>
-                                                <p className="text-xs text-muted-foreground">Total Questions</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="text-2xl font-bold">{totalMarks}</p>
-                                                <p className="text-xs text-muted-foreground">Total Marks</p>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                    <Tabs defaultValue="blueprint" className="flex-grow flex flex-col mt-4">
+                        <div className="px-6">
+                            <TabsList className="w-full">
+                                <TabsTrigger value="blueprint" className="flex-1">Blueprint</TabsTrigger>
+                                <TabsTrigger value="review" className="flex-1">Question List</TabsTrigger>
+                            </TabsList>
+                        </div>
+                        
+                        <div className="flex-grow overflow-y-auto p-6">
+                            <TabsContent value="blueprint" className="mt-0 space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10">
+                                            <p className="text-3xl font-bold text-primary">{selectedQuestions.length}</p>
+                                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Questions</p>
+                                        </div>
+                                        <div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10">
+                                            <p className="text-3xl font-bold text-primary">{totalMarks}</p>
+                                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Marks</p>
+                                        </div>
+                                    </div>
                                     
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle className="text-base">Content Breakdown</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div>
-                                                <h4 className="text-sm font-semibold mb-2">By Unit</h4>
-                                                <div className="space-y-3">
-                                                    {Object.entries(breakdownByUnit).map(([name, data]) => (
-                                                        <div key={name}>
-                                                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                                <span>{name}</span>
-                                                                <span>{data.count} Qs, {data.marks} Marks</span>
-                                                            </div>
-                                                            <Progress value={(data.count / selectedQuestions.length) * 100} />
-                                                        </div>
-                                                    ))}
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-semibold flex items-center gap-2"><Filter className="h-4 w-4"/> Unit Distribution</h4>
+                                        <div className="space-y-3">
+                                            {Object.entries(breakdownByUnit).map(([name, data]) => (
+                                                <div key={name}>
+                                                    <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                                                        <span>{name}</span>
+                                                        <span className="font-mono">{Math.round((data.count / selectedQuestions.length) * 100)}%</span>
+                                                    </div>
+                                                    <Progress value={(data.count / selectedQuestions.length) * 100} className="h-2" />
                                                 </div>
-                                            </div>
-                                            <div>
-                                                <h4 className="text-sm font-semibold mb-2">By Category</h4>
-                                                <div className="space-y-3">
-                                                    {Object.entries(breakdownByCategory).map(([name, data]) => (
-                                                        <div key={name}>
-                                                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                                                <span>{name}</span>
-                                                                <span>{data.count} Qs, {data.marks} Marks</span>
-                                                            </div>
-                                                            <Progress value={(data.count / selectedQuestions.length) * 100} />
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                             </TabsContent>
-                            <TabsContent value="review" className="mt-4 px-6 pb-6">
-                            <div className="space-y-3">
+                            
+                            <TabsContent value="review" className="mt-0 space-y-3">
                                     {selectedQuestions.map(q => {
                                         const CurrencyIcon = currencyIcons[q.currencyType] || Sparkles;
-                                        const currencyColor = currencyColors[q.currencyType];
                                         return (
-                                        <Card key={q.id} className="p-3">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="flex-grow">
-                                                    {q.source === 'manual' && <p className="font-semibold text-sm">{q.name}</p>}
-                                                    <p className="text-xs text-muted-foreground">{unitMap.get(q.unitId)}</p>
-                                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                                        {q.gradingMode === 'ai' && (
-                                                            <Badge variant="outline" className="flex items-center gap-1 text-xs"><Bot className="h-3 w-3"/> AI Graded</Badge>
-                                                        )}
-                                                        {q.source === 'random' && (
-                                                            <Badge variant="outline" className="flex items-center gap-1 text-xs"><Shuffle className="h-3 w-3"/> Random</Badge>
-                                                        )}
-                                                        <Badge variant="outline" className="text-xs">{getQuestionMarks(q)} Marks</Badge>
-                                                        <Badge variant="outline" className={cn("flex items-center gap-1 text-xs capitalize", currencyColor)}>
-                                                            <CurrencyIcon className="h-3 w-3"/> {q.currencyType}
-                                                        </Badge>
-                                                    </div>
+                                            <div key={q.id} className="flex items-start gap-3 p-3 rounded-lg border bg-white dark:bg-slate-900 shadow-sm relative group">
+                                                <div className="mt-1 p-1.5 rounded-md bg-slate-100 dark:bg-slate-800">
+                                                    <CurrencyIcon className="h-4 w-4 text-muted-foreground" />
                                                 </div>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => removeQuestion(q.id)}>
-                                                    <Trash2 className="h-4 w-4 text-destructive"/>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <Badge variant="outline" className="text-[10px] h-5">{q.currencyType}</Badge>
+                                                        {q.gradingMode === 'ai' && <Badge variant="secondary" className="text-[10px] h-5 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">AI</Badge>}
+                                                    </div>
+                                                    <p className="text-sm font-medium line-clamp-1">{q.name || "Untitled Question"}</p>
+                                                    <p className="text-xs text-muted-foreground truncate">{unitMap.get(q.unitId)}</p>
+                                                </div>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeQuestion(q.id)}>
+                                                    <Trash2 className="h-4 w-4"/>
                                                 </Button>
                                             </div>
-                                        </Card>
-                                    )})}
+                                        )
+                                    })}
                                     {selectedQuestions.length === 0 && (
-                                        <div className="text-center py-10 text-sm text-muted-foreground">
-                                            No questions selected.
+                                        <div className="text-center py-12 text-muted-foreground">
+                                            <p>No questions selected yet.</p>
                                         </div>
                                     )}
-                                </div>
                             </TabsContent>
                         </div>
                     </Tabs>
                 </div>
-                <SheetFooter className="bg-card border-t px-6 py-4 mt-auto">
-                    <div className="flex justify-between items-center w-full">
-                         <div className="text-sm font-semibold">
-                            <p>Est. Time: {estimatedTime} mins</p>
-                            {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0) && (
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <p>Cost:</p>
-                                    {creationCost.coins > 0 && <span className="flex items-center text-yellow-600 dark:text-yellow-400"><Coins className="mr-1 h-4 w-4" />{creationCost.coins}</span>}
-                                    {creationCost.gold > 0 && <span className="flex items-center text-amber-600 dark:text-amber-400"><Crown className="mr-1 h-4 w-4" />{creationCost.gold}</span>}
-                                    {creationCost.diamonds > 0 && <span className="flex items-center text-blue-600 dark:text-blue-400"><Gem className="mr-1 h-4 w-4" />{creationCost.diamonds}</span>}
-                                </div>
-                            )}
+                
+                <SheetFooter className="p-6 pt-2 bg-slate-50 dark:bg-slate-900 border-t">
+                    <div className="w-full space-y-4">
+                         <div className="flex justify-between items-center text-sm font-medium">
+                            <span className="text-muted-foreground">Estimated Time</span>
+                            <span>{estimatedTime} mins</span>
                         </div>
-                         <Button onClick={handleCreateClick} disabled={!canAfford}>
-                            {!canAfford ? 'Insufficient Funds' : 'Create Worksheet'}
+                        {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0) && (
+                             <div className="flex justify-between items-center text-sm font-medium">
+                                <span className="text-muted-foreground">Creation Cost</span>
+                                <div className="flex gap-2">
+                                    {creationCost.coins > 0 && <span className="flex items-center text-yellow-600"><Coins className="mr-1 h-3 w-3" />{creationCost.coins}</span>}
+                                    {creationCost.gold > 0 && <span className="flex items-center text-amber-600"><Crown className="mr-1 h-3 w-3" />{creationCost.gold}</span>}
+                                    {creationCost.diamonds > 0 && <span className="flex items-center text-blue-600"><Gem className="mr-1 h-3 w-3" />{creationCost.diamonds}</span>}
+                                </div>
+                            </div>
+                        )}
+                         <Button className="w-full h-11 text-base font-semibold shadow-lg" onClick={handleCreateClick} disabled={!canAfford}>
+                            {!canAfford ? 'Insufficient Funds' : 'Generate Worksheet'}
                             <ArrowRight className="ml-2 h-4 w-4"/>
                         </Button>
                     </div>

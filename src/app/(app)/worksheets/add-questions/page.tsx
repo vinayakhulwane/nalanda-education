@@ -4,7 +4,7 @@ import { WorksheetRandomBuilder } from "@/components/worksheet-random-builder";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import type { Question, Subject, Worksheet, Unit, Category, EconomySettings } from "@/types"; 
 import { collection, query, where, doc, addDoc, serverTimestamp, updateDoc, increment, getDoc } from "firebase/firestore"; 
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Wand2, PenTool } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from 'react';
 import { Button } from "@/components/ui/button";
@@ -200,7 +200,7 @@ function AddQuestionsPageContent() {
         }
     };
     
-    // ✅ MODIFIED: Add Question with AI Limit Logic
+    // Add Question with AI Limit Logic
     const addQuestion = (question: Question, source: 'manual' | 'random') => {
         // 1. Prevent Duplicates
         if (selectedQuestions.find(q => q.id === question.id)) {
@@ -223,7 +223,6 @@ function AddQuestionsPageContent() {
 
         // 3. Add to Cart if checks pass
         setSelectedQuestions([...selectedQuestions, { ...question, source }]);
-        
     };
 
     const removeQuestion = (questionId: string) => {
@@ -233,50 +232,71 @@ function AddQuestionsPageContent() {
 
     if (isLoading) {
         return (
-            <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="flex flex-col gap-4 h-[calc(100vh-4rem)] w-full items-center justify-center bg-slate-50/50 dark:bg-slate-950/50">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground animate-pulse">Loading worksheet builder...</p>
             </div>
         )
     }
 
     return (
-        <div>
-             <Button variant="ghost" onClick={() => router.push(backUrl)} className="mb-4">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Details
-            </Button>
-            <PageHeader
-                title={title || "Add Questions"}
-                description={`Building worksheet for ${subject?.name || 'subject'}. Select questions for your assignment.`}
-            />
-            <Tabs defaultValue="random" className="w-full">
-                <TabsList>
-                    <TabsTrigger value="random">Random Worksheet</TabsTrigger>
-                    <TabsTrigger value="manual">Manual Worksheet</TabsTrigger>
-                </TabsList>
-                <TabsContent value="random">
-                     <WorksheetRandomBuilder 
-                        availableQuestions={questions || []}
-                        units={allUnits || []}
-                        categories={allCategories || []}
-                        selectedQuestions={selectedQuestions}
-                        setSelectedQuestions={setSelectedQuestions}
-                        onCreateWorksheet={handleCreateWorksheet}
-                        removeQuestion={removeQuestion}
-                    />
-                </TabsContent>
-                 <TabsContent value="manual">
-                    <WorksheetManualBuilder
-                        availableQuestions={questions || []}
-                        selectedQuestions={selectedQuestions}
-                        addQuestion={addQuestion}
-                        units={allUnits || []}
-                        categories={allCategories || []}
-                        removeQuestion={removeQuestion}
-                        onCreateWorksheet={handleCreateWorksheet}
-                    />
-                </TabsContent>
-            </Tabs>
+        <div className="min-h-screen bg-slate-50/30 dark:bg-slate-950/30 pb-20">
+             <div className="container max-w-7xl mx-auto px-4 py-6">
+                <Button variant="ghost" onClick={() => router.push(backUrl)} className="mb-6 hover:bg-slate-100 dark:hover:bg-slate-800 -ml-2">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Setup
+                </Button>
+                
+                <div className="mb-8 space-y-2">
+                    <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80">
+                        Builder Mode
+                    </div>
+                    <h1 className="text-3xl font-extrabold tracking-tight lg:text-4xl">
+                        {title || "Untitled Worksheet"}
+                    </h1>
+                    <p className="text-lg text-muted-foreground max-w-2xl">
+                        {subject?.name ? `Curating content for ${subject.name}.` : 'Select questions below.'} Choose a method to begin.
+                    </p>
+                </div>
+
+                <Tabs defaultValue="random" className="w-full space-y-8">
+                    <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-4 border-b">
+                        <TabsList className="grid w-full max-w-md grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-full">
+                            <TabsTrigger value="random" className="rounded-full px-4 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm transition-all">
+                                <Wand2 className="mr-2 h-4 w-4" /> Random Builder
+                            </TabsTrigger>
+                            <TabsTrigger value="manual" className="rounded-full px-4 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm transition-all">
+                                <PenTool className="mr-2 h-4 w-4" /> Manual Selection
+                            </TabsTrigger>
+                        </TabsList>
+                    </div>
+
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <TabsContent value="random" className="mt-0">
+                             <WorksheetRandomBuilder 
+                                availableQuestions={questions || []}
+                                units={allUnits || []}
+                                categories={allCategories || []}
+                                selectedQuestions={selectedQuestions}
+                                setSelectedQuestions={setSelectedQuestions}
+                                onCreateWorksheet={handleCreateWorksheet}
+                                removeQuestion={removeQuestion}
+                            />
+                        </TabsContent>
+                         <TabsContent value="manual" className="mt-0">
+                            <WorksheetManualBuilder
+                                availableQuestions={questions || []}
+                                selectedQuestions={selectedQuestions}
+                                addQuestion={addQuestion}
+                                units={allUnits || []}
+                                categories={allCategories || []}
+                                removeQuestion={removeQuestion}
+                                onCreateWorksheet={handleCreateWorksheet}
+                            />
+                        </TabsContent>
+                    </div>
+                </Tabs>
+            </div>
         </div>
     );
 }
