@@ -260,7 +260,7 @@ const saveToDatabase = async (status: 'draft' | 'published') => {
                         <Button 
                             onClick={handlePublish} 
                             disabled={isSaving}
-                            className="bg-green-600 hover:bg-green-700 text-white shadow-md gap-2"
+                            className="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white shadow-md gap-2"
                         >
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : (isPublished ? <RefreshCw className="w-4 h-4"/> : <Rocket className="w-4 h-4"/>)}
                             {isPublished ? "Update Question" : "Publish Question"}
