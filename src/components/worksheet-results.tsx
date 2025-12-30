@@ -410,7 +410,7 @@ export function WorksheetResults({
             >
               {isClaiming ? <Loader2 className="h-6 w-6 animate-spin" /> : hasClaimed ? 'Rewards Claimed' : 'Claim Rewards'}
             </Button>
-            <Button variant="outline" className="w-full h-12 text-lg" onClick={handlePrint}>
+            <Button variant="outline" className="w-full h-12 text-lg" onClick={() => window.print()}>
                 <Printer className="mr-2 h-5 w-5" /> Export to PDF
             </Button>
           </div>
