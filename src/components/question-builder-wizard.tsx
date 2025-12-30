@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 // --- HELPER: CLEAN DATA ---
 const cleanPayload = (obj: any): any => {
-    if (obj === null) return null;
+    if (obj === null || obj === undefined) return undefined;
     if (Array.isArray(obj)) {
         return obj.map(v => cleanPayload(v));
     }
@@ -27,7 +27,7 @@ const cleanPayload = (obj: any): any => {
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 const value = obj[key];
-                if (value !== undefined) { // Only copy if value is not undefined
+                if (value !== undefined) {
                     newObj[key] = cleanPayload(value);
                 }
             }
@@ -175,7 +175,7 @@ export function QuestionBuilderWizard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 pb-40"> {/* Huge padding bottom to clear footer */}
+    <div className="max-w-5xl mx-auto py-8 px-4">
       
       {/* HEADER */}
       <div className="flex justify-between items-center mb-8 border-b pb-4">
@@ -185,34 +185,37 @@ export function QuestionBuilderWizard() {
           </div>
       </div>
 
-      {/* PROGRESS STEPS */}
-      <div className="mb-8 flex justify-between items-center relative">
-        <div className="absolute left-0 right-0 top-[15px] h-0.5 bg-slate-200 -z-10" />
-        {steps.map((step, idx) => {
-            const stepNum = idx + 1;
-            const isCompleted = currentStep > stepNum;
-            const isActive = currentStep === stepNum;
-            return (
-                <div key={step} className="flex flex-col items-center gap-2 z-10">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${isCompleted ? 'bg-green-500 border-green-500 text-white' : isActive ? 'bg-white border-violet-600 text-violet-600' : 'bg-white border-slate-300 text-slate-300'}`}>
-                        {isCompleted ? <Check className="w-5 h-5" /> : <span className="text-sm font-bold">{stepNum}</span>}
-                    </div>
-                    <span className={`text-xs font-semibold ${isActive ? 'text-violet-600' : isCompleted ? 'text-green-600' : 'text-slate-400'}`}>{step}</span>
-                </div>
-            );
-        })}
-      </div>
+      <div className="pb-40"> {/* New wrapper with padding */}
+        {/* PROGRESS STEPS */}
+        <div className="mb-8 flex justify-between items-center relative">
+          <div className="absolute left-0 right-0 top-[15px] h-0.5 bg-slate-200 -z-10" />
+          {steps.map((step, idx) => {
+              const stepNum = idx + 1;
+              const isCompleted = currentStep > stepNum;
+              const isActive = currentStep === stepNum;
+              return (
+                  <div key={step} className="flex flex-col items-center gap-2 z-10 bg-background px-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${isCompleted ? 'bg-green-500 border-green-500 text-white' : isActive ? 'bg-white border-violet-600 text-violet-600' : 'bg-white border-slate-300 text-slate-300'}`}>
+                          {isCompleted ? <Check className="w-5 h-5" /> : <span className="text-sm font-bold">{stepNum}</span>}
+                      </div>
+                      <span className={`text-xs font-semibold ${isActive ? 'text-violet-600' : isCompleted ? 'text-green-600' : 'text-slate-400'}`}>{step}</span>
+                  </div>
+              );
+          })}
+        </div>
 
-      {/* MAIN CONTENT */}
-      <div className="min-h-[400px] bg-white p-6 rounded-lg shadow-sm border mb-6 relative z-0">
-        <div key={question.id || 'new'}>
-            {currentStep === 1 && <Step1Metadata question={question} setQuestion={setQuestion} onValidityChange={setIsStep1Valid} />}
-            {currentStep === 2 && <Step2Sequence question={question} setQuestion={setQuestion} />}
-            {currentStep === 3 && <Step3Validation question={question} onValidityChange={setIsStep3Valid} />}
-            {currentStep === 4 && <Step4Grading question={question} setQuestion={setQuestion} />}
-            {currentStep === 5 && <Step5Preview question={question} />} 
+        {/* MAIN CONTENT */}
+        <div className="min-h-[400px] bg-white p-6 rounded-lg shadow-sm border mb-6">
+          <div key={question.id || 'new'}>
+              {currentStep === 1 && <Step1Metadata question={question} setQuestion={setQuestion} onValidityChange={setIsStep1Valid} />}
+              {currentStep === 2 && <Step2Sequence question={question} setQuestion={setQuestion} />}
+              {currentStep === 3 && <Step3Validation question={question} onValidityChange={setIsStep3Valid} />}
+              {currentStep === 4 && <Step4Grading question={question} setQuestion={setQuestion} />}
+              {currentStep === 5 && <Step5Preview question={question} />} 
+          </div>
         </div>
       </div>
+
 
       {/* FOOTER */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t p-4 z-50">
