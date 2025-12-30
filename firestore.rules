@@ -120,7 +120,7 @@ service cloud.firestore {
 
     match /questions/{questionId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isTeacher();
+      allow write: if isAdmin();
     }
 
     match /worksheets/{worksheetId} {
@@ -136,11 +136,11 @@ service cloud.firestore {
     }
 
     match /worksheet_attempts/{attemptId} {
-      // READ: Admins/teachers can get any attempt. Users can only get their own.
-      allow get: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
+      // READ: Admins/teachers can read any attempt. Users can only read their own.
+      allow read: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
       
-      // LIST: Admins can list all attempts. Users can only list their own.
-      allow list: if (request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) && request.query.userId == request.auth.uid) || isAdmin();
+      // LIST: Admins can list all attempts. Users can only list attempts matching their own UID.
+      allow list: if isAdmin() || (request.query.userId == request.auth.uid);
 
       // WRITE: Users can create their own attempt. No one can update/delete.
       allow create: if isOwner(request.resource.data.userId);
