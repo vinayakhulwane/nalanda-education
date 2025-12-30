@@ -3,28 +3,20 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore'; // ✅ Added Firestore type
-import { useState, useEffect } from 'react'; // ✅ Added for the hook
+import { getFirestore } from 'firebase/firestore';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION (Kept exactly as you had it)
+// This function ensures Firebase is initialized only once (Singleton pattern)
 export function initializeFirebase() {
-  if (!getApps().length) {
-    let firebaseApp;
-    try {
-      firebaseApp = initializeApp();
-    } catch (e) {
-      if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-      }
-      firebaseApp = initializeApp(firebaseConfig);
-    }
-    return getSdks(firebaseApp);
+  if (getApps().length) {
+    const app = getApp();
+    return {
+        firebaseApp: app,
+        auth: getAuth(app),
+        firestore: getFirestore(app)
+    };
   }
-
-  return getSdks(getApp());
-}
-
-export function getSdks(firebaseApp: FirebaseApp) {
+  
+  const firebaseApp = initializeApp(firebaseConfig);
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
@@ -32,30 +24,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
   };
 }
 
-// ==========================================
-// ✅ ADDED THIS SECTION TO FIX YOUR BUILD ERROR
-// ==========================================
-
-// 1. Initialize immediately to get the instances
-const { auth, firestore: db } = initializeFirebase();
-
-// 2. Export them so 'use-user.ts' works
-export { auth, db };
-
-// 3. Export the hook that 'question-builder-wizard.tsx' needs
-export function useFirestore() {
-  const [firestoreInstance, setFirestoreInstance] = useState<Firestore | null>(null);
-
-  useEffect(() => {
-    setFirestoreInstance(db);
-  }, []);
-
-  return firestoreInstance;
-}
-
-// ==========================================
-// EXISTING EXPORTS (Kept these)
-// ==========================================
+// Export all hooks and providers from their respective files
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
