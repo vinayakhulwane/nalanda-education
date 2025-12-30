@@ -202,12 +202,14 @@ export function WorksheetResults({
             
             if (result) {
                 let calculatedSum = 0;
-                const breakdown = (result as any).aiBreakdown || {};
+                // @ts-ignore
+                const breakdown = result.aiBreakdown || {};
                 const rubric = q.aiRubric || {};
 
                 if (Object.keys(breakdown).length > 0 && Object.keys(rubric).length > 0) {
                     Object.entries(rubric).forEach(([key, weight]) => {
                         const cleanKey = formatCriterionKey(key);
+                        // @ts-ignore
                         const scoreVal = breakdown[key] ?? breakdown[cleanKey] ?? 0;
                         const weightVal = typeof weight === 'string' ? parseFloat(weight) : (weight as number);
                         calculatedSum += (scoreVal / 100) * (weightVal / 100) * qTotalMarks;
@@ -419,8 +421,10 @@ export function WorksheetResults({
               if (question.gradingMode === 'ai') {
                 const firstSub = question.solutionSteps[0]?.subQuestions[0];
                 const result = results[firstSub?.id];
-                const breakdown = (result as any)?.aiBreakdown;
-                const feedback = (result as any)?.feedback; 
+                // @ts-ignore
+                const breakdown = result?.aiBreakdown;
+                 // @ts-ignore
+                const feedback = result?.feedback; 
                 const driveLink = answers[firstSub?.id]?.answer;
                 const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
         
