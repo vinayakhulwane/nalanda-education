@@ -58,9 +58,6 @@ export function QuestionBuilderWizard() {
   const [isSaving, setIsSaving] = useState(false); 
   const [isLoading, setIsLoading] = useState(true);
   
-  // State for button click visual feedback
-  const [isClicked, setIsClicked] = useState(false);
-
   // Validation
   const [isStep1Valid, setIsStep1Valid] = useState(false);
   const [isStep3Valid, setIsStep3Valid] = useState(false);
@@ -152,23 +149,8 @@ export function QuestionBuilderWizard() {
   };
 
   const handlePublish = async () => {
-    // Flash button for visual feedback
-    setIsClicked(true);
-    setTimeout(() => setIsClicked(false), 200);
-
-    const isUpdate = question.status === 'published';
-    const msg = isUpdate 
-      ? "Update this live question? Changes will be visible immediately." 
-      : "Publish this question? It will become visible to students.";
-    
-    if (!confirm(msg)) return;
-
-    const success = await saveToDatabase('published');
-    
-    if (success && !isUpdate) {
-        setTimeout(() => router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`), 1500);
-    }
-};
+    console.log("--- DEBUG: 'Publish' button was clicked! ---");
+  };
 
   const isNextDisabled = () => {
     if (currentStep === 1) return !isStep1Valid;
@@ -254,8 +236,7 @@ export function QuestionBuilderWizard() {
                             onClick={handlePublish} 
                             disabled={isSaving}
                             className={cn(
-                                "bg-green-600 hover:bg-green-700 text-white shadow-md gap-2 transition-colors",
-                                isClicked && "bg-purple-600"
+                                "bg-green-600 hover:bg-green-700 text-white shadow-md gap-2 transition-colors"
                             )}
                         >
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : (isPublished ? <RefreshCw className="w-4 h-4"/> : <Rocket className="w-4 h-4"/>)}
