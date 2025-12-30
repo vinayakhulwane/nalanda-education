@@ -236,7 +236,7 @@ export function QuestionBuilderWizard() {
                             onClick={handlePublish} 
                             disabled={isSaving}
                             className={cn(
-                                "bg-green-600 hover:bg-green-700 text-white shadow-md gap-2 transition-colors"
+                                "bg-green-600 hover:bg-green-700 text-white shadow-md gap-2 transition-colors relative z-[9999]"
                             )}
                         >
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin"/> : (isPublished ? <RefreshCw className="w-4 h-4"/> : <Rocket className="w-4 h-4"/>)}
