@@ -25,6 +25,7 @@ const cleanPayload = (obj: any): any => {
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
                 const value = obj[key];
+                // ✅ FIX: Only include the key if the value is NOT undefined.
                 if (value !== undefined) {
                     newObj[key] = cleanPayload(value);
                 }
