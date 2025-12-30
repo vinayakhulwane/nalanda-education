@@ -151,7 +151,17 @@ export function QuestionBuilderWizard() {
   };
 
   const handlePublish = async () => {
-    alert("Button click was detected!");
+      const isNew = !question.id;
+      const success = await saveToDatabase('published');
+      if (success) {
+          toast({
+              title: "Question Published!",
+              description: "It is now available in the question bank."
+          });
+          if (isNew && question.classId && question.subjectId) {
+            router.push(`/questions/bank?classId=${question.classId}&subjectId=${question.subjectId}`);
+          }
+      }
   };
 
   const isNextDisabled = () => {
