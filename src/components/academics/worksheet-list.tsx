@@ -3,8 +3,8 @@ import { useMemo } from "react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
 import type { Worksheet } from "@/types";
-import { Loader2 } from "lucide-react";
-import { WorksheetDisplayCard } from "./worksheet-display-card";
+import { Loader2, SearchX } from "lucide-react";
+import { WorksheetDisplayCard } from "./worksheet-display-card"; // Make sure to use the new file
 import { EnrollmentPromptCard } from "./enrollment-prompt-card";
 
 interface WorksheetListProps {
@@ -54,17 +54,25 @@ export function WorksheetList({ subjectId, isEnrolled, userIsEditor }: Worksheet
   const showEnrollmentPrompt = !userIsEditor && !isEnrolled;
 
   return (
-    <div className="mt-6">
+    <div className="mt-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
         {(visibleWorksheets && visibleWorksheets.length > 0) || showEnrollmentPrompt ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {visibleWorksheets.map(ws => (
-                    <WorksheetDisplayCard key={ws.id} worksheet={ws} />
+                    <WorksheetDisplayCard 
+                        key={ws.id} 
+                        worksheet={ws} 
+                        isPractice={false}
+                    />
                 ))}
                  {showEnrollmentPrompt && <EnrollmentPromptCard />}
             </div>
         ) : (
-            <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-                <p className="text-muted-foreground">No worksheets available for this subject yet.</p>
+            <div className="flex flex-col h-64 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="p-4 bg-white dark:bg-slate-900 rounded-full mb-3">
+                     <SearchX className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">No assignments yet</p>
+                <p className="text-sm text-muted-foreground">Check back later for new classroom work.</p>
             </div>
         )}
     </div>

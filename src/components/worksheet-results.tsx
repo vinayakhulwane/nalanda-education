@@ -1,12 +1,13 @@
 'use client';
 import ReactMarkdown from 'react-markdown';
-import type { Question, SubQuestion, Worksheet, CurrencyType, WorksheetAttempt, EconomySettings, Class, Subject } from "@/types";
-import { useMemo, useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "./ui/card";
+import rehypeRaw from 'rehype-raw'; 
+import type { Question, SubQuestion, Worksheet, WorksheetAttempt, EconomySettings, Class, Subject, CurrencyType } from "@/types";
+import { useMemo, useState, useEffect } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "./ui/card";
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Timer, CheckCircle, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2, ExternalLink, FileImage, ArrowLeft, Printer, Lock, Unlock } from "lucide-react";
+import { Timer, CheckCircle2, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2, ExternalLink, ArrowLeft, Printer, Lock, Unlock, Zap, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -16,8 +17,9 @@ import { calculateAttemptRewards } from "@/lib/wallet";
 import confetti from "canvas-confetti";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { generateSolutionAction } from '@/app/actions/ai-solution'; // Ensure this file exists
+import { generateSolutionAction } from '@/app/actions/ai-solution'; 
 
+// --- TYPES (Unchanged) ---
 export type AnswerState = {
   [subQuestionId: string]: {
     answer: any;
@@ -42,6 +44,8 @@ interface WorksheetResultsProps {
   attempt?: WorksheetAttempt;
 }
 
+// --- HELPER COMPONENTS ---
+
 const currencyIcons: Record<string, React.ElementType> = {
   coin: Coins,
   gold: Crown,
@@ -56,17 +60,15 @@ const currencyColors: Record<string, string> = {
   diamond: 'text-blue-500',
 };
 
-// Helper for display
 const CurrencyDisplay = ({ type, amount }: { type: string, amount: number }) => {
     const Icon = currencyIcons[type] || Coins;
     return (
-        <span className={cn("flex items-center gap-1 font-bold", currencyColors[type])}>
+        <span className={cn("inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full bg-opacity-10 text-xs", currencyColors[type], `bg-${type === 'coin' ? 'yellow' : type === 'gold' ? 'amber' : 'blue'}-500`)}>
             <Icon className="h-3 w-3" /> {amount}
         </span>
     );
 };
 
-// ... (Rest of your existing helper functions: processedMainQuestionText, formatCriterionKey, AIRubricBreakdown, getAnswerText, getCorrectAnswerText - keep them as they were) ...
 const processedMainQuestionText = (text: string) => {
     if (!text) return '';
     return text.replace(/&nbsp;/g, ' ').replace(/\u00A0/g, ' ');
@@ -82,9 +84,13 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
         ? rubric 
         : Object.keys(breakdown).reduce((acc, key) => ({ ...acc, [key]: "N/A" }), {} as Record<string, any>);
     return (
-        <div className="space-y-4 my-6 animate-in fade-in duration-700">
-            <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Skill Assessment Breakdown</h4>
-            <div className="space-y-5">
+        // ✅ NOTE: The 'animate-in' class here is what caused the PDF issue. 
+        // We will strip it programmatically in handleDirectDownload.
+        <div className="space-y-4 my-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-xl border animate-in fade-in duration-700">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
+                <Zap className="h-3 w-3" /> Skill Breakdown
+            </h4>
+            <div className="space-y-4">
                 {Object.entries(activeRubric).map(([rawKey, rawWeight], index) => {
                     const criterion = formatCriterionKey(rawKey);
                     const percentageScore = breakdown[rawKey] ?? breakdown[criterion] ?? 0; 
@@ -95,16 +101,16 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
                         <div key={index} className="space-y-2">
                             <div className="flex justify-between text-xs sm:text-sm items-end">
                                 <div className="flex items-center gap-2">
-                                    <span className="font-semibold">{criterion}</span>
-                                    <span className="text-muted-foreground text-[10px]">({weightPct}%)</span>
+                                    <span className="font-medium text-slate-700 dark:text-slate-300">{criterion}</span>
+                                    <span className="text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 rounded text-muted-foreground">{weightPct}%</span>
                                 </div>
-                                <div className="font-mono font-bold">
-                                    <span className={percentageScore < 50 ? "text-red-500" : "text-green-600"}>{earnedCategoryMarks.toFixed(2)}</span>
-                                    <span className="text-muted-foreground ml-1">/ {maxCategoryMarks.toFixed(2)}</span>
+                                <div className="font-mono font-bold text-xs">
+                                    <span className={percentageScore < 50 ? "text-red-500" : "text-green-600"}>{earnedCategoryMarks.toFixed(1)}</span>
+                                    <span className="text-muted-foreground ml-1 opacity-50">/ {maxCategoryMarks.toFixed(1)}</span>
                                 </div>
                             </div>
-                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                <div className={cn("h-full transition-all duration-1000 ease-out", percentageScore < 40 ? "bg-red-500" : percentageScore < 70 ? "bg-amber-500" : "bg-green-500")} style={{ width: `${percentageScore}%` }} />
+                            <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div className={cn("h-full transition-all duration-1000 ease-out rounded-full", percentageScore < 40 ? "bg-red-500" : percentageScore < 70 ? "bg-amber-500" : "bg-green-500")} style={{ width: `${percentageScore}%` }} />
                             </div>
                         </div>
                     );
@@ -146,6 +152,8 @@ const getCorrectAnswerText = (subQ: SubQuestion) => {
   }
 }
 
+// --- MAIN COMPONENT ---
+
 export function WorksheetResults({
   worksheet,
   questions,
@@ -168,11 +176,17 @@ export function WorksheetResults({
   const [hasClaimed, setHasClaimed] = useState(isReview || attempt?.rewardsClaimed);
   const [isDownloading, setIsDownloading] = useState(false);
   const [loadingSolutions, setLoadingSolutions] = useState<Record<string, boolean>>({});
+  const [localUnlocked, setLocalUnlocked] = useState<Record<string, string>>(attempt?.unlockedSolutions || {});
+
+  useEffect(() => {
+    if (attempt?.unlockedSolutions) {
+        setLocalUnlocked(prev => ({...prev, ...attempt.unlockedSolutions}));
+    }
+  }, [attempt]);
   
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
   const { data: settings } = useDoc<EconomySettings>(settingsRef);
   
-  // Data for PDF Header
   const classRef = useMemoFirebase(() => (firestore && worksheet ? doc(firestore, 'classes', worksheet.classId) : null), [firestore, worksheet]);
   const { data: classData } = useDoc<Class>(classRef);
   const subjectRef = useMemoFirebase(() => (firestore && worksheet ? doc(firestore, 'subjects', worksheet.subjectId) : null), [firestore, worksheet]);
@@ -226,7 +240,7 @@ export function WorksheetResults({
   }, [questions, results, worksheet, user?.uid, settings]);
 
   const triggerCelebration = () => {
-    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });
   };
 
   const handleClaimRewards = async () => {
@@ -255,7 +269,7 @@ export function WorksheetResults({
       await updateDoc(attemptRef, { rewardsClaimed: true });
       await Promise.all(transactionPromises);
       triggerCelebration();
-      toast({ title: "Rewards Claimed!", description: "Your wallet has been updated." });
+      toast({ title: "Waw! Rewards Claimed!", description: "Your wallet has been updated." });
       setHasClaimed(true);
     } catch (error) {
       console.error("Error claiming rewards:", error);
@@ -265,12 +279,11 @@ export function WorksheetResults({
     }
   }
 
-  // === NEW: Handle Get Solution ===
   const handleGetSolution = async (question: Question) => {
       if (!user || !userProfile || !attempt?.id) return;
       
-      const cost = settings?.solutionCost ?? 5; // Default flat cost
-      const currency = settings?.solutionCurrency ?? 'coin'; // Default currency
+      const cost = settings?.solutionCost ?? 5; 
+      const currency = settings?.solutionCurrency ?? 'coin'; 
 
       // @ts-ignore
       const currentBalance = userProfile[currency === 'coin' ? 'coins' : currency === 'gold' ? 'gold' : 'diamonds'] || 0;
@@ -287,26 +300,23 @@ export function WorksheetResults({
       setLoadingSolutions(prev => ({ ...prev, [question.id]: true }));
 
       try {
-          // 1. Generate Solution
           const aiResponse = await generateSolutionAction({ questionText: question.mainQuestionText });
           if (!aiResponse.success || !aiResponse.solution) throw new Error("Failed to generate solution");
 
-          // 2. Deduct Currency
+          setLocalUnlocked(prev => ({ ...prev, [question.id]: aiResponse.solution }));
+
           const userRef = doc(firestore, 'users', user.uid);
           const attemptRef = doc(firestore, 'worksheet_attempts', attempt.id);
           const updatePayload: any = {};
           const fieldName = currency === 'coin' ? 'coins' : currency === 'gold' ? 'gold' : 'diamonds';
           updatePayload[fieldName] = increment(-cost);
+          
           await updateDoc(userRef, updatePayload);
-
-          // 3. Log Transaction
           await addDoc(collection(firestore, 'transactions'), {
               userId: user.uid, amount: cost, currency: currency,
               type: 'spent', description: `Unlocked solution for: ${question.name}`,
               createdAt: serverTimestamp()
           });
-
-          // 4. Save to Attempt
           await updateDoc(attemptRef, {
               [`unlockedSolutions.${question.id}`]: aiResponse.solution
           });
@@ -315,6 +325,12 @@ export function WorksheetResults({
       } catch (error) {
           console.error(error);
           toast({ variant: 'destructive', title: 'Error', description: 'Could not unlock solution.' });
+          
+          setLocalUnlocked(prev => {
+              const newState = { ...prev };
+              delete newState[question.id];
+              return newState;
+          });
       } finally {
           setLoadingSolutions(prev => ({ ...prev, [question.id]: false }));
       }
@@ -330,173 +346,422 @@ export function WorksheetResults({
     }
   };
 
-  // ... (handleDirectDownload & handlePrint omitted for brevity, identical to your original code) ...
-  const handleDirectDownload = async () => { /* ... existing code ... */ };
+  const handleDirectDownload = async () => {
+    setIsDownloading(true);
+    const reportElement = document.getElementById('printable-report-area');
+    if (!reportElement) {
+        toast({ variant: "destructive", title: "Download Failed", description: "Report element not found."});
+        setIsDownloading(false);
+        return;
+    }
+    
+    try {
+        const canvas = await html2canvas(reportElement, {
+            scale: 2, 
+            useCORS: true, 
+            scrollY: -window.scrollY, // Help capture full height
+            onclone: (clonedDoc) => {
+                const doc = clonedDoc;
+                
+                // 1. Handle Print Classes
+                doc.getElementById('printable-report-area')?.classList.remove('no-print');
+                const printOnlyElements = doc.querySelectorAll('.print-only');
+                printOnlyElements.forEach(el => (el as HTMLElement).style.display = 'block');
+                const noPrintElements = doc.querySelectorAll('.no-print');
+                noPrintElements.forEach(el => (el as HTMLElement).style.display = 'none');
+
+                // 2. ✅ FIX: Remove all 'animate-in' and 'fade-in' classes
+                // This ensures html2canvas sees the element as fully opaque immediately
+                const animatedElements = doc.querySelectorAll('.animate-in');
+                animatedElements.forEach(el => {
+                    el.classList.remove('animate-in', 'fade-in', 'duration-700', 'slide-in-from-bottom-2');
+                    (el as HTMLElement).style.opacity = '1';
+                    (el as HTMLElement).style.transform = 'none';
+                    (el as HTMLElement).style.animation = 'none';
+                    (el as HTMLElement).style.transition = 'none';
+                });
+            }
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+            orientation: 'p',
+            unit: 'mm',
+            format: 'a4',
+        });
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = imgWidth / imgHeight;
+        
+        let finalImgWidth = pdfWidth;
+        let finalImgHeight = pdfWidth / ratio;
+        
+        if (finalImgHeight > pdfHeight) {
+            finalImgHeight = pdfHeight;
+            finalImgWidth = pdfHeight * ratio;
+        }
+
+        const x = (pdfWidth - finalImgWidth) / 2;
+        const y = 0; 
+
+        pdf.addImage(imgData, 'PNG', x, y, finalImgWidth, finalImgHeight);
+        pdf.save('worksheet-results.pdf');
+
+    } catch (error) {
+        console.error("PDF generation error:", error);
+        toast({ variant: "destructive", title: "Download Failed", description: "An error occurred while generating the PDF."});
+    } finally {
+        setIsDownloading(false);
+    }
+  };
+
+  const formattedDate = attempt?.attemptedAt?.toDate ? format(attempt.attemptedAt.toDate(), 'PPP p') : format(new Date(), 'PPP');
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
         <div id="printable-report-area" className="printable-area">
-            {/* ... Existing Styles & Header ... */}
-            
-            <Card>
-                <CardHeader>
-                     {/* ... Existing Card Header ... */}
-                </CardHeader>
-                <CardContent>
-                    {/* ... Existing Score Grid ... */}
-                    {/* ... Existing Buttons (Claim / Print) ... */}
-                    <div className="space-y-6">
-                        <h3 className="text-xl font-semibold text-center">Question Review</h3>
-                        
-                        {questions.map((question, qIndex) => {
-                            // Check if unlocked
-                            // @ts-ignore
-                            const unlockedSolution = attempt?.unlockedSolutions?.[question.id];
-                            const cost = settings?.solutionCost ?? 5;
-                            const currency = settings?.solutionCurrency ?? 'coin';
-                            const isSolutionLoading = loadingSolutions[question.id];
+            <style jsx global>{`
+                @media print {
+                    body { -webkit-print-color-adjust: exact; color-adjust: exact; }
+                    .printable-area { box-shadow: none !important; border: none !important; padding: 0 !important; }
+                    .no-print { display: none !important; }
+                    .print-only { display: block !important; }
+                    .page-break { page-break-after: always; }
+                    .print-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 10vw; font-weight: bold; color: rgba(100, 116, 139, 0.08); z-index: -1; pointer-events: none; text-align: center; }
+                }
+            `}</style>
 
-                            // --- RENDER AI GRADED QUESTION ---
-                            if (question.gradingMode === 'ai') {
-                                const firstSub = question.solutionSteps[0]?.subQuestions[0];
-                                const result = results[firstSub?.id];
-                                // @ts-ignore
-                                const breakdown = result?.aiBreakdown;
-                                // @ts-ignore
-                                const feedback = result?.feedback; 
-                                const driveLink = answers[firstSub?.id]?.answer;
-                                const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
-                        
-                                return (
-                                    <div key={question.id} className="border rounded-lg overflow-hidden">
-                                        <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words border-b">
-                                            <div className="flex gap-2">
-                                                <span className="font-bold">Q{qIndex + 1}.</span>
-                                                <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(question.mainQuestionText) }} />
-                                            </div>
+            {/* --- BACK BUTTON --- */}
+            <div className="no-print mb-6">
+                <Button variant="ghost" onClick={handleBackClick} className="pl-0 hover:bg-transparent hover:text-primary">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> 
+                    {from === 'progress' ? 'Back to Progress' : 'Back to Subject'}
+                </Button>
+            </div>
+
+            {/* --- HERO HEADER --- */}
+            <div className="relative mb-8 text-center sm:text-left">
+                 <div className="absolute top-0 right-0 hidden sm:block opacity-10">
+                    <GraduationCap className="h-32 w-32" />
+                 </div>
+                 <div className="relative z-10">
+                    <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-primary">{worksheet.title}</h1>
+                    <p className="text-lg text-muted-foreground mt-2 flex items-center justify-center sm:justify-start gap-2">
+                        {isReview ? <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded text-sm font-semibold">Review</span> : <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded text-sm font-semibold">Completed</span>}
+                        <span className="opacity-50">•</span>
+                        <span>{formattedDate}</span>
+                    </p>
+                 </div>
+            </div>
+
+            {/* --- PRINT HEADER --- */}
+            <div className="hidden print-only mb-8 border-b pb-4">
+                 <h1 className="text-2xl font-bold mb-2">{worksheet.title} - Performance Report</h1>
+                 <div className="grid grid-cols-2 gap-4 text-sm">
+                    <p>Student: {userProfile?.name}</p>
+                    <p>Class: {classData?.name} | Subject: {subjectData?.name}</p>
+                 </div>
+            </div>
+
+            {/* --- STAT CARDS GRID --- */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+                {/* 1. TIME CARD */}
+                <Card className="border-none shadow-md bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 overflow-hidden relative group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                        <Timer className="h-16 w-16" />
+                    </div>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Time Taken</CardDescription>
+                        <CardTitle className="text-3xl font-bold tracking-tight">
+                            {Math.floor(timeTaken / 60)}<span className="text-sm font-normal text-muted-foreground">m</span> {timeTaken % 60}<span className="text-sm font-normal text-muted-foreground">s</span>
+                        </CardTitle>
+                    </CardHeader>
+                </Card>
+
+                {/* 2. SCORE CARD */}
+                <Card className="border-none shadow-md bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 overflow-hidden relative group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                        <CheckCircle2 className="h-16 w-16" />
+                    </div>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Score</CardDescription>
+                        <CardTitle className="text-3xl font-bold tracking-tight text-primary">
+                            {Number(score).toFixed(1)} <span className="text-lg text-muted-foreground font-medium">/ {totalMarks}</span>
+                        </CardTitle>
+                    </CardHeader>
+                </Card>
+
+                {/* 3. REWARDS CARD */}
+                <Card className="border-none shadow-md bg-gradient-to-br from-white to-amber-50 dark:from-slate-900 dark:to-amber-950/20 overflow-hidden relative group">
+                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform text-amber-500">
+                        <Award className="h-16 w-16" />
+                    </div>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Rewards Earned</CardDescription>
+                        <div className="flex flex-wrap gap-3 mt-1">
+                            {calculatedRewards && Object.keys(calculatedRewards).length > 0 ? (
+                                Object.entries(calculatedRewards).map(([currency, amount]) => {
+                                    if (!amount || amount === 0) return null;
+                                    const Icon = currencyIcons[currency];
+                                    const color = currencyColors[currency];
+                                    if (!Icon) return null;
+                                    return (
+                                        <div key={currency} className={cn("flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-slate-800 shadow-sm border", color)}>
+                                            <Icon className="h-4 w-4" />
+                                            <span className="font-bold text-lg">{Number(amount).toFixed(0)}</span>
                                         </div>
+                                    );
+                                })
+                            ) : (
+                                <span className="text-3xl font-bold text-muted-foreground">0</span>
+                            )}
+                        </div>
+                    </CardHeader>
+                </Card>
+            </div>
 
-                                        <div className="p-4 space-y-4">
-                                            <AIRubricBreakdown rubric={question.aiRubric || null} breakdown={breakdown} maxMarks={qMaxMarks} />
-                                            
-                                            {feedback && (
-                                                <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-lg">
-                                                    <div className="flex items-start gap-3">
-                                                        <CheckCircle className="h-5 w-5 text-purple-600 mt-0.5 shrink-0" />
-                                                        <div className="flex-1">
-                                                            <h4 className="font-semibold text-purple-800 mb-1">AI Feedback</h4>
-                                                            <ReactMarkdown className="text-sm text-purple-800 leading-relaxed">{feedback}</ReactMarkdown>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            
-                                            <div className="flex items-center justify-between pt-2">
-                                                 {driveLink && (
-                                                    <a href={driveLink} target="_blank" rel="noopener noreferrer" className="text-xs flex items-center text-muted-foreground hover:text-primary transition-colors no-print">
-                                                        <ExternalLink className="h-3 w-3 mr-1" /> View Original Submission
-                                                    </a>
-                                                 )}
-                                            </div>
+            {/* --- ACTION BUTTONS (CLAIM / DOWNLOAD) --- */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-10 no-print">
+                 <Button
+                    size="lg"
+                    className={cn(
+                        "flex-1 h-14 text-lg font-bold shadow-lg transition-all duration-300",
+                        hasClaimed 
+                          ? "bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed hover:bg-slate-100" 
+                          : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white hover:shadow-amber-500/25 hover:scale-[1.02]"
+                    )}
+                    onClick={handleClaimRewards}
+                    disabled={isClaiming || hasClaimed || !calculatedRewards || Object.values(calculatedRewards).every(a => a === 0)}
+                >
+                    {isClaiming ? <Loader2 className="h-6 w-6 animate-spin mr-2" /> : hasClaimed ? (
+                        <>
+                            <CheckCircle2 className="mr-2 h-6 w-6" /> Rewards Claimed
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles className="mr-2 h-6 w-6" /> Claim Rewards
+                        </>
+                    )}
+                </Button>
 
-                                            {/* === AI SOLUTION SECTION === */}
-                                            {unlockedSolution ? (
-                                                <div className="mt-4 p-4 bg-green-50/50 border border-green-100 rounded-lg animate-in fade-in">
-                                                    <h4 className="font-semibold text-green-700 flex items-center gap-2 mb-2">
-                                                        <Unlock className="h-4 w-4" /> Expert Solution
-                                                    </h4>
-                                                    <ReactMarkdown className="text-sm text-gray-700">{unlockedSolution}</ReactMarkdown>
-                                                </div>
-                                            ) : (
-                                                <div className="mt-2 flex justify-end no-print">
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant="outline"
-                                                        onClick={() => handleGetSolution(question)}
-                                                        disabled={isSolutionLoading}
-                                                        className="border-primary/20 hover:bg-primary/5 hover:text-primary gap-2"
-                                                    >
-                                                        {isSolutionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-3 w-3 opacity-70" />}
-                                                        Get Solution <span className="bg-muted px-1.5 py-0.5 rounded text-xs"><CurrencyDisplay type={currency} amount={cost} /></span>
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            }
+                 <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={handleDirectDownload}
+                    disabled={isDownloading}
+                    className="flex-1 h-14 text-lg border-2 hover:bg-slate-50 dark:hover:bg-slate-900"
+                >
+                    {isDownloading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Printer className="mr-2 h-5 w-5" />}
+                    Export Report
+                </Button>
+            </div>
 
-                            // --- RENDER STANDARD QUESTION ---
-                            return (
-                                <div key={question.id} className="border rounded-lg overflow-hidden">
-                                     <div className="prose dark:prose-invert max-w-none p-4 bg-muted rounded-t-lg break-words">
-                                        <div className="flex gap-2">
-                                            <span className="font-bold">Q{qIndex + 1}.</span>
+            <Separator className="my-8" />
+
+            {/* --- QUESTIONS LIST --- */}
+            <div className="space-y-8">
+                <div className="flex items-center justify-center gap-3 mb-6">
+                    <div className="h-px bg-border flex-1 max-w-[100px]" />
+                    <h3 className="text-xl font-bold text-center uppercase tracking-wider text-muted-foreground">Detailed Review</h3>
+                    <div className="h-px bg-border flex-1 max-w-[100px]" />
+                </div>
+                
+                {questions.map((question, qIndex) => {
+                    // Local state logic
+                    const unlockedSolution = localUnlocked[question.id] || attempt?.unlockedSolutions?.[question.id];
+                    const cost = settings?.solutionCost ?? 5;
+                    const currency = settings?.solutionCurrency ?? 'coin';
+                    const isSolutionLoading = loadingSolutions[question.id];
+
+                    // AI Graded Question
+                    if (question.gradingMode === 'ai') {
+                        const firstSub = question.solutionSteps[0]?.subQuestions[0];
+                        const result = results[firstSub?.id];
+                        // @ts-ignore
+                        const breakdown = result?.aiBreakdown;
+                        // @ts-ignore
+                        const feedback = result?.feedback; 
+                        const driveLink = answers[firstSub?.id]?.answer;
+                        const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
+                
+                        return (
+                            <Card key={question.id} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
+                                {/* Question Header */}
+                                <div className="bg-slate-50 dark:bg-slate-900 border-b p-5">
+                                    <div className="flex gap-3">
+                                        <span className="flex items-center justify-center h-8 w-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shrink-0">
+                                            {qIndex + 1}
+                                        </span>
+                                        <div className="prose dark:prose-invert max-w-none prose-p:my-1">
                                             <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(question.mainQuestionText) }} />
                                         </div>
                                     </div>
-                                    <div className="p-4 space-y-3">
-                                        {question.solutionSteps.flatMap(step => step.subQuestions).map(subQ => {
-                                            const result = results[subQ.id];
-                                            const isCorrect = result?.isCorrect;
-                                            const studentAnswer = answers[subQ.id]?.answer;
-                                            return (
-                                                <div key={subQ.id} className="p-3 border rounded-md text-sm">
-                                                    <div className="flex items-start justify-between">
-                                                        <div className="flex-1">
-                                                            <div className="prose-sm dark:prose-invert max-w-none mb-2" dangerouslySetInnerHTML={{ __html: subQ.questionText }} />
-                                                        </div>
-                                                        <div className={`flex items-center gap-2 font-semibold text-sm ${isCorrect ? 'text-green-600' : 'text-destructive'}`}>
-                                                            {isCorrect ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                                                            {isCorrect ? `${subQ.marks}/${subQ.marks}` : `0/${subQ.marks}`}
-                                                        </div>
-                                                    </div>
-                                                    <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted/50 rounded space-y-1">
-                                                        <div>Your Answer: <span className="font-semibold">{getAnswerText(subQ, studentAnswer)}</span></div>
-                                                        {!isCorrect && (
-                                                            <div>Correct Answer: <span className="font-semibold">{getCorrectAnswerText(subQ)}</span></div>
-                                                        )}
+                                </div>
+
+                                <CardContent className="p-5 space-y-6">
+                                    {/* Skill Breakdown */}
+                                    <AIRubricBreakdown rubric={question.aiRubric || null} breakdown={breakdown} maxMarks={qMaxMarks} />
+                                    
+                                    {/* AI Feedback */}
+                                    {feedback && (
+                                        <div className="relative overflow-hidden rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-900 p-5">
+                                            <div className="absolute top-0 right-0 p-4 opacity-5">
+                                                <Sparkles className="h-24 w-24 text-purple-600" />
+                                            </div>
+                                            <div className="relative z-10 flex gap-4">
+                                                <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg h-fit shrink-0">
+                                                    <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <h4 className="font-bold text-purple-900 dark:text-purple-300">AI Feedback</h4>
+                                                    <div className="text-sm text-purple-800 dark:text-purple-200 leading-relaxed">
+                                                        <ReactMarkdown rehypePlugins={[rehypeRaw]}>{feedback}</ReactMarkdown>
                                                     </div>
                                                 </div>
-                                            )
-                                        })}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* View Submission Link */}
+                                    {driveLink && (
+                                        <div className="flex justify-end">
+                                            <a href={driveLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors no-print px-3 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800">
+                                                <ExternalLink className="h-3.5 w-3.5" /> 
+                                                <span>View Original Upload</span>
+                                            </a>
+                                        </div>
+                                    )}
 
-                                        {/* === AI SOLUTION SECTION (FOR MANUAL QS) === */}
-                                        {unlockedSolution ? (
-                                            <div className="mt-4 p-4 bg-green-50/50 border border-green-100 rounded-lg animate-in fade-in">
-                                                <h4 className="font-semibold text-green-700 flex items-center gap-2 mb-2">
+                                    {/* AI Solution Block */}
+                                    {unlockedSolution ? (
+                                        <div className="relative overflow-hidden rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900 p-5 animate-in slide-in-from-bottom-2">
+                                            <div className="relative z-10 space-y-3">
+                                                <h4 className="font-bold text-green-800 dark:text-green-300 flex items-center gap-2">
                                                     <Unlock className="h-4 w-4" /> Expert Solution
                                                 </h4>
-                                                <ReactMarkdown className="text-sm text-gray-700">{unlockedSolution}</ReactMarkdown>
+                                                <div className="text-sm text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none">
+                                                    <ReactMarkdown rehypePlugins={[rehypeRaw]}>{unlockedSolution}</ReactMarkdown>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <div className="mt-2 flex justify-end no-print">
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="outline"
-                                                    onClick={() => handleGetSolution(question)}
-                                                    disabled={isSolutionLoading}
-                                                    className="border-primary/20 hover:bg-primary/5 hover:text-primary gap-2"
-                                                >
-                                                    {isSolutionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-3 w-3 opacity-70" />}
-                                                    Get Solution <span className="bg-muted px-1.5 py-0.5 rounded text-xs"><CurrencyDisplay type={currency} amount={cost} /></span>
-                                                </Button>
-                                            </div>
-                                        )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-end no-print pt-2">
+                                            <Button 
+                                                variant="outline"
+                                                onClick={() => handleGetSolution(question)}
+                                                disabled={isSolutionLoading}
+                                                className="border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 shadow-sm"
+                                            >
+                                                {isSolutionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-3.5 w-3.5 opacity-70" />}
+                                                Unlock Expert Solution 
+                                                <span className="bg-white dark:bg-slate-950 px-2 py-0.5 rounded-full text-xs shadow-sm border">
+                                                    <CurrencyDisplay type={currency} amount={cost} />
+                                                </span>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        );
+                    }
+
+                    // Standard Question
+                    return (
+                        <Card key={question.id} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
+                            <div className="bg-slate-50 dark:bg-slate-900 border-b p-5">
+                                <div className="flex gap-3">
+                                    <span className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-sm shrink-0">
+                                        {qIndex + 1}
+                                    </span>
+                                    <div className="prose dark:prose-invert max-w-none prose-p:my-1">
+                                        <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(question.mainQuestionText) }} />
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
+                            </div>
 
-                    <div className="text-center mt-8 no-print">
-                         <Button onClick={handleBackClick}>
-                            <Home className="mr-2 h-4 w-4" /> 
-                            {from === 'progress' ? 'Back to Progress' : 'Back to Subject'}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+                            <CardContent className="p-0">
+                                <div className="divide-y">
+                                    {question.solutionSteps.flatMap(step => step.subQuestions).map(subQ => {
+                                        const result = results[subQ.id];
+                                        const isCorrect = result?.isCorrect;
+                                        const studentAnswer = answers[subQ.id]?.answer;
+                                        return (
+                                            <div key={subQ.id} className="p-5 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors">
+                                                <div className="flex flex-col md:flex-row md:items-start gap-4 justify-between">
+                                                    <div className="flex-1 space-y-2">
+                                                        <div className="prose-sm dark:prose-invert max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: subQ.questionText }} />
+                                                    </div>
+                                                    <div className="shrink-0">
+                                                        <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border", isCorrect ? "bg-green-100 text-green-800 border-green-200" : "bg-red-100 text-red-800 border-red-200")}>
+                                                            {isCorrect ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
+                                                            {isCorrect ? `${subQ.marks}/${subQ.marks}` : `0/${subQ.marks}`}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="p-3 bg-slate-100 dark:bg-slate-900 rounded-lg">
+                                                        <span className="text-xs font-bold uppercase text-slate-500 tracking-wider block mb-1">Your Answer</span>
+                                                        <span className="font-medium">{getAnswerText(subQ, studentAnswer)}</span>
+                                                    </div>
+                                                    {!isCorrect && (
+                                                        <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900 rounded-lg">
+                                                            <span className="text-xs font-bold uppercase text-green-600 tracking-wider block mb-1">Correct Answer</span>
+                                                            <span className="font-medium text-green-800 dark:text-green-300">{getCorrectAnswerText(subQ)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                {/* Solution Section for Standard Q */}
+                                <div className="p-5 bg-slate-50/30 dark:bg-slate-900/30 border-t">
+                                     {unlockedSolution ? (
+                                        <div className="relative overflow-hidden rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900 p-5 animate-in slide-in-from-bottom-2">
+                                            <div className="relative z-10 space-y-3">
+                                                <h4 className="font-bold text-green-800 dark:text-green-300 flex items-center gap-2">
+                                                    <Unlock className="h-4 w-4" /> Expert Solution
+                                                </h4>
+                                                <div className="text-sm text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none">
+                                                    <ReactMarkdown rehypePlugins={[rehypeRaw]}>{unlockedSolution}</ReactMarkdown>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-end no-print">
+                                            <Button 
+                                                variant="outline"
+                                                onClick={() => handleGetSolution(question)}
+                                                disabled={isSolutionLoading}
+                                                className="border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 shadow-sm"
+                                            >
+                                                {isSolutionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-3.5 w-3.5 opacity-70" />}
+                                                Unlock Expert Solution 
+                                                <span className="bg-white dark:bg-slate-950 px-2 py-0.5 rounded-full text-xs shadow-sm border">
+                                                    <CurrencyDisplay type={currency} amount={cost} />
+                                                </span>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
+            </div>
+
+            <div className="text-center mt-12 mb-8 no-print">
+                 <p className="text-muted-foreground mb-4 text-sm">Great job reviewing your work!</p>
+                 <Button onClick={handleBackClick} variant="ghost">
+                    <Home className="mr-2 h-4 w-4" /> 
+                    {from === 'progress' ? 'Return to Progress' : 'Return to Subject Dashboard'}
+                </Button>
+            </div>
         </div>
     </div>
   );

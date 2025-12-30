@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus, BookOpen, Trophy, GraduationCap, ChevronRight, Zap } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { UnlockContentCard } from "@/components/academics/unlock-content-card";
+import { cn } from "@/lib/utils";
 
 // Dynamic Imports
 const SyllabusEditor = dynamic(
@@ -290,163 +291,240 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
     const visibleCustomTabs = userIsEditor ? subject?.customTabs : subject?.customTabs?.filter(t => !t.hidden);
 
     if (isUserProfileLoading || isSubjectLoading) {
-        return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+        return (
+            <div className="flex h-[calc(100vh-4rem)] items-center justify-center flex-col gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground animate-pulse">Loading course content...</p>
+            </div>
+        );
     }
 
     return (
-        <div>
-             <Button variant="ghost" onClick={() => router.push(`/academics/${classId}`)} className="mb-4">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Subjects
-            </Button>
-            <div className="border-b pb-4 mb-6">
-                <div>
-                    <h1 className="font-headline text-3xl md:text-4xl font-bold tracking-tight">{subject?.name || "Subject"}</h1>
-                    <p className="text-lg text-muted-foreground mt-2">
-                        {displayedDescription}
-                        {shouldTruncate && (
-                             <Button variant="link" className="p-0 pl-1 text-lg" onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}>
-                                {isDescriptionExpanded ? 'Read less' : 'Read more'}
-                            </Button>
-                        )}
-                    </p>
-                </div>
-                 {userProfile?.role === 'student' && (
-                    <div className="mt-4">
-                        <Button onClick={handleEnrollment} disabled={isUserBlocked || isSaving}>
-                           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                           {isUserBlocked ? (
-                                <>
-                                    <ShieldAlert className="mr-2" /> Blocked
-                                </>
-                           ) : isEnrolled ? (
-                                <>
-                                    <UserMinus className="mr-2" /> Unenroll
-                                </>
-                            ) : (
-                                <>
-                                    <UserPlus className="mr-2" /> Enroll
-                                </>
-                            )}
-                        </Button>
-                         {isUserBlocked && (
-                            <Alert variant="destructive" className="mt-4 max-w-md">
-                                <AlertTitle>Account Blocked</AlertTitle>
-                                <AlertDescription>
-                                    Your account has been blocked by an administrator. Please contact Nalanda Education to resolve this issue.
-                                </AlertDescription>
-                            </Alert>
+        <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50">
+            {/* HERO SECTION */}
+            <div className="bg-slate-900 text-white relative overflow-hidden">
+                 {/* Decorative elements */}
+                 <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
+                     <GraduationCap className="h-96 w-96 text-white" />
+                 </div>
+                 <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 pointer-events-none" />
+
+                 <div className="container mx-auto max-w-7xl px-4 py-8 md:py-12 relative z-10">
+                     {/* Breadcrumb / Back */}
+                     <Button 
+                        variant="ghost" 
+                        onClick={() => router.push(`/academics/${classId}`)} 
+                        className="mb-6 text-slate-300 hover:text-white hover:bg-white/10 pl-0 -ml-3"
+                     >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back to Subjects
+                    </Button>
+
+                    <div className="flex flex-col md:flex-row gap-8 items-start justify-between">
+                        <div className="flex-1 space-y-4">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-200 text-sm font-medium">
+                                <BookOpen className="h-3.5 w-3.5" /> Course
+                            </div>
+                            <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white">{subject?.name || "Loading Subject..."}</h1>
+                            <div className="text-lg text-slate-300 max-w-3xl leading-relaxed">
+                                {displayedDescription}
+                                {shouldTruncate && (
+                                    <button 
+                                        className="ml-2 text-blue-300 hover:text-blue-100 font-medium underline-offset-4 hover:underline focus:outline-none" 
+                                        onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                    >
+                                        {isDescriptionExpanded ? 'Read less' : 'Read more'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Action Card (Enrollment) */}
+                        {userProfile?.role === 'student' && (
+                            <Card className="w-full md:w-80 bg-white/10 backdrop-blur-md border-white/10 text-white shadow-xl">
+                                <CardContent className="p-6 space-y-4">
+                                    <div className="flex items-center justify-between text-sm text-slate-300">
+                                        <span>Status</span>
+                                        {isEnrolled ? (
+                                            <span className="flex items-center gap-1.5 text-emerald-300 font-medium bg-emerald-500/10 px-2 py-0.5 rounded">
+                                                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /> Enrolled
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-400">Not Enrolled</span>
+                                        )}
+                                    </div>
+                                    
+                                    <Button 
+                                        onClick={handleEnrollment} 
+                                        disabled={isUserBlocked || isSaving}
+                                        className={cn(
+                                            "w-full font-bold h-12 text-base shadow-lg transition-all",
+                                            isEnrolled 
+                                                ? "bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30" 
+                                                : "bg-white text-slate-900 hover:bg-blue-50"
+                                        )}
+                                    >
+                                        {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                                        {isUserBlocked ? (
+                                            <> <ShieldAlert className="mr-2" /> Account Blocked </>
+                                        ) : isEnrolled ? (
+                                            <> <UserMinus className="mr-2" /> Unenroll Course </>
+                                        ) : (
+                                            <> <UserPlus className="mr-2" /> Enroll Now </>
+                                        )}
+                                    </Button>
+
+                                    {isUserBlocked && (
+                                        <p className="text-xs text-red-300 bg-red-900/30 p-2 rounded border border-red-900/50">
+                                            Your account has been restricted. Please contact support.
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
                         )}
                     </div>
-                )}
+                 </div>
             </div>
             
-            {!isUserBlocked && (
-            <Tabs defaultValue="syllabus">
-                <div className="flex items-center">
-                    <TabsList>
-                        <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
-                        <TabsTrigger value="worksheet">Worksheet</TabsTrigger>
-                        <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+            {/* MAIN CONTENT AREA */}
+            <div className="container mx-auto max-w-7xl px-4 py-8">
+                {!isUserBlocked && (
+                <Tabs defaultValue="syllabus" className="space-y-8">
+                    {/* Modern Tabs Navigation */}
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all">
+                        <TabsList className="h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm overflow-x-auto max-w-full flex-wrap justify-start">
+                            <TabsTrigger value="syllabus" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium">
+                                <BookOpen className="mr-2 h-4 w-4" /> Syllabus
+                            </TabsTrigger>
+                            <TabsTrigger value="worksheet" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium">
+                                <BookCopy className="mr-2 h-4 w-4" /> Worksheets
+                            </TabsTrigger>
+                            <TabsTrigger value="leaderboard" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium">
+                                <Trophy className="mr-2 h-4 w-4" /> Leaderboard
+                            </TabsTrigger>
+                            
+                            {/* Dynamic Tabs */}
+                            {visibleCustomTabs?.map(tab => {
+                                const isLocked = !userIsEditor && !isTabUnlocked(tab);
+                                return (
+                                    <div key={tab.id} className="relative group flex items-center">
+                                        <TabsTrigger 
+                                            value={tab.id} 
+                                            className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex items-center gap-2"
+                                        >
+                                            {tab.label}
+                                            {isLocked && <Lock className="h-3 w-3 text-muted-foreground opacity-70" />}
+                                        </TabsTrigger>
+                                        
+                                        {/* Tab Menu (Editor Only) */}
+                                        {userIsEditor && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 -mr-2 opacity-50 hover:opacity-100 rounded-full">
+                                                        <MoreVertical className="h-3 w-3" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="start">
+                                                    <DropdownMenuItem onClick={() => openEditTabDialog(tab)}>
+                                                        <Edit className="mr-2 h-4 w-4" /> Edit Details
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
+                                                        {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                                                        {tab.hidden ? 'Show to Students' : 'Hide from Students'}
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive">
+                                                        <Trash className="mr-2 h-4 w-4" /> Delete Tab
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </TabsList>
+
+                        {/* Add Tab Button */}
+                        {userIsEditor && (
+                             <Button onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true);}} className="gap-2 shadow-sm">
+                                <Plus className="h-4 w-4" /> New Tab
+                            </Button>
+                        )}
+                    </div>
+                    
+                    {/* --- TAB CONTENT AREAS --- */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-6 md:p-8 min-h-[500px]">
+                        
+                        <TabsContent value="syllabus" className="mt-0 animate-in fade-in duration-500">
+                            <div className="max-w-4xl mx-auto">
+                                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                    <BookOpen className="h-5 w-5 text-primary" /> Course Syllabus
+                                </h3>
+                                <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="worksheet" className="mt-0 animate-in fade-in duration-500">
+                            <Tabs defaultValue="assignments" className="w-full">
+                                <div className="flex justify-center mb-8">
+                                    <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-full">
+                                        <TabsTrigger value="assignments" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
+                                            <BookCopy className="mr-2 h-4 w-4"/> Assignments
+                                        </TabsTrigger>
+                                        <TabsTrigger value="practice" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
+                                            <FilePlus className="mr-2 h-4 w-4"/> Practice Zone
+                                        </TabsTrigger>
+                                    </TabsList>
+                                </div>
+                                <TabsContent value="assignments">
+                                    <WorksheetList subjectId={subjectId} isEnrolled={isEnrolled} userIsEditor={userIsEditor} />
+                                </TabsContent>
+                                <TabsContent value="practice">
+                                    <PracticeZone classId={classId} subjectId={subjectId} />
+                                </TabsContent>
+                            </Tabs>
+                        </TabsContent>
+                        
+                        <TabsContent value="leaderboard" className="mt-0 animate-in fade-in duration-500">
+                             <div className="max-w-3xl mx-auto">
+                                <Leaderboard subjectId={subjectId} />
+                             </div>
+                        </TabsContent>
+
                         {visibleCustomTabs?.map(tab => {
                             const isLocked = !userIsEditor && !isTabUnlocked(tab);
                             return (
-                                <div key={tab.id} className="relative group">
-                                    <TabsTrigger 
-                                        value={tab.id} 
-                                        className={userIsEditor ? 'pr-8' : isLocked ? 'pr-2' : ''}
-                                    >
-                                        {tab.label}
-                                        {isLocked && <Lock className="ml-2 h-3 w-3 text-muted-foreground" />}
-                                    </TabsTrigger>
-                                    {userIsEditor && (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="absolute top-1/2 right-0.5 -translate-y-1/2 h-6 w-6 opacity-60 group-hover:opacity-100">
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => openEditTabDialog(tab)}>
-                                                    <Edit className="mr-2 h-4 w-4" /> Edit Details
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
-                                                    {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-                                                    {tab.hidden ? 'Show to Students' : 'Hide from Students'}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive">
-                                                    <Trash className="mr-2 h-4 w-4" /> Delete Tab
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                <TabsContent key={tab.id} value={tab.id} className="mt-0 animate-in fade-in duration-500">
+                                    {isLocked ? (
+                                        <div className="max-w-md mx-auto py-12">
+                                            <UnlockContentCard tab={tab} onUnlock={() => handleUnlockTab(tab)} />
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="flex items-center justify-between mb-6 border-b pb-4">
+                                                <h2 className="text-2xl font-bold tracking-tight">{tab.label}</h2>
+                                                {userIsEditor && (
+                                                    <Button variant="outline" size="sm" onClick={() => openEditTabContentDialog(tab)}>
+                                                        <Pencil className="mr-2 h-4 w-4" />
+                                                        Edit Content
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="prose prose-lg dark:prose-invert max-w-none">
+                                                <div dangerouslySetInnerHTML={{ __html: tab.content }} />
+                                            </div>
+                                        </div>
                                     )}
-                                </div>
+                                </TabsContent>
                             )
                         })}
-                    </TabsList>
-                    {userIsEditor && (
-                         <Button variant="ghost" size="icon" className="ml-2" onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true);}}>
-                            <Plus className="h-4 w-4" />
-                        </Button>
-                    )}
-                </div>
-                
-                {/* DYNAMICALLY LOADED COMPONENTS */}
-                <TabsContent value="syllabus">
-                    <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
-                </TabsContent>
+                    </div>
+                </Tabs>
+                )}
+            </div>
 
-                <TabsContent value="worksheet">
-                    <Tabs defaultValue="assignments" className="mt-4">
-                        <TabsList>
-                            <TabsTrigger value="assignments"><BookCopy className="mr-2 h-4 w-4"/> Classroom Assignments</TabsTrigger>
-                            <TabsTrigger value="practice"><FilePlus className="mr-2 h-4 w-4"/> My Practice Zone</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="assignments">
-                            <WorksheetList subjectId={subjectId} isEnrolled={isEnrolled} userIsEditor={userIsEditor} />
-                        </TabsContent>
-                        <TabsContent value="practice">
-                            <PracticeZone classId={classId} subjectId={subjectId} />
-                        </TabsContent>
-                    </Tabs>
-                </TabsContent>
-                
-                <TabsContent value="leaderboard">
-                     <Leaderboard subjectId={subjectId} />
-                </TabsContent>
-
-                 {visibleCustomTabs?.map(tab => {
-                    const isLocked = !userIsEditor && !isTabUnlocked(tab);
-                    return (
-                        <TabsContent key={tab.id} value={tab.id}>
-                            {isLocked ? (
-                                <UnlockContentCard tab={tab} onUnlock={() => handleUnlockTab(tab)} />
-                            ) : (
-                                <Card className="mt-6">
-                                    <CardHeader className="flex-row items-center justify-between">
-                                        <CardTitle>{tab.label}</CardTitle>
-                                        {userIsEditor && (
-                                            <Button variant="outline" size="sm" onClick={() => openEditTabContentDialog(tab)}>
-                                                <Pencil className="mr-2 h-4 w-4" />
-                                                Edit Content
-                                            </Button>
-                                        )}
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div
-                                            className="prose dark:prose-invert max-w-none"
-                                            dangerouslySetInnerHTML={{ __html: tab.content }}
-                                        />
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </TabsContent>
-                    )
-                })}
-            </Tabs>
-            )}
-
+            {/* --- DIALOGS (Unchanged Logic, just styling tweaks) --- */}
+            
             {/* Add/Edit Tab Dialog */}
             <Dialog open={isAddTabDialogOpen || isEditTabDialogOpen} onOpenChange={(open) => !open && !isSaving && (setAddTabDialogOpen(false), setEditTabDialogOpen(false))}>
                 <DialogContent>
@@ -486,7 +564,7 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
 
             {/* Edit Tab Content Dialog */}
              <Dialog open={isEditTabContentDialogOpen} onOpenChange={(open) => !open && !isSaving && setEditTabContentDialogOpen(false)}>
-                <DialogContent className="sm:max-w-[800px]">
+                <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Edit Content</DialogTitle>
                         <DialogDescription>Edit the content for the tab '{editingTab?.label}'.</DialogDescription>

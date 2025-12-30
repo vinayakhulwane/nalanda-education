@@ -1,27 +1,36 @@
- 'use server';
+'use server';
 
 import OpenAI from 'openai';
 
-// 1. Initialize OpenAI client pointing to OpenRouter
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY, // Ensure this is set in your .env file
-  defaultHeaders: {
-    "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000", // Optional: Your site URL
-    "X-Title": "Nalanda Education", // Optional: Your site name
-  }
-});
-
 export async function generateSolutionAction({ questionText }: { questionText: string }) {
+  // 1. Check if API Key exists
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.error("❌ CRITICAL ERROR: OPENROUTER_API_KEY is missing from .env file.");
+    return { success: false, error: "Server Error: API Key is missing." };
+  }
+
+  // 2. Initialize Client inside the action to ensure it picks up the latest env var
+  const openai = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey: process.env.OPENROUTER_API_KEY,
+    defaultHeaders: {
+      "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+      "X-Title": "Nalanda Education",
+    }
+  });
+
   try {
-    if (!questionText) return { success: false, error: "No question provided" };
+    if (!questionText) {
+      console.error("❌ Error: No question text provided to action.");
+      return { success: false, error: "No question provided" };
+    }
 
-    // 2. Use your specified OpenRouter model
-    // You can switch between 'google/gemini-2.0-flash-exp:free' or 'google/gemma-3-12b-it:free'
-    const model = "google/gemini-2.0-flash-exp:free"; 
+    console.log(`🔄 Sending request to OpenRouter for question: "${questionText.substring(0, 30)}..."`);
 
+    // 3. Call API
     const response = await openai.chat.completions.create({
-      model: model,
+      // Try a fallback model if the specific 'free' one is down/busy
+      model: "google/gemini-2.0-flash-exp:free", 
       messages: [
         {
           role: "system",
@@ -35,10 +44,23 @@ export async function generateSolutionAction({ questionText }: { questionText: s
     });
 
     const solution = response.choices[0]?.message?.content;
-    return { success: true, solution: solution || "No solution generated." };
 
-  } catch (error) {
-    console.error("AI Generation Error:", error);
-    return { success: false, error: "Failed to generate solution" };
+    if (!solution) {
+      console.error("❌ OpenRouter Error: Received empty response from model.", response);
+      return { success: false, error: "Empty response from AI." };
+    }
+
+    console.log("✅ Solution generated successfully.");
+    return { success: true, solution: solution };
+
+  } catch (error: any) {
+    // 4. Log the EXACT error from OpenRouter
+    console.error("❌ OpenRouter API Exception:", error);
+    
+    // Return the actual error message so you can see it in the UI/Console
+    return { 
+      success: false, 
+      error: error?.message || "Failed to generate solution" 
+    };
   }
 }
