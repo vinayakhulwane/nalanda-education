@@ -5,8 +5,9 @@ import { TeacherDashboard } from "@/components/teacher-dashboard";
 import { useUser, useDoc, useFirestore } from "@/firebase";
 import type { User as AppUser } from "@/types";
 import { doc } from "firebase/firestore";
-import { Loader2, GraduationCap } from "lucide-react"; // Added Icon
+import { Loader2 } from "lucide-react";
 import { useMemo } from "react";
+import Image from "next/image";
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
@@ -22,17 +23,16 @@ export default function DashboardPage() {
   // Modern Loading Screen
   if (isUserLoading || isProfileLoading) {
     return (
-      <div className="flex flex-col h-[calc(100vh-4rem)] w-full items-center justify-center gap-4 bg-slate-50/50 dark:bg-slate-950/50">
-        <div className="relative">
-             <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" />
-             <div className="relative bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-lg border">
-                <GraduationCap className="h-8 w-8 text-primary animate-bounce" />
-             </div>
-        </div>
-        <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm font-medium">Loading your dashboard...</span>
-        </div>
+      <div className="flex h-[calc(100vh-4rem)] w-full flex-col items-center justify-center gap-4 bg-background">
+        <Image 
+          src="/HD_Logo_TBG.png" 
+          alt="Nalanda Loading" 
+          width={128} 
+          height={128} 
+          className="animate-pulse-once"
+          priority
+        />
+        <p className="text-sm text-muted-foreground">Loading dashboard...</p>
       </div>
     );
   }

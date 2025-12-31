@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Edit, Save, X, Info } from 'lucide-react';
 import { RichTextEditor } from '@/components/rich-text-editor';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Image from "next/image";
 
 const DEFAULT_CONTENT = `
   <h2>🎓 Welcome to Nalanda</h2>
@@ -85,7 +86,18 @@ export default function AboutPage() {
     };
 
     if (isLoading) {
-        return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <Image 
+                  src="/HD_Logo_TBG.png" 
+                  alt="Nalanda Loading" 
+                  width={128} 
+                  height={128} 
+                  className="animate-pulse-once"
+                  priority
+                />
+            </div>
+        );
     }
 
     return (
