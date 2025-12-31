@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     
     // ✅ FIX: Use the PINNED VERSION 'gemini-1.5-flash-001'
     // This avoids the 404 error caused by aliases like 'latest' or 'flash'
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+    const model = genAI.getGenerativeModel({ model: "google/gemini-2.0-flash-exp:free" });
 
     // 5. Construct Prompt
     const prompt = `
