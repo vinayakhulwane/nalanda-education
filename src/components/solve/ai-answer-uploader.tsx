@@ -6,14 +6,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Camera, Upload, X, Loader2, Sparkles, Maximize2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils"; // Make sure to import cn utility
+import { cn } from "@/lib/utils"; 
+// ✅ IMPORT COMPRESSION LIBRARY
+import imageCompression from 'browser-image-compression';
 
 interface AIAnswerUploaderProps {
   questionId: string;
   onImageSelected: (file: File | null) => void;
   isGrading?: boolean;
   savedImage?: File | null;
-  // ✅ FIX: Add the missing prop
   disabled?: boolean; 
 }
 
@@ -22,9 +23,10 @@ export function AIAnswerUploader({
   onImageSelected, 
   isGrading = false, 
   savedImage,
-  disabled = false // Default to false
+  disabled = false 
 }: AIAnswerUploaderProps) {
   const [preview, setPreview] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false); // New state for compression loading
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -36,21 +38,52 @@ export function AIAnswerUploader({
     }
   }, [savedImage]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ✅ UPDATED HANDLER: Compresses image before setting state
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast({ variant: 'destructive', title: 'File too large', description: 'Please upload an image smaller than 10MB.' });
+    if (!file) return;
+
+    // Basic validation
+    if (!file.type.startsWith('image/')) {
+        toast({ variant: 'destructive', title: 'Invalid File', description: 'Please select an image file.' });
         return;
-      }
-      const objectUrl = URL.createObjectURL(file);
-      setPreview(objectUrl);
-      onImageSelected(file);
+    }
+
+    setIsCompressing(true);
+
+    try {
+        // 1. Configuration: Shrink to ~0.5MB and max 1024px dimension
+        const options = {
+            maxSizeMB: 0.5,          
+            maxWidthOrHeight: 1024,
+            useWebWorker: true,
+            initialQuality: 0.8
+        };
+
+        // 2. Run Compression
+        console.log(`Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+        const compressedFile = await imageCompression(file, options);
+        console.log(`Compressed size: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
+
+        // 3. Create Preview & Pass to Parent
+        const objectUrl = URL.createObjectURL(compressedFile);
+        setPreview(objectUrl);
+        onImageSelected(compressedFile); // Send the SMALL file to the parent
+
+    } catch (error) {
+        console.error("Compression failed:", error);
+        toast({ 
+            variant: 'destructive', 
+            title: 'Image Error', 
+            description: 'Could not process this image. Please try another.' 
+        });
+    } finally {
+        setIsCompressing(false);
     }
   };
 
   const clearImage = () => {
-    if (disabled || isGrading) return; // Prevent clearing if disabled
+    if (disabled || isGrading || isCompressing) return; 
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     onImageSelected(null);
@@ -66,7 +99,7 @@ export function AIAnswerUploader({
         accept="image/*" 
         capture="environment" 
         onChange={handleFileChange}
-        disabled={disabled || isGrading} // Disable input
+        disabled={disabled || isGrading || isCompressing} 
       />
 
       {!preview ? (
@@ -74,28 +107,38 @@ export function AIAnswerUploader({
           <Card 
             className={cn(
                 "border-dashed border-2 transition-all group",
-                // Conditional styling for disabled state
-                disabled 
+                (disabled || isCompressing)
                     ? "opacity-50 cursor-not-allowed bg-muted" 
                     : "cursor-pointer hover:bg-muted/50 hover:border-primary/50"
             )}
             onClick={() => {
-                if (!disabled && !isGrading) fileInputRef.current?.click();
+                if (!disabled && !isGrading && !isCompressing) fileInputRef.current?.click();
             }}
           >
             <CardContent className="flex flex-col items-center justify-center p-6 text-center h-40">
-              <div className={cn(
-                  "p-3 rounded-full transition-colors mb-3",
-                  disabled ? "bg-muted-foreground/10" : "bg-primary/10 group-hover:bg-primary/20"
-              )}>
-                 <Camera className={cn("h-6 w-6", disabled ? "text-muted-foreground" : "text-primary")} />
-              </div>
-              <p className="text-sm font-medium">
-                  {disabled ? "Upload Disabled" : "Upload or Take Photo"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                  {disabled ? "This question is already graded." : "Select an image of your solution from your device."}
-              </p>
+              {isCompressing ? (
+                  // Loading State while compressing
+                  <div className="flex flex-col items-center animate-pulse">
+                      <Loader2 className="h-8 w-8 text-primary animate-spin mb-2" />
+                      <p className="text-sm font-medium text-primary">Optimizing Image...</p>
+                  </div>
+              ) : (
+                  // Normal Upload State
+                  <>
+                    <div className={cn(
+                        "p-3 rounded-full transition-colors mb-3",
+                        disabled ? "bg-muted-foreground/10" : "bg-primary/10 group-hover:bg-primary/20"
+                    )}>
+                        <Camera className={cn("h-6 w-6", disabled ? "text-muted-foreground" : "text-primary")} />
+                    </div>
+                    <p className="text-sm font-medium">
+                        {disabled ? "Upload Disabled" : "Upload or Take Photo"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        {disabled ? "This question is already graded." : "Select an image (Auto-compressed for speed)"}
+                    </p>
+                  </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -113,7 +156,6 @@ export function AIAnswerUploader({
                     </DialogContent>
                 </Dialog>
                 
-                {/* Hide Clear Button if Disabled (Preserve Evidence) */}
                 {!disabled && !isGrading && (
                     <Button variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-sm" onClick={clearImage}>
                         <X className="h-4 w-4" />
@@ -141,14 +183,13 @@ export function AIAnswerUploader({
         </div>
       )}
 
-      {/* Only show "Ready to Check" if NOT graded yet */}
-      {!isGrading && !disabled && preview && (
+      {!isGrading && !disabled && !isCompressing && preview && (
          <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 rounded-lg text-sm border border-blue-100 shadow-sm">
             <Sparkles className="h-5 w-5 mt-0.5 shrink-0 text-indigo-500" />
             <div>
                 <p className="font-semibold text-indigo-700">Ready to Check</p>
                 <p className="opacity-90 mt-1">
-                    Your solution is ready. Click <b>"Check Answer"</b> below to let the AI analyze your work.
+                    Your solution is optimized and ready. Click <b>"Check Answer"</b> below.
                 </p>
             </div>
          </div>
