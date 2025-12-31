@@ -309,7 +309,7 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                  </div>
                  <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 pointer-events-none" />
 
-                 <div className="container mx-auto max-w-7xl px-4 py-8 md:py-12 relative z-10">
+                 <div className="container px-6 py-8 md:py-12 relative z-10">
                      {/* Breadcrumb / Back */}
                      <Button 
                         variant="ghost" 
