@@ -1,93 +1,69 @@
 import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
-// ✅ VERCEL OPTIMIZATION: Use 'nodejs' runtime.
-export const runtime = 'nodejs'; 
-export const dynamic = 'force-dynamic';
+// ✅ Use Edge Runtime (Fastest on Vercel)
+export const runtime = 'edge'; 
+
+const openai = new OpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY, 
+  defaultHeaders: {
+    "HTTP-Referer": "https://nalanda-education.vercel.app",
+    "X-Title": "Nalanda Education",
+  },
+});
 
 export async function POST(request: Request) {
   try {
-    // 1. Check for API Key
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'Server Config Error: GEMINI_API_KEY is missing.' }, { status: 500 });
-    }
-
-    // 2. Parse Form Data
     const formData = await request.formData();
     const imageFile = formData.get('image') as File;
     const questionText = formData.get('questionText') as string;
     const rubricJson = formData.get('rubric') as string;
 
-    if (!imageFile) {
-      return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
-    }
+    if (!imageFile) return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
 
-    // 3. Prepare Image (Base64)
     const arrayBuffer = await imageFile.arrayBuffer();
     const base64Image = Buffer.from(arrayBuffer).toString('base64');
+    const dataUrl = `data:${imageFile.type};base64,${base64Image}`;
 
-    // 4. Construct Prompt
     const systemPrompt = `
-      You are a strict academic grader.
-      TASK: Analyze the handwritten student solution in the image provided.
+      You are an expert academic grader.
+      Analyze the handwritten student solution.
       QUESTION: "${questionText}"
       RUBRIC: ${rubricJson}
-      OUTPUT FORMAT (Return PURE JSON only):
+      OUTPUT JSON ONLY:
       {
         "totalScore": number (0-100),
         "isCorrect": boolean,
-        "feedback": "markdown string (bullet points)",
-        "breakdown": { "Step 1": number, "Step 2": number, "Final Answer": number }
+        "feedback": "markdown string",
+        "breakdown": { "Step 1": number, "Final Answer": number }
       }
     `;
 
-    // 5. Call Google API DIRECTLY (No SDK)
-    // We use the REST endpoint manually to bypass SDK 404 errors.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-    const payload = {
-      contents: [{
-        parts: [
-          { text: systemPrompt },
-          { inline_data: { mime_type: imageFile.type || "image/jpeg", data: base64Image } }
-        ]
-      }],
-      generationConfig: {
-        response_mime_type: "application/json"
-      }
-    };
-
-    console.log("Sending request to Google REST API...");
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    // ✅ CRITICAL: Use 'google/gemini-flash-1.5' (PAID version)
+    // DO NOT add ':free' at the end.
+    // This will cost you approx ₹0.014 per request.
+    const completion = await openai.chat.completions.create({
+      model: "google/gemini-flash-1.5", 
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: systemPrompt },
+            { type: "image_url", image_url: { url: dataUrl } }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" }
     });
 
-    // 6. Handle Response
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Google API Error:", errorText);
-      return NextResponse.json({ error: `AI Error: ${response.status} ${response.statusText}`, details: errorText }, { status: response.status });
-    }
+    const content = completion.choices[0]?.message?.content || "";
+    const rawResult = JSON.parse(content);
 
-    const data = await response.json();
-    
-    // 7. Parse the messy JSON structure from Google
-    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!textContent) {
-       throw new Error("AI returned empty response");
-    }
-
-    const cleanJson = textContent.replace(/```json|```/g, "").trim();
-    const parsedResult = JSON.parse(cleanJson);
-
-    return NextResponse.json(parsedResult);
+    return NextResponse.json(rawResult);
 
   } catch (error: any) {
-    console.error("Backend Failure:", error);
+    console.error("OpenRouter Error:", error);
     return NextResponse.json({ error: error.message || "Grading Failed" }, { status: 500 });
   }
 }
