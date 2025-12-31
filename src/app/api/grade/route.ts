@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ✅ VERCEL OPTIMIZATION: Use Edge Runtime. 
-// This makes the API lighter and prevents the 10-second timeout.
-export const runtime = 'edge'; 
+// ✅ VERCEL OPTIMIZATION: Use 'nodejs' for Google SDK stability.
+// 'edge' runtime can sometimes cause issues with the official Google library.
+// 'force-dynamic' ensures it doesn't try to cache the API results.
+export const runtime = 'nodejs'; 
+export const dynamic = 'force-dynamic';
 
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-  },
-});
+// Initialize Google AI Client
+// Make sure GEMINI_API_KEY is added to your Vercel Environment Variables
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 const PATTERN_MAPPING: Record<string, string> = {
     'givenRequiredMapping': 'Given Data & Required Mapping',
@@ -36,7 +34,7 @@ export async function POST(request: Request) {
 
     if (!imageFile) return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
 
-    // --- STEP 1: Process Rubric (Fast) ---
+    // --- STEP 1: Process Rubric (Preserved Logic) ---
     let parsedRubric: Record<string, number> = {};
     try {
         parsedRubric = JSON.parse(rubricJson);
@@ -60,12 +58,10 @@ export async function POST(request: Request) {
         feedbackFocusList = "- General observations";
     }
 
-    // --- STEP 2: Process Image (In Memory) ---
-    // We skip Google Drive upload to save 3-5 seconds
+    // --- STEP 2: Process Image (Standard Node.js Buffer) ---
     const arrayBuffer = await imageFile.arrayBuffer();
     const base64Image = Buffer.from(arrayBuffer).toString('base64');
-    const dataUrl = `data:${imageFile.type};base64,${base64Image}`;
-
+    
     // --- STEP 3: Construct AI Prompt ---
     const totalQuestionMarks = parseFloat(formData.get('totalMarks') as string) || 8;
 
@@ -81,35 +77,43 @@ export async function POST(request: Request) {
       1. Score (0-100) for each rubric criterion.
       2. Feedback as a markdown list. Use bold titles (e.g. "**Title:**").
       
-      OUTPUT JSON: { "breakdown": { "Criteria": number }, "feedback": "markdown string" }
+      OUTPUT JSON (Strictly JSON only): 
+      { "breakdown": { "Criteria": number }, "feedback": "markdown string" }
     `;
 
-    // --- STEP 4: Call AI (Single Fast Attempt) ---
-    // Using gemini-2.0-flash-exp because it is the fastest free model currently active
-    const completion = await openai.chat.completions.create({
-        model: "google/gemini-2.0-flash-exp:free",
-        messages: [
-            {
-                role: "user",
-                content: [
-                    { type: "text", text: systemPrompt },
-                    { type: "image_url", image_url: { url: dataUrl } }
-                ]
-            }
-        ],
-        response_format: { type: "json_object" }
-    });
+    // --- STEP 4: Call AI (Switched to Gemini 1.5 Flash) ---
+    // gemini-1.5-flash gives you 1,500 free requests per day
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const result = await model.generateContent([
+      systemPrompt,
+      {
+        inlineData: {
+          data: base64Image,
+          mimeType: imageFile.type || "image/jpeg"
+        }
+      }
+    ]);
 
     // --- STEP 5: Parse Response ---
-    const content = completion.choices[0]?.message?.content || "";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const response = await result.response;
+    const text = response.text();
     
-    if (!jsonMatch) throw new Error("AI output format error");
+    // Clean markdown if AI adds it (e.g. ```json ... ```)
+    const jsonMatch = text.replace(/```json|```/g, "").trim();
     
-    const rawResult = JSON.parse(jsonMatch[0]);
+    let rawResult;
+    try {
+        rawResult = JSON.parse(jsonMatch);
+    } catch (e) {
+        // Fallback if AI returns plain text instead of JSON
+        console.error("JSON Parse Failed:", text);
+        throw new Error("AI did not return valid JSON");
+    }
+
     const breakdown = rawResult.breakdown || {};
 
-    // Calculate Weighted Score
+    // Calculate Weighted Score (Preserved Logic)
     let calculatedTotalScore = 0;
     let totalWeight = 0;
     const normalizedBreakdown: Record<string, number> = {};
@@ -142,7 +146,7 @@ export async function POST(request: Request) {
         isCorrect: calculatedTotalScore >= 50,
         feedback: rawResult.feedback || "Grading complete.",
         breakdown: breakdown,
-        driveLink: null // Google Drive link is null because we skipped upload for speed
+        driveLink: null 
     });
 
   } catch (error: any) {
