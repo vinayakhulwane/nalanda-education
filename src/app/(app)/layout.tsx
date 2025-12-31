@@ -6,7 +6,7 @@ import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import Image from "next/image";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -20,8 +20,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isUserLoading || !user) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
+        <Image 
+          src="/HD_Logo_TBG.png" 
+          alt="Nalanda Loading" 
+          width={128} 
+          height={128} 
+          className="animate-pulse-once"
+          priority
+        />
+        <p className="text-sm text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -33,7 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <SidebarInset>
             <AppHeader />
-            <main className="py-4 lg:p-6 !pt-0">
+            <main className="p-0 lg:p-6 !pt-0">
                 {children}
             </main>
         </SidebarInset>
