@@ -454,7 +454,7 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                 </div>
                 
                 {/* --- TAB CONTENT AREAS --- */}
-                <div className="container mx-auto max-w-7xl px-4 bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-6 md:p-8 min-h-[500px]">
+                <div className="container mx-auto max-w-7xl px-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm min-h-[500px]">
                     
                     <TabsContent value="syllabus" className="mt-0 animate-in fade-in duration-500">
                         <div className="max-w-4xl mx-auto">
@@ -615,3 +615,4 @@ export default function SubjectWorkspacePage({
 
     return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
 }
+
