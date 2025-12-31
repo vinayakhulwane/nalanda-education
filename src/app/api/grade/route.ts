@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ✅ VERCEL OPTIMIZATION: Use 'nodejs' runtime.
 export const runtime = 'nodejs'; 
@@ -10,11 +9,7 @@ export async function POST(request: Request) {
     // 1. Check for API Key
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error("API Key Missing on Vercel");
-      return NextResponse.json(
-        { error: 'Server Config Error: GEMINI_API_KEY is missing.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Server Config Error: GEMINI_API_KEY is missing.' }, { status: 500 });
     }
 
     // 2. Parse Form Data
@@ -27,30 +22,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
     }
 
-    // 3. Prepare Image for Google AI
+    // 3. Prepare Image (Base64)
     const arrayBuffer = await imageFile.arrayBuffer();
     const base64Image = Buffer.from(arrayBuffer).toString('base64');
 
-    // 4. Initialize Gemini
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // ✅ FIX: Use the PINNED VERSION 'gemini-1.5-flash-001'
-    // This avoids the 404 error caused by aliases like 'latest' or 'flash'
-    const model = genAI.getGenerativeModel({ model: "google/gemini-2.0-flash-exp:free" });
-
-    // 5. Construct Prompt
-    const prompt = `
+    // 4. Construct Prompt
+    const systemPrompt = `
       You are a strict academic grader.
       TASK: Analyze the handwritten student solution in the image provided.
-      
       QUESTION: "${questionText}"
       RUBRIC: ${rubricJson}
-      
-      INSTRUCTIONS:
-      - Ignore minor spelling errors unless they change the meaning.
-      - Focus on the logic and steps shown in the handwriting.
-      - If the image is blurry or irrelevant, set totalScore to 0.
-      
       OUTPUT FORMAT (Return PURE JSON only):
       {
         "totalScore": number (0-100),
@@ -60,37 +41,53 @@ export async function POST(request: Request) {
       }
     `;
 
-    // 6. Call AI
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: base64Image,
-          mimeType: imageFile.type || "image/jpeg",
-        },
-      },
-    ]);
+    // 5. Call Google API DIRECTLY (No SDK)
+    // We use the REST endpoint manually to bypass SDK 404 errors.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    const response = await result.response;
-    const text = response.text();
+    const payload = {
+      contents: [{
+        parts: [
+          { text: systemPrompt },
+          { inline_data: { mime_type: imageFile.type || "image/jpeg", data: base64Image } }
+        ]
+      }],
+      generationConfig: {
+        response_mime_type: "application/json"
+      }
+    };
 
-    // 7. Clean JSON
-    const cleanJson = text.replace(/```json|```/g, "").trim();
-    let data;
-    try {
-        data = JSON.parse(cleanJson);
-    } catch (e) {
-        console.error("JSON Parse Error. AI returned:", text);
-        throw new Error("AI returned invalid format");
+    console.log("Sending request to Google REST API...");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    // 6. Handle Response
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Google API Error:", errorText);
+      return NextResponse.json({ error: `AI Error: ${response.status} ${response.statusText}`, details: errorText }, { status: response.status });
     }
 
-    return NextResponse.json(data);
+    const data = await response.json();
+    
+    // 7. Parse the messy JSON structure from Google
+    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!textContent) {
+       throw new Error("AI returned empty response");
+    }
+
+    const cleanJson = textContent.replace(/```json|```/g, "").trim();
+    const parsedResult = JSON.parse(cleanJson);
+
+    return NextResponse.json(parsedResult);
 
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    return NextResponse.json(
-        { error: error.message || "Grading Failed" }, 
-        { status: 500 }
-    );
+    console.error("Backend Failure:", error);
+    return NextResponse.json({ error: error.message || "Grading Failed" }, { status: 500 });
   }
 }
