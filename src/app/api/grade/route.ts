@@ -34,8 +34,9 @@ export async function POST(request: Request) {
     // 4. Initialize Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // ✅ FIX: Use 'gemini-1.5-flash-latest' to avoid 404 Model Not Found errors
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    // ✅ FIX: Use the PINNED VERSION 'gemini-1.5-flash-001'
+    // This avoids the 404 error caused by aliases like 'latest' or 'flash'
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
     // 5. Construct Prompt
     const prompt = `
