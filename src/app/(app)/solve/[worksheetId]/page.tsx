@@ -241,35 +241,30 @@ export default function SolveWorksheetPage() {
         const rubricToSend = question.aiRubric || { "General Accuracy": "100%" };
         formData.append('rubric', JSON.stringify(rubricToSend));
 
+        // ✅ ADD THIS LINE: Sends the selected patterns (like 'nextSteps') to the backend
+        // This ensures the backend can map these to "How you can improve?" etc.
+        formData.append('feedbackPatterns', JSON.stringify(question.aiFeedbackPatterns || []));
+
         const response = await fetch('/api/grade', { method: 'POST', body: formData });
-        if (!response.ok) throw new Error("API call failed");
+        
+        // Improved error handling to capture the actual backend error message
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Server Response Error:", errorText);
+            throw new Error("API call failed: Check console for details.");
+        }
         
         const aiResult = await response.json();
         const subQuestionIds = question.solutionSteps.flatMap(s => s.subQuestions).map(sq => sq.id);
         const newResults: ResultState = {};
         const newAnswers: AnswerState = {};
         
-        let calculatedSum = 0;
-        const rubric = question.aiRubric || {};
-        const breakdown = aiResult.breakdown || {};
-
-        if (Object.keys(rubric).length > 0) {
-            Object.entries(rubric).forEach(([key, weight]) => {
-                const cleanKey = formatCriterionKey(key);
-                const scoreVal = breakdown[key] ?? breakdown[cleanKey] ?? 0;
-                const weightVal = typeof weight === 'string' ? parseFloat(weight) : (weight as number);
-                const partMarks = (scoreVal / 100) * (weightVal / 100) * qMaxMarks;
-                calculatedSum += partMarks;
-            });
-        } else {
-            calculatedSum = (parseFloat(aiResult.totalScore) / 100) * qMaxMarks;
-        }
-
-        const finalActualMarks = Math.round(calculatedSum * 100) / 100;
+        // Use the totalScore calculated mathematically by the backend for accuracy
+        const finalActualMarks = (aiResult.totalScore / 100) * qMaxMarks;
 
         subQuestionIds.forEach(id => {
             newResults[id] = {
-                isCorrect: finalActualMarks >= (qMaxMarks / 2),
+                isCorrect: aiResult.isCorrect,
                 score: finalActualMarks, 
                 feedback: aiResult.feedback,
                 aiBreakdown: aiResult.breakdown 
@@ -282,7 +277,7 @@ export default function SolveWorksheetPage() {
         
         toast({ 
             title: "Grading Complete!", 
-            description: `Summed Score: ${finalActualMarks.toFixed(2)} / ${qMaxMarks}` 
+            description: `Score: ${finalActualMarks.toFixed(2)} / ${qMaxMarks}` 
         });
 
     } catch (error: any) {
@@ -291,7 +286,7 @@ export default function SolveWorksheetPage() {
     } finally {
         setIsAiGrading(false);
     }
-  };
+};
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   if (!worksheet || orderedQuestions.length === 0) return (
