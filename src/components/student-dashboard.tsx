@@ -9,6 +9,7 @@ import { ClassCard } from "./academics/class-card";
 import { SubjectCard } from "./subject-card";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { ActivityChart } from "./dashboard/activity-chart";
 
 type StudentDashboardProps = {
     user: User | null;
@@ -259,28 +260,31 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
             </div>
 
             {/* STATS GRID */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <DashboardStatCard
                     title="Active Courses"
                     value={user.enrollments?.length.toString() ?? '0'}
                     icon={BookOpen}
-                    description="Courses you are currently enrolled in"
+                    description="Courses enrolled"
                     gradient="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-indigo-950/30"
                 />
                 <DashboardStatCard
                     title="Average Score"
                     value={attemptsLoading || worksheetsLoading || questionsLoading ? '...' : overallScore}
                     icon={Target}
-                    description="Your performance across all worksheets"
+                    description="Across all attempts"
                     gradient="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-emerald-950/30"
                 />
                 <DashboardStatCard
                     title="Completed Works"
                     value={attemptsLoading ? '...' : (completedWorksheets ?? user.completedWorksheets?.length ?? 0).toString()}
                     icon={Trophy}
-                    description="Total worksheets finished successfully"
+                    description="Worksheets finished"
                     gradient="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-slate-900 dark:to-amber-950/30"
                 />
+                <div className="lg:col-span-1">
+                    <ActivityChart />
+                </div>
             </div>
             
             {/* ACADEMICS SECTION */}
