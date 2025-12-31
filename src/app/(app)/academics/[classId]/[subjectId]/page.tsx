@@ -387,11 +387,11 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
             </div>
             
             {/* MAIN CONTENT AREA */}
-            <div className="container mx-auto max-w-7xl px-4 py-8">
-                {!isUserBlocked && (
-                <Tabs defaultValue="syllabus" className="space-y-8">
-                    {/* Modern Tabs Navigation */}
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all">
+            {!isUserBlocked && (
+            <Tabs defaultValue="syllabus" className="space-y-8 py-8">
+                {/* Modern Tabs Navigation */}
+                <div className="container mx-auto max-w-7xl px-4 sticky top-0 z-30 -my-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <TabsList className="h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm overflow-x-auto max-w-full flex-wrap justify-start">
                             <TabsTrigger value="syllabus" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium">
                                 <BookOpen className="mr-2 h-4 w-4" /> Syllabus
@@ -451,77 +451,77 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
                             </Button>
                         )}
                     </div>
+                </div>
+                
+                {/* --- TAB CONTENT AREAS --- */}
+                <div className="container mx-auto max-w-7xl px-4 bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-6 md:p-8 min-h-[500px]">
                     
-                    {/* --- TAB CONTENT AREAS --- */}
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl border shadow-sm p-6 md:p-8 min-h-[500px]">
-                        
-                        <TabsContent value="syllabus" className="mt-0 animate-in fade-in duration-500">
-                            <div className="max-w-4xl mx-auto">
-                                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                    <BookOpen className="h-5 w-5 text-primary" /> Course Syllabus
-                                </h3>
-                                <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
+                    <TabsContent value="syllabus" className="mt-0 animate-in fade-in duration-500">
+                        <div className="max-w-4xl mx-auto">
+                            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                <BookOpen className="h-5 w-5 text-primary" /> Course Syllabus
+                            </h3>
+                            <SyllabusEditor subjectId={subjectId} subjectName={subject?.name || 'this subject'}/>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="worksheet" className="mt-0 animate-in fade-in duration-500">
+                        <Tabs defaultValue="assignments" className="w-full">
+                            <div className="flex justify-center mb-8">
+                                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-full">
+                                    <TabsTrigger value="assignments" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
+                                        <BookCopy className="mr-2 h-4 w-4"/> Assignments
+                                    </TabsTrigger>
+                                    <TabsTrigger value="practice" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
+                                        <FilePlus className="mr-2 h-4 w-4"/> Practice Zone
+                                    </TabsTrigger>
+                                </TabsList>
                             </div>
-                        </TabsContent>
+                            <TabsContent value="assignments">
+                                <WorksheetList subjectId={subjectId} isEnrolled={isEnrolled} userIsEditor={userIsEditor} />
+                            </TabsContent>
+                            <TabsContent value="practice">
+                                <PracticeZone classId={classId} subjectId={subjectId} />
+                            </TabsContent>
+                        </Tabs>
+                    </TabsContent>
+                    
+                    <TabsContent value="leaderboard" className="mt-0 animate-in fade-in duration-500">
+                         <div className="max-w-3xl mx-auto">
+                            <Leaderboard subjectId={subjectId} />
+                         </div>
+                    </TabsContent>
 
-                        <TabsContent value="worksheet" className="mt-0 animate-in fade-in duration-500">
-                            <Tabs defaultValue="assignments" className="w-full">
-                                <div className="flex justify-center mb-8">
-                                    <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-full">
-                                        <TabsTrigger value="assignments" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
-                                            <BookCopy className="mr-2 h-4 w-4"/> Assignments
-                                        </TabsTrigger>
-                                        <TabsTrigger value="practice" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
-                                            <FilePlus className="mr-2 h-4 w-4"/> Practice Zone
-                                        </TabsTrigger>
-                                    </TabsList>
-                                </div>
-                                <TabsContent value="assignments">
-                                    <WorksheetList subjectId={subjectId} isEnrolled={isEnrolled} userIsEditor={userIsEditor} />
-                                </TabsContent>
-                                <TabsContent value="practice">
-                                    <PracticeZone classId={classId} subjectId={subjectId} />
-                                </TabsContent>
-                            </Tabs>
-                        </TabsContent>
-                        
-                        <TabsContent value="leaderboard" className="mt-0 animate-in fade-in duration-500">
-                             <div className="max-w-3xl mx-auto">
-                                <Leaderboard subjectId={subjectId} />
-                             </div>
-                        </TabsContent>
-
-                        {visibleCustomTabs?.map(tab => {
-                            const isLocked = !userIsEditor && !isTabUnlocked(tab);
-                            return (
-                                <TabsContent key={tab.id} value={tab.id} className="mt-0 animate-in fade-in duration-500">
-                                    {isLocked ? (
-                                        <div className="max-w-md mx-auto py-12">
-                                            <UnlockContentCard tab={tab} onUnlock={() => handleUnlockTab(tab)} />
+                    {visibleCustomTabs?.map(tab => {
+                        const isLocked = !userIsEditor && !isTabUnlocked(tab);
+                        return (
+                            <TabsContent key={tab.id} value={tab.id} className="mt-0 animate-in fade-in duration-500">
+                                {isLocked ? (
+                                    <div className="max-w-md mx-auto py-12">
+                                        <UnlockContentCard tab={tab} onUnlock={() => handleUnlockTab(tab)} />
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-6 border-b pb-4">
+                                            <h2 className="text-2xl font-bold tracking-tight">{tab.label}</h2>
+                                            {userIsEditor && (
+                                                <Button variant="outline" size="sm" onClick={() => openEditTabContentDialog(tab)}>
+                                                    <Pencil className="mr-2 h-4 w-4" />
+                                                    Edit Content
+                                                </Button>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <div>
-                                            <div className="flex items-center justify-between mb-6 border-b pb-4">
-                                                <h2 className="text-2xl font-bold tracking-tight">{tab.label}</h2>
-                                                {userIsEditor && (
-                                                    <Button variant="outline" size="sm" onClick={() => openEditTabContentDialog(tab)}>
-                                                        <Pencil className="mr-2 h-4 w-4" />
-                                                        Edit Content
-                                                    </Button>
-                                                )}
-                                            </div>
-                                            <div className="prose prose-lg dark:prose-invert max-w-none">
-                                                <div dangerouslySetInnerHTML={{ __html: tab.content }} />
-                                            </div>
+                                        <div className="prose prose-lg dark:prose-invert max-w-none">
+                                            <div dangerouslySetInnerHTML={{ __html: tab.content }} />
                                         </div>
-                                    )}
-                                </TabsContent>
-                            )
-                        })}
-                    </div>
-                </Tabs>
-                )}
-            </div>
+                                    </div>
+                                )}
+                            </TabsContent>
+                        )
+                    })}
+                </div>
+            </Tabs>
+            )}
 
             {/* --- DIALOGS (Unchanged Logic, just styling tweaks) --- */}
             
