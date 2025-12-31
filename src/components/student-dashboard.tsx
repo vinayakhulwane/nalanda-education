@@ -208,7 +208,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
     }
     
     return (
-        <div className="p-6 md:p-8 max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-500">
+        <div className="space-y-10 animate-in fade-in duration-500">
             
             {/* HERO WELCOME BANNER */}
             <div className="relative rounded-3xl bg-[#1e1b4b] text-white p-8 md:p-12 overflow-hidden shadow-2xl">
