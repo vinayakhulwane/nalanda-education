@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// ✅ VERCEL OPTIMIZATION: Use Edge Runtime for speed
+// ✅ VERCEL OPTIMIZATION: Use Edge Runtime. 
+// This makes the API lighter and prevents the 10-second timeout.
 export const runtime = 'edge'; 
 
-// 1. Initialize OpenRouter (AI)
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -24,7 +24,6 @@ const PATTERN_MAPPING: Record<string, string> = {
     'nextSteps': 'How you can improve?', 
 };
 
-// Helper to normalize keys
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 export async function POST(request: Request) {
@@ -37,7 +36,7 @@ export async function POST(request: Request) {
 
     if (!imageFile) return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
 
-    // --- STEP 1: Process Data (Fast) ---
+    // --- STEP 1: Process Rubric (Fast) ---
     let parsedRubric: Record<string, number> = {};
     try {
         parsedRubric = JSON.parse(rubricJson);
@@ -62,12 +61,10 @@ export async function POST(request: Request) {
     }
 
     // --- STEP 2: Process Image (In Memory) ---
+    // We skip Google Drive upload to save 3-5 seconds
     const arrayBuffer = await imageFile.arrayBuffer();
-    // Convert to base64 directly
     const base64Image = Buffer.from(arrayBuffer).toString('base64');
     const dataUrl = `data:${imageFile.type};base64,${base64Image}`;
-
-    // Note: We SKIPPED Google Drive upload to save ~4 seconds and prevent Vercel Timeout
 
     // --- STEP 3: Construct AI Prompt ---
     const totalQuestionMarks = parseFloat(formData.get('totalMarks') as string) || 8;
@@ -87,8 +84,8 @@ export async function POST(request: Request) {
       OUTPUT JSON: { "breakdown": { "Criteria": number }, "feedback": "markdown string" }
     `;
 
-    // --- STEP 4: Call AI (Single Attempt for Speed) ---
-    // We try the fastest model first to ensure we beat the 10s timer
+    // --- STEP 4: Call AI (Single Fast Attempt) ---
+    // Using gemini-2.0-flash-exp because it is the fastest free model currently active
     const completion = await openai.chat.completions.create({
         model: "google/gemini-2.0-flash-exp:free",
         messages: [
@@ -112,7 +109,7 @@ export async function POST(request: Request) {
     const rawResult = JSON.parse(jsonMatch[0]);
     const breakdown = rawResult.breakdown || {};
 
-    // Calculate Score
+    // Calculate Weighted Score
     let calculatedTotalScore = 0;
     let totalWeight = 0;
     const normalizedBreakdown: Record<string, number> = {};
@@ -145,7 +142,7 @@ export async function POST(request: Request) {
         isCorrect: calculatedTotalScore >= 50,
         feedback: rawResult.feedback || "Grading complete.",
         breakdown: breakdown,
-        driveLink: null // We did not upload to drive
+        driveLink: null // Google Drive link is null because we skipped upload for speed
     });
 
   } catch (error: any) {
