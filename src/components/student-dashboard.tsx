@@ -211,7 +211,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
         <div className="space-y-10 animate-in fade-in duration-500">
             
             {/* HERO WELCOME BANNER */}
-            <div className="relative rounded-3xl bg-[#1e1b4b] text-white p-8 md:p-12 overflow-hidden shadow-2xl">
+            <div className="relative rounded-3xl bg-[#1e1b4b] text-white px-6 sm:px-8 md:px-12 py-8 md:py-12 overflow-hidden shadow-2xl">
                  {/* Abstract Background Shapes */}
                  <div className="absolute top-0 right-0 p-12 opacity-10 transform rotate-12 scale-150 pointer-events-none">
                      <Sparkles className="h-96 w-96 text-indigo-400" />
