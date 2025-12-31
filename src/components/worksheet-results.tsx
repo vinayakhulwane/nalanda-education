@@ -60,7 +60,6 @@ const currencyColors: Record<string, string> = {
   diamond: 'text-blue-600 dark:text-blue-400',
 };
 
-// ✅ UPDATED: More vibrant cost display
 const CurrencyDisplay = ({ type, amount }: { type: string, amount: number }) => {
     const Icon = currencyIcons[type] || Coins;
     const colorClass = currencyColors[type] || 'text-slate-500';
@@ -280,6 +279,7 @@ export function WorksheetResults({
     }
   }
 
+  // ✅ FIXED: Better error handling for AI Solution generation
   const handleGetSolution = async (question: Question) => {
       if (!user || !userProfile || !attempt?.id) return;
       
@@ -302,7 +302,12 @@ export function WorksheetResults({
 
       try {
           const aiResponse = await generateSolutionAction({ questionText: question.mainQuestionText });
-          if (!aiResponse.success || !aiResponse.solution) throw new Error("Failed to generate solution");
+          
+          // ✅ CHECK: Log detailed error if API fails
+          if (!aiResponse.success || !aiResponse.solution) {
+              console.error("AI Generation Error Details:", aiResponse); // View this in Browser Console
+              throw new Error(aiResponse.error || "AI could not generate a solution.");
+          }
 
           setLocalUnlocked(prev => ({ ...prev, [question.id]: aiResponse.solution }));
 
@@ -323,9 +328,13 @@ export function WorksheetResults({
           });
 
           toast({ title: 'Solution Unlocked!' });
-      } catch (error) {
-          console.error(error);
-          toast({ variant: 'destructive', title: 'Error', description: 'Could not unlock solution.' });
+      } catch (error: any) {
+          console.error("handleGetSolution Error:", error);
+          toast({ 
+              variant: 'destructive', 
+              title: 'Generation Failed', 
+              description: error.message || 'Could not unlock solution. Check console for details.' 
+          });
           
           setLocalUnlocked(prev => {
               const newState = { ...prev };

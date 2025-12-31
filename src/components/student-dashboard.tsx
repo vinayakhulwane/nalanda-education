@@ -255,7 +255,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
             </div>
 
             {/* STATS GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 px-4 sm:px-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4 sm:px-0">
                 <DashboardStatCard
                     title="Active Courses"
                     value={user.enrollments?.length.toString() ?? '0'}
@@ -281,8 +281,8 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
                     textColor="text-amber-600 dark:text-amber-400"
                 />
                 
-                {/* Activity Chart Container - Spans 1 col */}
-                <div className="h-full min-h-[160px]">
+                {/* Activity Chart Container - Spans all columns on mobile, 2 on md, 1 on lg */}
+                <div className="md:col-span-2 lg:col-span-1 h-full min-h-[160px]">
                     <ActivityChart />
                 </div>
             </div>
