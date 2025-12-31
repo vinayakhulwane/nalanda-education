@@ -3,6 +3,10 @@ import OpenAI from 'openai';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 
+// ✅ VERCEL FIX 1: Allow function to run for 60 seconds (prevents timeout on Hobby plan)
+export const maxDuration = 60; 
+export const dynamic = 'force-dynamic';
+
 // 1. Initialize OpenRouter (AI)
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -36,7 +40,7 @@ const PATTERN_MAPPING: Record<string, string> = {
     'nextSteps': 'How you can improve?', 
 };
 
-// Helper to normalize keys for matching (e.g. "Calculation Accuracy" == "calculationAccuracy")
+// Helper to normalize keys
 const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // Helper delay function
@@ -69,9 +73,7 @@ export async function POST(request: Request) {
     try {
         const patterns = JSON.parse(feedbackPatternsJson || '[]');
         if (Array.isArray(patterns) && patterns.length > 0) {
-            feedbackFocusList = patterns
-                .map(p => `- ${PATTERN_MAPPING[p] || p}`)
-                .join("\n");
+            feedbackFocusList = patterns.map(p => `- ${PATTERN_MAPPING[p] || p}`).join("\n");
         } else {
             feedbackFocusList = "- General Step-by-Step Review";
         }
@@ -144,13 +146,13 @@ export async function POST(request: Request) {
     `;
 
     // --- STEP 6: Call AI with Retries & Fallbacks ---
-    // ✅ Updated Model List: Prioritize fast free models, then high quality ones
+    // ✅ VERCEL FIX 2: Use only models known to be active & free on OpenRouter right now
     const modelsToTry = [
-        "google/gemini-2.0-flash-lite-preview-02-05:free", 
-        "google/gemini-2.0-pro-exp-02-05:free",
-        "google/gemini-2.0-flash-exp:free",
-        "mistralai/pixtral-12b:free",
-        "meta-llama/llama-3.2-11b-vision-instruct:free",
+        "google/gemini-2.0-flash-exp:free",           // Fastest & Best
+        "google/gemini-2.0-flash-thinking-exp:free",  // Strong reasoning fallback
+        "google/gemini-exp-1206:free",                // Reliable older version
+        "google/learnlm-1.5-pro-experimental:free",   // Good for education
+        "qwen/qwen-2-vl-7b-instruct:free",            // Good open-source backup
     ];
 
     let completion;
@@ -177,8 +179,8 @@ export async function POST(request: Request) {
         } catch (err: any) {
             console.warn(`Model ${modelId} failed: ${err.message}`);
             lastError = err;
-            // ✅ Wait 1 second before trying the next model to avoid rate limit spam
-            await delay(1000);
+            // ✅ VERCEL FIX 3: Wait 2 seconds (increased from 1s) to clear shared rate limits
+            await delay(2000);
         }
     }
 
@@ -189,7 +191,7 @@ export async function POST(request: Request) {
         );
     }
 
-    // --- STEP 7: Parse & Recalculate Score (THE FIX) ---
+    // --- STEP 7: Parse & Recalculate Score ---
     const content = completion.choices[0]?.message?.content || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     
@@ -199,11 +201,10 @@ export async function POST(request: Request) {
     const breakdown = rawResult.breakdown || {};
 
     // ✅ ROBUST SCORE RE-CALCULATION
-    // We ignore AI's "totalScore" and calculate it ourselves based on the Rubric weights.
     let calculatedTotalScore = 0;
     let totalWeight = 0;
 
-    // Normalize keys to ensure we match "CalculationAccuracy" with "Calculation Accuracy"
+    // Normalize keys
     const normalizedBreakdown: Record<string, number> = {};
     Object.keys(breakdown).forEach(k => {
         normalizedBreakdown[normalizeKey(k)] = Number(breakdown[k] || 0);
@@ -216,7 +217,6 @@ export async function POST(request: Request) {
         let score = normalizedBreakdown[normKey];
 
         if (score === undefined) {
-             // Fallback: If AI named it slightly differently, look for it
              const foundKey = Object.keys(normalizedBreakdown).find(k => k.includes(normKey) || normKey.includes(k));
              score = foundKey ? normalizedBreakdown[foundKey] : 0;
         }
@@ -239,7 +239,7 @@ export async function POST(request: Request) {
     }
 
     const cleanResult = {
-        totalScore: Math.round(calculatedTotalScore), // ✅ Used our Calculated Score
+        totalScore: Math.round(calculatedTotalScore), 
         isCorrect: calculatedTotalScore >= 50,
         feedback: rawResult.feedback || "Grading complete.",
         breakdown: breakdown,
