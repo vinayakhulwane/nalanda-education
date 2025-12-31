@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo, use } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter, useParams } from "next/navigation";
 import dynamic from 'next/dynamic';
 import { ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus, BookOpen, Trophy, GraduationCap, ChevronRight, Zap } from "lucide-react";
 
@@ -48,9 +48,12 @@ const WorksheetList = dynamic(
 );
 
 
-function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, subjectId: string }) {
+export default function SubjectWorkspacePage() {
     const { user, userProfile, isUserProfileLoading } = useUser();
     const router = useRouter();
+    const params = useParams();
+    const classId = params.classId as string;
+    const subjectId = params.subjectId as string;
     const firestore = useFirestore();
     const { toast } = useToast();
     
@@ -605,14 +608,3 @@ function SubjectWorkspacePageContent({ classId, subjectId }: { classId: string, 
         </div>
     );
 }
-
-export default function SubjectWorkspacePage({ 
-  params 
-}: { 
-  params: Promise<{ classId: string; subjectId: string }> 
-}) {
-    const { classId, subjectId } = use(params);
-
-    return <SubjectWorkspacePageContent classId={classId} subjectId={subjectId} />;
-}
-
