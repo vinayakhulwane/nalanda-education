@@ -103,6 +103,7 @@ export interface User {
   coins: number;
   gold: number;
   diamonds: number;
+  aiCredits?: number;
   active?: boolean;
   enrollments?: string[];
   completedWorksheets?: string[];
