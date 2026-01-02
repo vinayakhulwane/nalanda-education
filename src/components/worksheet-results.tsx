@@ -656,12 +656,11 @@ export function WorksheetResults({
                                         </div>
                                     ) : (
                                         <div className="flex justify-end no-print pt-2">
-                                            {/* ✅ UPDATED BUTTON: MORE VISIBLE COST */}
                                             <Button 
                                                 variant="outline"
                                                 onClick={() => handleGetSolution(question)}
                                                 disabled={isSolutionLoading}
-                                                className="border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 shadow-sm h-auto py-2 px-4"
+                                                className="border-primary/20 bg-primary/5 hover:bg-primary hover:text-primary-foreground text-primary gap-2 shadow-sm h-auto py-2 px-4 transition-colors"
                                             >
                                                 {isSolutionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-3.5 w-3.5 opacity-70" />}
                                                 Unlock Expert Solution 
@@ -740,12 +739,11 @@ export function WorksheetResults({
                                         </div>
                                     ) : (
                                         <div className="flex justify-end no-print">
-                                            {/* ✅ UPDATED BUTTON: MORE VISIBLE COST */}
                                             <Button 
                                                 variant="outline"
                                                 onClick={() => handleGetSolution(question)}
                                                 disabled={isSolutionLoading}
-                                                className="border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary gap-2 shadow-sm h-auto py-2 px-4"
+                                                className="border-primary/20 bg-primary/5 hover:bg-primary hover:text-primary-foreground text-primary gap-2 shadow-sm h-auto py-2 px-4 transition-colors"
                                             >
                                                 {isSolutionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-3.5 w-3.5 opacity-70" />}
                                                 Unlock Expert Solution 
