@@ -36,10 +36,6 @@ export default function WalletPage() {
         title="My Wallet"
         description="View your balances, exchange currencies, and see your transaction history."
       />
-      
-      <WalletBalances userProfile={userProfile} />
-
-      <SurpriseCoupon userProfile={userProfile} />
 
       <Tabs defaultValue="swap" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
@@ -55,6 +51,11 @@ export default function WalletPage() {
           <TransactionHistory />
         </TabsContent>
       </Tabs>
+      
+      <WalletBalances userProfile={userProfile} />
+
+      <SurpriseCoupon userProfile={userProfile} />
+
     </div>
   );
 }
