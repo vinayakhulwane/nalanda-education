@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -30,7 +30,11 @@ export default function EconomySettingsPage() {
     rewardClassroom: 0.5,
     rewardSpark: 0.5,
     solutionCost: 5,
-    solutionCurrency: 'coin'
+    solutionCurrency: 'coin',
+    welcomeAiCredits: 5,
+    surpriseRewardAmount: 100,
+    surpriseRewardCurrency: 'coin',
+    surpriseRewardCooldownHours: 24
   });
 
   const settingsDocRef = useMemoFirebase(() => {
@@ -237,13 +241,83 @@ export default function EconomySettingsPage() {
               </div>
             </div>
           </CardContent>
-          <CardFooter>
+        </Card>
+
+        {/* SECTION 4: SURPRISE COUPON */}
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Gift className="h-5 w-5 text-primary" />
+                    <CardTitle>Surprise Coupon Settings</CardTitle>
+                </div>
+                <CardDescription>Configure the welcome gift and recurring surprise rewards for students.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
+                    <h3 className="font-semibold text-sm">New User Welcome Gift</h3>
+                     <div className="space-y-2">
+                        <Label htmlFor="welcomeAiCredits">Welcome AI Credits Amount</Label>
+                        <Input 
+                            id="welcomeAiCredits"
+                            type="number"
+                            value={settings.welcomeAiCredits ?? 5} 
+                            onChange={(e) => setSettings({...settings, welcomeAiCredits: parseInt(e.target.value)})} 
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Amount of AI Credits given to a new user when they claim their first coupon.
+                        </p>
+                    </div>
+                </div>
+
+                 <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
+                    <h3 className="font-semibold text-sm">Recurring Surprise Reward</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Reward Amount</Label>
+                            <Input 
+                                type="number" 
+                                value={settings.surpriseRewardAmount ?? 100} 
+                                onChange={(e) => setSettings({...settings, surpriseRewardAmount: parseInt(e.target.value)})} 
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Reward Currency</Label>
+                            <Select 
+                                value={settings.surpriseRewardCurrency ?? 'coin'} 
+                                onValueChange={(val: CurrencyType) => setSettings({...settings, surpriseRewardCurrency: val})}
+                            >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="coin">Coins</SelectItem>
+                                    <SelectItem value="gold">Gold</SelectItem>
+                                    <SelectItem value="diamond">Diamonds</SelectItem>
+                                    <SelectItem value="aiCredits">AI Credits</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="cooldownHours">Cooldown Period (in Hours)</Label>
+                        <Input 
+                            id="cooldownHours"
+                            type="number" 
+                            value={settings.surpriseRewardCooldownHours ?? 24} 
+                            onChange={(e) => setSettings({...settings, surpriseRewardCooldownHours: parseInt(e.target.value)})} 
+                        />
+                         <p className="text-xs text-muted-foreground">
+                            How long a student must wait after claiming a coupon before a new one is available.
+                        </p>
+                    </div>
+                 </div>
+            </CardContent>
+        </Card>
+
+        <CardFooter className="px-0">
             <Button onClick={handleSave} size="lg" className="w-full md:w-auto">
               <Save className="mr-2" />
-              Save Settings
+              Save All Settings
             </Button>
-          </CardFooter>
-        </Card>
+        </CardFooter>
       </div>
     </div>
   );

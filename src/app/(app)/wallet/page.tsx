@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { CurrencySwap } from "@/components/wallet/currency-swap";
 import { TransactionHistory } from "@/components/wallet/transaction-history";
+import { SurpriseCoupon } from "@/components/wallet/surprise-coupon";
 
 export default function WalletPage() {
   const { userProfile, isUserProfileLoading } = useUser();
@@ -35,17 +36,16 @@ export default function WalletPage() {
         title="My Wallet"
         description="View your balances, exchange currencies, and see your transaction history."
       />
+      
+      <WalletBalances userProfile={userProfile} />
 
-      <Tabs defaultValue="balances" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="balances">My Balances</TabsTrigger>
+      <SurpriseCoupon userProfile={userProfile} />
+
+      <Tabs defaultValue="swap" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="swap">Currency Swap</TabsTrigger>
           <TabsTrigger value="history">Transaction History</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="balances" className="mt-6">
-          <WalletBalances userProfile={userProfile} />
-        </TabsContent>
         
         <TabsContent value="swap" className="mt-6">
           <CurrencySwap userProfile={userProfile} />

@@ -109,6 +109,8 @@ export interface User {
   completedWorksheets?: string[];
   unlockedTabs?: string[];
   unlockedSolutions?: string[];
+  lastCouponClaimedAt?: any; // Firestore Timestamp
+  hasClaimedWelcomeCoupon?: boolean;
 }
 
 export interface Class {
@@ -223,9 +225,6 @@ export interface EconomySettings {
 
   // Creation Costs
   costPerMark: number;
-  solutionCostPercentage?: number; // kept for legacy support if needed
-
-  // ✅ NEW: Flat cost settings for AI Solutions
   solutionCost?: number; 
   solutionCurrency?: CurrencyType;
 
@@ -233,6 +232,12 @@ export interface EconomySettings {
   rewardPractice: number;
   rewardClassroom: number;
   rewardSpark: number;
+  
+  // Surprise Coupon Settings
+  welcomeAiCredits?: number;
+  surpriseRewardAmount?: number;
+  surpriseRewardCurrency?: CurrencyType;
+  surpriseRewardCooldownHours?: number;
 }
 
 export interface Transaction {
