@@ -123,7 +123,12 @@ export function StudentProgressList() {
             
             return {
                 student,
-                wallet: { coins: student.coins, gold: student.gold, diamonds: student.diamonds, aiCredits: student.aiCredits || 0 },
+                wallet: { 
+                    coins: student.coins || 0, 
+                    gold: student.gold || 0, 
+                    diamonds: student.diamonds || 0, 
+                    aiCredits: student.aiCredits || 0 
+                },
                 totalAttempts: studentAttempts.length,
                 avgScore: Math.round(avgScore),
             };
@@ -245,7 +250,7 @@ export function StudentProgressList() {
                                                         <span className="flex items-center gap-1 text-yellow-600"><Coins className="h-3 w-3" />{detail.wallet.coins}</span>
                                                         <span className="flex items-center gap-1 text-amber-600"><Crown className="h-3 w-3" />{detail.wallet.gold}</span>
                                                         <span className="flex items-center gap-1 text-blue-600"><Gem className="h-3 w-3" />{detail.wallet.diamonds}</span>
-                                                        <span className="flex items-center gap-1 text-indigo-600"><Sparkles className="h-3w -3" />{detail.wallet.aiCredits}</span>
+                                                        <span className="flex items-center gap-1 text-indigo-600"><Sparkles className="h-3 w-3" />{detail.wallet.aiCredits}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-center font-medium">
