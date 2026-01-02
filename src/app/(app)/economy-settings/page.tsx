@@ -113,13 +113,12 @@ export default function EconomySettingsPage() {
       return days;
   }, [daysInMonth, year, month, currentYear, currentMonth, currentDay]);
   
-
   const handleSaveExchangeRates = async () => {
     if (!settingsDocRef) return;
     setIsSaving(true);
     const payload = {
-        coinToGold: settings.coinToGold,
-        goldToDiamond: settings.goldToDiamond,
+        coinToGold: settings.coinToGold || 0,
+        goldToDiamond: settings.goldToDiamond || 0,
     };
     await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
     toast({ title: 'Settings Saved', description: `Exchange Rate settings have been updated.` });
@@ -130,9 +129,9 @@ export default function EconomySettingsPage() {
     if (!settingsDocRef) return;
     setIsSaving(true);
     const payload = {
-        costPerMark: settings.costPerMark,
-        solutionCost: settings.solutionCost,
-        solutionCurrency: settings.solutionCurrency,
+        costPerMark: settings.costPerMark || 0,
+        solutionCost: settings.solutionCost || 0,
+        solutionCurrency: settings.solutionCurrency || 'coin',
     };
     await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
     toast({ title: 'Settings Saved', description: `Content Cost settings have been updated.` });
@@ -142,14 +141,16 @@ export default function EconomySettingsPage() {
   const handleSaveCouponSettings = async () => {
     if (!settingsDocRef) return;
     setIsSaving(true);
-    let payload: Partial<EconomySettings> = {
-        welcomeAiCredits: settings.welcomeAiCredits,
-        surpriseRewardAmount: settings.surpriseRewardAmount,
-        surpriseRewardCurrency: settings.surpriseRewardCurrency,
-        couponConditions: settings.couponConditions,
-        rewardPractice: settings.rewardPractice,
-        rewardClassroom: settings.rewardClassroom,
-        rewardSpark: settings.rewardSpark,
+    
+    // ✅ FIX: Ensure numerical values are numbers, not undefined/NaN
+    const payload: Partial<EconomySettings> = {
+        welcomeAiCredits: Number(settings.welcomeAiCredits) || 0,
+        surpriseRewardAmount: Number(settings.surpriseRewardAmount) || 0,
+        surpriseRewardCurrency: settings.surpriseRewardCurrency || 'coin',
+        couponConditions: settings.couponConditions || [],
+        rewardPractice: Number(settings.rewardPractice) || 0,
+        rewardClassroom: Number(settings.rewardClassroom) || 0,
+        rewardSpark: Number(settings.rewardSpark) || 0,
     };
 
     if (year && month && day) {
@@ -163,7 +164,6 @@ export default function EconomySettingsPage() {
     toast({ title: 'Settings Saved', description: `Coupon and Reward settings have been updated.` });
     setIsSaving(false);
   };
-
 
   if (isLoading) {
     return (
