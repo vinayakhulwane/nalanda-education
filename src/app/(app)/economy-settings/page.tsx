@@ -77,41 +77,8 @@ export default function EconomySettingsPage() {
     }
   }, [userProfile, isUserProfileLoading, router]);
 
-  // Combine local date/time into the main settings object before saving
-  const handleSave = () => {
-    if (!settingsDocRef) return;
-    
-    // Construct date from dropdowns and time
-    const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    const [hours, minutes] = time.split(':').map(Number);
-    newDate.setHours(hours, minutes, 0, 0);
-
-    const settingsToSave = {
-      ...settings,
-      nextCouponAvailableDate: newDate,
-    };
-    
-    setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
-    toast({
-        title: 'Settings Saved',
-        description: 'Economy settings have been updated globally.',
-    });
-  };
-
   const isLoading = isUserProfileLoading || areSettingsLoading;
-
-  if (isLoading) {
-    return (
-      <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (userProfile?.role !== 'admin') {
-    return null;
-  }
-
+  
   // Date dropdown logic
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -141,6 +108,38 @@ export default function EconomySettingsPage() {
       return days;
   }, [daysInMonth, year, month, currentYear, currentMonth, currentDay]);
 
+  // Combine local date/time into the main settings object before saving
+  const handleSave = () => {
+    if (!settingsDocRef) return;
+    
+    // Construct date from dropdowns and time
+    const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const [hours, minutes] = time.split(':').map(Number);
+    newDate.setHours(hours, minutes, 0, 0);
+
+    const settingsToSave = {
+      ...settings,
+      nextCouponAvailableDate: newDate,
+    };
+    
+    setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
+    toast({
+        title: 'Settings Saved',
+        description: 'Economy settings have been updated globally.',
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (userProfile?.role !== 'admin') {
+    return null;
+  }
 
   const handleYearChange = (newYear: string) => {
       setYear(newYear);
