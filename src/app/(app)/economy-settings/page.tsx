@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -41,6 +42,11 @@ export default function EconomySettingsPage() {
     nextCouponAvailableDate: new Date(),
   });
 
+  const [day, setDay] = useState('');
+  const [month, setMonth] = useState('');
+  const [year, setYear] = useState('');
+  const [time, setTime] = useState('09:00');
+
   const settingsDocRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return doc(firestore, 'settings', 'economy');
@@ -50,14 +56,20 @@ export default function EconomySettingsPage() {
 
   useEffect(() => {
     if (remoteSettings) {
-      // Ensure date comes in as a Date object
-      const newSettings = { ...remoteSettings };
+      const newSettings: Partial<EconomySettings> = { ...remoteSettings };
       if (remoteSettings.nextCouponAvailableDate && remoteSettings.nextCouponAvailableDate.seconds) {
-        newSettings.nextCouponAvailableDate = new Date(remoteSettings.nextCouponAvailableDate.seconds * 1000);
+        const date = new Date(remoteSettings.nextCouponAvailableDate.seconds * 1000);
+        newSettings.nextCouponAvailableDate = date;
+        // Pre-fill dropdowns from loaded settings
+        setYear(date.getFullYear().toString());
+        setMonth((date.getMonth() + 1).toString());
+        setDay(date.getDate().toString());
+        setTime(format(date, 'HH:mm'));
       }
       setSettings(newSettings);
     }
   }, [remoteSettings]);
+
 
   useEffect(() => {
     if (!isUserProfileLoading && userProfile?.role !== 'admin') {
@@ -65,9 +77,21 @@ export default function EconomySettingsPage() {
     }
   }, [userProfile, isUserProfileLoading, router]);
 
+  // Combine local date/time into the main settings object before saving
   const handleSave = () => {
     if (!settingsDocRef) return;
-    setDocumentNonBlocking(settingsDocRef, settings, { merge: true });
+    
+    // Construct date from dropdowns and time
+    const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const [hours, minutes] = time.split(':').map(Number);
+    newDate.setHours(hours, minutes, 0, 0);
+
+    const settingsToSave = {
+      ...settings,
+      nextCouponAvailableDate: newDate,
+    };
+    
+    setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
     toast({
         title: 'Settings Saved',
         description: 'Economy settings have been updated globally.',
@@ -88,23 +112,46 @@ export default function EconomySettingsPage() {
     return null;
   }
 
-  const handleDateChange = (date: Date | undefined) => {
-      if (!date) return;
-      const current = settings.nextCouponAvailableDate || new Date();
-      const newDate = new Date(date);
-      // Preserve time from existing state
-      newDate.setHours(current.getHours(), current.getMinutes());
-      setSettings({ ...settings, nextCouponAvailableDate: newDate });
-  };
-  
-  const handleTimeChange = (time: string) => {
-      const [hours, minutes] = time.split(':').map(Number);
-      const current = settings.nextCouponAvailableDate || new Date();
-      const newDate = new Date(current);
-      newDate.setHours(hours, minutes, 0, 0);
-      setSettings({ ...settings, nextCouponAvailableDate: newDate });
-  };
+  // Date dropdown logic
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1; // 1-indexed
+  const currentDay = today.getDate();
 
+  const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+    
+  const availableMonths = useMemo(() => {
+      const allMonths = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
+      if (parseInt(year) === currentYear) {
+          return allMonths.slice(currentMonth - 1);
+      }
+      return allMonths;
+  }, [year, currentYear, currentMonth]);
+
+  const daysInMonth = useMemo(() => {
+      if (!month || !year) return 31;
+      return new Date(parseInt(year), parseInt(month), 0).getDate();
+  }, [month, year]);
+
+  const availableDays = useMemo(() => {
+      const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+      if (parseInt(year) === currentYear && parseInt(month) === currentMonth) {
+          return days.filter(d => d >= currentDay);
+      }
+      return days;
+  }, [daysInMonth, year, month, currentYear, currentMonth, currentDay]);
+
+
+  const handleYearChange = (newYear: string) => {
+      setYear(newYear);
+      setMonth('');
+      setDay('');
+  }
+
+  const handleMonthChange = (newMonth: string) => {
+      setMonth(newMonth);
+      setDay('');
+  }
 
   return (
     <div>
@@ -324,34 +371,30 @@ export default function EconomySettingsPage() {
                         </div>
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="cooldownHours">Next Coupon Availability Date</Label>
+                        <Label htmlFor="cooldownHours">Next Coupon Availability Date & Time</Label>
                          <div className="flex flex-wrap gap-2">
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-[240px] justify-start text-left font-normal",
-                                        !settings.nextCouponAvailableDate && "text-muted-foreground"
-                                    )}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {settings.nextCouponAvailableDate ? format(settings.nextCouponAvailableDate, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={settings.nextCouponAvailableDate}
-                                    onSelect={handleDateChange}
-                                    initialFocus
-                                />
-                                </PopoverContent>
-                            </Popover>
+                             <Select onValueChange={handleYearChange} value={year}>
+                                <SelectTrigger className="w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger>
+                                <SelectContent>
+                                    {years.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Select onValueChange={handleMonthChange} value={month} disabled={!year}>
+                                <SelectTrigger className="w-[150px]"><SelectValue placeholder="Month" /></SelectTrigger>
+                                <SelectContent>
+                                    {availableMonths.map(m => <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Select onValueChange={setDay} value={day} disabled={!month}>
+                                <SelectTrigger className="w-[100px]"><SelectValue placeholder="Day" /></SelectTrigger>
+                                <SelectContent>
+                                    {availableDays.map(d => <SelectItem key={d} value={d.toString()}>{d}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
                             <Input
                                 type="time"
-                                value={settings.nextCouponAvailableDate ? format(settings.nextCouponAvailableDate, 'HH:mm') : ''}
-                                onChange={e => handleTimeChange(e.target.value)}
+                                value={time}
+                                onChange={e => setTime(e.target.value)}
                                 className="w-auto"
                             />
                         </div>
