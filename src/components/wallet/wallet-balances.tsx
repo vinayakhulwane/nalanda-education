@@ -1,7 +1,7 @@
 'use client';
 
 import type { User } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Coins, Crown, Gem, BrainCircuit } from 'lucide-react';
 
 interface WalletBalancesProps {
@@ -19,28 +19,28 @@ export function WalletBalances({ userProfile }: WalletBalancesProps) {
     );
   }
 
+  const balances = [
+    { name: 'Coins', value: userProfile.coins || 0, icon: Coins, color: 'text-yellow-500' },
+    { name: 'Gold', value: userProfile.gold || 0, icon: Crown, color: 'text-amber-500' },
+    { name: 'Diamonds', value: userProfile.diamonds || 0, icon: Gem, color: 'text-blue-500' },
+    { name: 'AI Credits', value: userProfile.aiCredits || 0, icon: BrainCircuit, color: 'text-indigo-500' },
+  ];
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <Card className="flex flex-col items-center justify-center p-6 text-center">
-        <Coins className="h-12 w-12 text-yellow-500 mb-4" />
-        <p className="text-4xl font-bold">{userProfile.coins || 0}</p>
-        <p className="text-muted-foreground mt-1">Coins</p>
-      </Card>
-      <Card className="flex flex-col items-center justify-center p-6 text-center">
-        <Crown className="h-12 w-12 text-amber-500 mb-4" />
-        <p className="text-4xl font-bold">{userProfile.gold || 0}</p>
-        <p className="text-muted-foreground mt-1">Gold</p>
-      </Card>
-      <Card className="flex flex-col items-center justify-center p-6 text-center">
-        <Gem className="h-12 w-12 text-blue-500 mb-4" />
-        <p className="text-4xl font-bold">{userProfile.diamonds || 0}</p>
-        <p className="text-muted-foreground mt-1">Diamonds</p>
-      </Card>
-      <Card className="flex flex-col items-center justify-center p-6 text-center">
-        <BrainCircuit className="h-12 w-12 text-indigo-500 mb-4" />
-        <p className="text-4xl font-bold">{userProfile.aiCredits || 0}</p>
-        <p className="text-muted-foreground mt-1">AI Credits</p>
-      </Card>
-    </div>
+    <Card>
+        <CardContent className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {balances.map(({ name, value, icon: Icon, color }) => (
+                    <div key={name} className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                        <Icon className={`h-10 w-10 ${color} shrink-0`} />
+                        <div>
+                            <p className="text-2xl font-bold">{value}</p>
+                            <p className="text-sm text-muted-foreground">{name}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </CardContent>
+    </Card>
   );
 }
