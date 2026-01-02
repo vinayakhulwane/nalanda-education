@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
@@ -11,6 +12,7 @@ import { Loader2, Users, Filter, Wallet, BarChart2, Target, TrendingUp, Gem, Coi
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useRouter } from 'next/navigation'; // Import useRouter
+import { query, where, documentId } from 'firebase/firestore';
 
 type SubjectEnrollmentInfo = {
     subject: Subject;
@@ -91,10 +93,20 @@ export function StudentProgressList() {
     const attemptsRef = useMemoFirebase(() => firestore && collection(firestore, 'worksheet_attempts'), [firestore]);
     const { data: allAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(attemptsRef);
 
-    const worksheetsRef = useMemoFirebase(() => firestore && collection(firestore, 'worksheets'), [firestore]);
+    const worksheetsRef = useMemoFirebase(() => {
+        if (!firestore || !allAttempts || allAttempts.length === 0) return null;
+        const worksheetIds = [...new Set(allAttempts.map(a => a.worksheetId))];
+        if (worksheetIds.length === 0) return null; // ✅ FIX: Prevent empty 'in' query
+        return query(collection(firestore, 'worksheets'), where(documentId(), 'in', worksheetIds.slice(0, 30)));
+    }, [firestore, allAttempts]);
     const { data: allWorksheets, isLoading: worksheetsLoading } = useCollection<Worksheet>(worksheetsRef);
     
-    const questionsRef = useMemoFirebase(() => firestore && collection(firestore, 'questions'), [firestore]);
+    const questionsRef = useMemoFirebase(() => {
+        if (!firestore || !allWorksheets || allWorksheets.length === 0) return null;
+        const questionIds = [...new Set(allWorksheets.flatMap(w => w.questions))];
+        if (questionIds.length === 0) return null; // ✅ FIX: Prevent empty 'in' query
+        return query(collection(firestore, 'questions'), where(documentId(), 'in', questionIds.slice(0, 30)));
+    }, [firestore, allWorksheets]);
     const { data: allQuestions, isLoading: questionsLoading } = useCollection<Question>(questionsRef);
 
     const isLoading = subjectsLoading || classesLoading || usersLoading || attemptsLoading || worksheetsLoading || questionsLoading;

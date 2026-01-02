@@ -63,10 +63,10 @@ function QuestionBankPageContent() {
   const { data: units, isLoading: areUnitsLoading } = useCollection<Unit>(unitsQuery);
 
   const categoriesQuery = useMemoFirebase(() => {
-      if (!firestore || !units || units.length === 0) return null;
+      if (!firestore || !units) return null;
       // Fetch all categories for the subject once, as filtering happens client-side.
       const unitIds = units.map(u => u.id);
-      if (unitIds.length === 0) return null;
+      if (unitIds.length === 0) return null; // ✅ FIX: Prevent empty 'in' query
       return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
   }, [firestore, units]);
   const { data: categories, isLoading: areCategoriesLoading } = useCollection<Category>(categoriesQuery);
