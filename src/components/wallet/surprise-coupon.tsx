@@ -5,7 +5,7 @@ import type { User, EconomySettings, CurrencyType, Worksheet, WorksheetAttempt }
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Gift, Loader2, CheckCircle2, Lock } from 'lucide-react';
-import { useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
 import { doc, updateDoc, writeBatch, collection, increment, serverTimestamp, query, where } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +51,7 @@ function CountdownTimer({ targetDate }: { targetDate: Date }) {
 
 export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [isClaiming, setIsClaiming] = useState(false);
   const [isReadyToClaim, setIsReadyToClaim] = useState(false);
@@ -129,15 +130,16 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
     }
     
     // For subsequent rewards, check date AND conditions
-    const dateIsReady = new Date() >= nextAvailableDate;
-    const lastClaimWasBeforeCycle = !lastClaimedDate || lastClaimedDate < nextAvailableDate;
+    if (settings) {
+        const dateIsReady = new Date() >= nextAvailableDate;
+        const lastClaimWasBeforeCycle = !lastClaimedDate || lastClaimedDate < nextAvailableDate;
+        setIsReadyToClaim(dateIsReady && lastClaimWasBeforeCycle && conditionsMet);
+    }
 
-    setIsReadyToClaim(dateIsReady && lastClaimWasBeforeCycle && conditionsMet);
-
-  }, [userProfile, lastClaimedDate, nextAvailableDate, conditionsMet]);
+  }, [userProfile, lastClaimedDate, nextAvailableDate, conditionsMet, settings]);
 
   const handleClaim = async () => {
-    if (!firestore || !userProfile.id || !settings) return;
+    if (!firestore || !userProfile.id || !settings || !user) return;
     setIsClaiming(true);
 
     const isWelcomeGift = !userProfile.hasClaimedWelcomeCoupon;
@@ -165,6 +167,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
             amount: rewardAmount,
             currency: rewardCurrency,
             createdAt: serverTimestamp(),
+            adminId: user.uid,
         });
         
         await batch.commit();

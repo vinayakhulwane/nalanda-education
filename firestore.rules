@@ -72,7 +72,8 @@ service cloud.firestore {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(userId) && hasValidAndConsistentUserDataOnCreate(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      // ✅ Allow users to update their own coupon status
+      allow update: if (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastCouponClaimedAt', 'hasClaimedWelcomeCoupon'])) || isAdmin();
       allow delete: if isExistingOwner(userId);
     }
      
