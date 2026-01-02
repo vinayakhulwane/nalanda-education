@@ -63,6 +63,11 @@ export default function EconomySettingsPage() {
   const years = useMemo(() => Array.from({ length: 10 }, (_, i) => currentYear + i), [currentYear]);
     
   const availableMonths = useMemo(() => {
+      if (!year) { 
+        const allMonths = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
+        if (currentYear.toString() === year) return allMonths.slice(currentMonth -1)
+        return allMonths
+      };
       const allMonths = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
       if (parseInt(year) === currentYear) {
           return allMonths.slice(currentMonth - 1);
@@ -76,6 +81,7 @@ export default function EconomySettingsPage() {
   }, [month, year]);
 
   const availableDays = useMemo(() => {
+      if (!month || !year) return Array.from({ length: daysInMonth }, (_, i) => i + 1);
       const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
       if (parseInt(year) === currentYear && parseInt(month) === currentMonth) {
           return days.filter(d => d >= currentDay);
@@ -109,29 +115,58 @@ export default function EconomySettingsPage() {
   const isLoading = isUserProfileLoading || areSettingsLoading;
   
 
-  const handleSave = async () => {
+  const handleSave = async (payload: Partial<EconomySettings>, sectionName: string) => {
     if (!settingsDocRef) return;
     
     setIsSaving(true);
-    let settingsToSave = { ...settings };
-
-    // Construct date from dropdowns and time if they are set
-    if (year && month && day) {
-        const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        const [hours, minutes] = time.split(':').map(Number);
-        newDate.setHours(hours, minutes, 0, 0);
-        settingsToSave.nextCouponAvailableDate = newDate;
-    }
-    
-    await setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
+    await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
     
     toast({
         title: 'Settings Saved',
-        description: 'Economy settings have been updated globally.',
+        description: `${sectionName} settings have been updated.`,
     });
     
     setIsSaving(false);
   };
+  
+  const handleSaveExchangeRates = () => {
+    const payload = {
+        coinToGold: settings.coinToGold,
+        goldToDiamond: settings.goldToDiamond,
+    };
+    handleSave(payload, 'Exchange Rate');
+  };
+
+  const handleSaveContentCosts = () => {
+    const payload = {
+        costPerMark: settings.costPerMark,
+        solutionCost: settings.solutionCost,
+        solutionCurrency: settings.solutionCurrency,
+    };
+    handleSave(payload, 'Content Cost');
+  };
+
+  const handleSaveCouponSettings = () => {
+      let payload: Partial<EconomySettings> = {
+        welcomeAiCredits: settings.welcomeAiCredits,
+        surpriseRewardAmount: settings.surpriseRewardAmount,
+        surpriseRewardCurrency: settings.surpriseRewardCurrency,
+        couponConditions: settings.couponConditions,
+        rewardPractice: settings.rewardPractice,
+        rewardClassroom: settings.rewardClassroom,
+        rewardSpark: settings.rewardSpark,
+    };
+
+    if (year && month && day) {
+        const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const [hours, minutes] = time.split(':').map(Number);
+        newDate.setHours(hours, minutes, 0, 0);
+        payload.nextCouponAvailableDate = newDate;
+    }
+    
+    handleSave(payload, 'Coupon and Reward');
+  };
+
 
   if (isLoading) {
     return (
@@ -222,7 +257,7 @@ export default function EconomySettingsPage() {
             </div>
           </CardContent>
            <CardFooter className="border-t px-6 py-4">
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSaveExchangeRates} disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Exchange Rates
             </Button>
@@ -295,60 +330,9 @@ export default function EconomySettingsPage() {
               </div>
           </CardContent>
            <CardFooter className="border-t px-6 py-4">
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSaveContentCosts} disabled={isSaving}>
               {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Content Costs
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* SECTION 3: REWARD RULES */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-              <CardTitle>Reward Rules</CardTitle>
-            </div>
-            <CardDescription>Set the percentage of rewards students earn for different activities.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="rewardPractice">Practice Test Reward (Multiplier)</Label>
-                <Input 
-                  id="rewardPractice"
-                  type="number" step="0.1"
-                  value={settings.rewardPractice ?? 1.0} 
-                  onChange={(e) => setSettings({...settings, rewardPractice: parseFloat(e.target.value)})} 
-                />
-                <p className="text-xs text-muted-foreground">Default: 1.0 (100% Rewards)</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="rewardClassroom">Classroom Assignment Reward (Multiplier)</Label>
-                <Input 
-                  id="rewardClassroom"
-                  type="number" step="0.1"
-                  value={settings.rewardClassroom ?? 0.5} 
-                  onChange={(e) => setSettings({...settings, rewardClassroom: parseFloat(e.target.value)})} 
-                />
-                <p className="text-xs text-muted-foreground">Default: 0.5 (50% Rewards)</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="rewardSpark">Spark Conversion Rate</Label>
-                <Input 
-                  id="rewardSpark"
-                  type="number" step="0.1"
-                  value={settings.rewardSpark ?? 0.5} 
-                  onChange={(e) => setSettings({...settings, rewardSpark: parseFloat(e.target.value)})} 
-                />
-                <p className="text-xs text-muted-foreground">Rate at which Spark Marks convert to Coins.</p>
-              </div>
-            </div>
-          </CardContent>
-           <CardFooter className="border-t px-6 py-4">
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Save Reward Rules
             </Button>
           </CardFooter>
         </Card>
@@ -358,11 +342,49 @@ export default function EconomySettingsPage() {
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <Gift className="h-5 w-5 text-primary" />
-                    <CardTitle>Surprise Coupon Settings</CardTitle>
+                    <CardTitle>Rewards & Coupon Settings</CardTitle>
                 </div>
                 <CardDescription>Configure gifts, recurring rewards, and eligibility criteria.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                
+                 {/* REWARD RULES */}
+                 <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
+                    <h3 className="font-semibold text-sm flex items-center gap-2"><Trophy className="h-4 w-4"/>Reward Rules</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="rewardPractice">Practice Test Reward (Multiplier)</Label>
+                        <Input 
+                          id="rewardPractice"
+                          type="number" step="0.1"
+                          value={settings.rewardPractice ?? 1.0} 
+                          onChange={(e) => setSettings({...settings, rewardPractice: parseFloat(e.target.value)})} 
+                        />
+                        <p className="text-xs text-muted-foreground">Default: 1.0 (100% Rewards)</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="rewardClassroom">Classroom Assignment Reward (Multiplier)</Label>
+                        <Input 
+                          id="rewardClassroom"
+                          type="number" step="0.1"
+                          value={settings.rewardClassroom ?? 0.5} 
+                          onChange={(e) => setSettings({...settings, rewardClassroom: parseFloat(e.target.value)})} 
+                        />
+                        <p className="text-xs text-muted-foreground">Default: 0.5 (50% Rewards)</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="rewardSpark">Spark Conversion Rate</Label>
+                        <Input 
+                          id="rewardSpark"
+                          type="number" step="0.1"
+                          value={settings.rewardSpark ?? 0.5} 
+                          onChange={(e) => setSettings({...settings, rewardSpark: parseFloat(e.target.value)})} 
+                        />
+                        <p className="text-xs text-muted-foreground">Rate at which Spark Marks convert to Coins.</p>
+                      </div>
+                    </div>
+                </div>
+
                 <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
                     <h3 className="font-semibold text-sm">New User Welcome Gift</h3>
                      <div className="space-y-2">
@@ -468,9 +490,9 @@ export default function EconomySettingsPage() {
                  </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-                <Button onClick={handleSave} disabled={isSaving}>
+                <Button onClick={handleSaveCouponSettings} disabled={isSaving}>
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Save Coupon Settings
+                  Save Rewards & Coupon Settings
                 </Button>
             </CardFooter>
         </Card>
