@@ -2,7 +2,7 @@
 import type { Question, Unit, Category, CurrencyType, EconomySettings } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
-import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Filter, X, Eye, CheckCircle2, Search, FileText } from 'lucide-react';
+import { PlusCircle, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Filter, X, Eye, CheckCircle2, Search, FileText, BrainCircuit } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
@@ -38,6 +38,7 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
     coin: Coins,
     gold: Crown,
     diamond: Gem,
+    aiCredits: BrainCircuit,
 };
 
 // Defined at top level to avoid ReferenceError
@@ -49,6 +50,7 @@ const currencyStyles: Record<CurrencyType, { badgeBg: string, badgeText: string,
     coin: { badgeBg: 'bg-yellow-100 dark:bg-yellow-900/30', badgeText: 'text-yellow-700 dark:text-yellow-400', border: 'border-yellow-200' },
     gold: { badgeBg: 'bg-amber-100 dark:bg-amber-900/30', badgeText: 'text-amber-700 dark:text-amber-400', border: 'border-amber-200' },
     diamond: { badgeBg: 'bg-blue-100 dark:bg-blue-900/30', badgeText: 'text-blue-700 dark:text-blue-400', border: 'border-blue-200' },
+    aiCredits: { badgeBg: 'bg-indigo-100 dark:bg-indigo-900/30', badgeText: 'text-indigo-700 dark:text-indigo-400', border: 'border-indigo-200' },
 };
 
 // ✅ HELPER: Cleans HTML entities and tags for preview
@@ -203,7 +205,8 @@ export function WorksheetManualBuilder({
         if (!userProfile) return false;
         return (userProfile.coins >= creationCost.coins) &&
             (userProfile.gold >= creationCost.gold) &&
-            (userProfile.diamonds >= creationCost.diamonds);
+            (userProfile.diamonds >= creationCost.diamonds) &&
+            ((userProfile.aiCredits || 0) >= (creationCost.aiCredits || 0));
     }, [userProfile, creationCost, userIsEditor]);
 
     const handleFilterChange = (filterType: 'units' | 'categories' | 'currencies', value: string, isChecked: boolean) => {
@@ -628,13 +631,14 @@ export function WorksheetManualBuilder({
                                                 <span className="text-muted-foreground">Estimated Time</span>
                                                 <span>{estimatedTime} mins</span>
                                             </div>
-                                            {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0) && (
+                                            {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0 || (creationCost.aiCredits ?? 0) > 0) && (
                                                  <div className="flex justify-between items-center text-sm font-medium">
                                                     <span className="text-muted-foreground">Creation Cost</span>
                                                     <div className="flex gap-2">
                                                         {creationCost.coins > 0 && <span className="flex items-center text-yellow-600"><Coins className="mr-1 h-3 w-3" />{creationCost.coins}</span>}
                                                         {creationCost.gold > 0 && <span className="flex items-center text-amber-600"><Crown className="mr-1 h-3 w-3" />{creationCost.gold}</span>}
                                                         {creationCost.diamonds > 0 && <span className="flex items-center text-blue-600"><Gem className="mr-1 h-3 w-3" />{creationCost.diamonds}</span>}
+                                                        {(creationCost.aiCredits ?? 0) > 0 && <span className="flex items-center text-indigo-600"><BrainCircuit className="mr-1 h-3 w-3" />{creationCost.aiCredits}</span>}
                                                     </div>
                                                 </div>
                                             )}
@@ -761,13 +765,14 @@ export function WorksheetManualBuilder({
                                     <span className="text-muted-foreground">Estimated Time</span>
                                     <span>{estimatedTime} mins</span>
                                 </div>
-                                {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0) && (
+                                {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0 || (creationCost.aiCredits ?? 0) > 0) && (
                                      <div className="flex justify-between items-center text-sm font-medium">
                                         <span className="text-muted-foreground">Creation Cost</span>
                                         <div className="flex gap-2">
                                             {creationCost.coins > 0 && <span className="flex items-center text-yellow-600"><Coins className="mr-1 h-3 w-3" />{creationCost.coins}</span>}
                                             {creationCost.gold > 0 && <span className="flex items-center text-amber-600"><Crown className="mr-1 h-3 w-3" />{creationCost.gold}</span>}
                                             {creationCost.diamonds > 0 && <span className="flex items-center text-blue-600"><Gem className="mr-1 h-3 w-3" />{creationCost.diamonds}</span>}
+                                            {(creationCost.aiCredits ?? 0) > 0 && <span className="flex items-center text-indigo-600"><BrainCircuit className="mr-1 h-3 w-3" />{creationCost.aiCredits}</span>}
                                         </div>
                                     </div>
                                 )}

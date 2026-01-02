@@ -249,4 +249,5 @@ export interface WalletTransaction {
     coins: number;
     gold: number;
     diamonds: number;
+    aiCredits?: number;
 }

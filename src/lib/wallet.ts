@@ -33,10 +33,16 @@ export function calculateWorksheetCost(
     // Merge provided settings with defaults
     const activeSettings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
     
-    const totalCost: WalletTransaction = { coins: 0, gold: 0, diamonds: 0 };
+    const totalCost: WalletTransaction = { coins: 0, gold: 0, diamonds: 0, aiCredits: 0 };
     const multiplier = getSafeNumber(activeSettings.costPerMark, 0.5);
 
     for (const question of questions) {
+        // AI Graded questions have a flat AI Credit cost
+        if (question.gradingMode === 'ai') {
+            totalCost.aiCredits = (totalCost.aiCredits || 0) + 1;
+            continue; // Skip other currency cost for AI questions
+        }
+
         // Safe lowercase check
         const type = (question.currencyType || 'coin').toLowerCase();
         

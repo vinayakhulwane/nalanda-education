@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { WorksheetRandomBuilder } from "@/components/worksheet-random-builder";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import type { Question, Subject, Worksheet, Unit, Category, EconomySettings } from "@/types"; 
-import { collection, query, where, doc, addDoc, serverTimestamp, updateDoc, increment, getDoc } from "firebase/firestore"; 
+import { collection, query, where, doc, addDoc, serverTimestamp, updateDoc, increment, getDoc, writeBatch } from "firebase/firestore"; 
 import { Loader2, ArrowLeft, Wand2, PenTool } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from 'react';
@@ -59,6 +59,7 @@ function AddQuestionsPageContent() {
     const allCategoriesQuery = useMemoFirebase(() => {
         if (!firestore || !allUnits || allUnits.length === 0) return null;
         const unitIds = allUnits.map(u => u.id);
+        if (unitIds.length === 0) return null; 
         return query(collection(firestore, 'categories'), where('unitId', 'in', unitIds.slice(0, 30)));
     }, [firestore, allUnits]);
     const { data: allCategories, isLoading: areCategoriesLoading } = useCollection<Category>(allCategoriesQuery);
@@ -91,7 +92,8 @@ function AddQuestionsPageContent() {
                 
                 const canAfford = (userProfile.coins ?? 0) >= cost.coins && 
                                   (userProfile.gold ?? 0) >= cost.gold && 
-                                  (userProfile.diamonds ?? 0) >= cost.diamonds;
+                                  (userProfile.diamonds ?? 0) >= cost.diamonds &&
+                                  ((userProfile.aiCredits ?? 0) >= (cost.aiCredits ?? 0));
                 
                 if (!canAfford) {
                     toast({
@@ -104,48 +106,27 @@ function AddQuestionsPageContent() {
                 }
                 
                 const userRef = doc(firestore, 'users', user.uid);
-                const updatePayload: Record<string, any> = {};
-                const transactionLogs: Promise<any>[] = [];
+                const batch = writeBatch(firestore);
                 const transactionDescription = `Practice Fee: ${title}`;
 
                 if (cost.coins > 0) {
-                    updatePayload['coins'] = increment(-cost.coins);
-                    transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
-                        userId: user.uid,
-                        type: 'spent',
-                        description: transactionDescription,
-                        amount: cost.coins,
-                        currency: 'coin',
-                        createdAt: serverTimestamp()
-                    }));
+                    batch.update(userRef, { 'coins': increment(-cost.coins) });
+                    batch.set(doc(collection(firestore, 'transactions')), { userId: user.uid, type: 'spent', description: transactionDescription, amount: cost.coins, currency: 'coin', createdAt: serverTimestamp() });
                 }
                 if (cost.gold > 0) {
-                    updatePayload['gold'] = increment(-cost.gold);
-                    transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
-                        userId: user.uid,
-                        type: 'spent',
-                        description: transactionDescription,
-                        amount: cost.gold,
-                        currency: 'gold',
-                        createdAt: serverTimestamp()
-                    }));
+                    batch.update(userRef, { 'gold': increment(-cost.gold) });
+                    batch.set(doc(collection(firestore, 'transactions')), { userId: user.uid, type: 'spent', description: transactionDescription, amount: cost.gold, currency: 'gold', createdAt: serverTimestamp() });
                 }
                 if (cost.diamonds > 0) {
-                    updatePayload['diamonds'] = increment(-cost.diamonds);
-                    transactionLogs.push(addDoc(collection(firestore, 'transactions'), {
-                        userId: user.uid,
-                        type: 'spent',
-                        description: transactionDescription,
-                        amount: cost.diamonds,
-                        currency: 'diamond',
-                        createdAt: serverTimestamp()
-                    }));
+                    batch.update(userRef, { 'diamonds': increment(-cost.diamonds) });
+                    batch.set(doc(collection(firestore, 'transactions')), { userId: user.uid, type: 'spent', description: transactionDescription, amount: cost.diamonds, currency: 'diamond', createdAt: serverTimestamp() });
                 }
-
-                if (Object.keys(updatePayload).length > 0) {
-                    await updateDoc(userRef, updatePayload);
-                    await Promise.all(transactionLogs);
+                if (cost.aiCredits && cost.aiCredits > 0) {
+                    batch.update(userRef, { 'aiCredits': increment(-cost.aiCredits) });
+                    batch.set(doc(collection(firestore, 'transactions')), { userId: user.uid, type: 'spent', description: transactionDescription, amount: cost.aiCredits, currency: 'aiCredits', createdAt: serverTimestamp() });
                 }
+                
+                await batch.commit();
             }
             
             const newWorksheet: Omit<Worksheet, 'id'> = {

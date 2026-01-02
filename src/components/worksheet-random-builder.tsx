@@ -4,7 +4,7 @@ import type { Question, CurrencyType, Unit, Category, EconomySettings } from '@/
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ShoppingCart, PlusCircle, Filter, Trash2, Bot, Coins, Gem, Crown, Sparkles, Wand2, PieChart, ArrowRight, Search } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Filter, Trash2, Bot, Coins, Gem, Crown, Sparkles, Wand2, PieChart, ArrowRight, Search, BrainCircuit } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -36,6 +36,7 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
     coin: Coins,
     gold: Crown,
     diamond: Gem,
+    aiCredits: BrainCircuit,
 };
 
 // ✅ MOVED TO TOP: Defined here so it's accessible everywhere
@@ -67,6 +68,12 @@ const currencyStyles: Record<CurrencyType, { bg: string, text: string, border: s
         border: 'border-blue-200 dark:border-blue-800',
         iconBg: 'text-blue-300/50 dark:text-blue-600/50'
     },
+    aiCredits: {
+        bg: 'bg-indigo-50 dark:bg-indigo-950/30',
+        text: 'text-indigo-700 dark:text-indigo-400',
+        border: 'border-indigo-200 dark:border-indigo-800',
+        iconBg: 'text-indigo-300/50 dark:text-indigo-600/50'
+    }
 };
 
 
@@ -275,7 +282,8 @@ export function WorksheetRandomBuilder({
         if (!userProfile) return false;
         return (userProfile.coins >= creationCost.coins) &&
                (userProfile.gold >= creationCost.gold) &&
-               (userProfile.diamonds >= creationCost.diamonds);
+               (userProfile.diamonds >= creationCost.diamonds) &&
+               ((userProfile.aiCredits || 0) >= (creationCost.aiCredits || 0));
     }, [userProfile, creationCost, userIsEditor]);
 
 
@@ -623,13 +631,14 @@ export function WorksheetRandomBuilder({
                             <span className="text-muted-foreground">Estimated Time</span>
                             <span>{estimatedTime} mins</span>
                         </div>
-                        {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0) && (
+                        {!userIsEditor && (creationCost.coins > 0 || creationCost.gold > 0 || creationCost.diamonds > 0 || (creationCost.aiCredits ?? 0) > 0) && (
                              <div className="flex justify-between items-center text-sm font-medium">
                                 <span className="text-muted-foreground">Creation Cost</span>
                                 <div className="flex gap-2">
                                     {creationCost.coins > 0 && <span className="flex items-center text-yellow-600"><Coins className="mr-1 h-3 w-3" />{creationCost.coins}</span>}
                                     {creationCost.gold > 0 && <span className="flex items-center text-amber-600"><Crown className="mr-1 h-3 w-3" />{creationCost.gold}</span>}
                                     {creationCost.diamonds > 0 && <span className="flex items-center text-blue-600"><Gem className="mr-1 h-3 w-3" />{creationCost.diamonds}</span>}
+                                    {(creationCost.aiCredits ?? 0) > 0 && <span className="flex items-center text-indigo-600"><BrainCircuit className="mr-1 h-3 w-3" />{creationCost.aiCredits}</span>}
                                 </div>
                             </div>
                         )}
