@@ -218,6 +218,11 @@ export interface WorksheetAttempt {
     unlockedSolutions?: Record<string, string>; 
 }
 
+export interface CouponCondition {
+    type: 'minClassroomAssignments' | 'minPracticeAssignments' | 'minGoldQuestions' | 'minAcademicHealth';
+    value: number;
+    description: string;
+}
 
 export interface EconomySettings {
   // Exchange Rates
@@ -239,6 +244,7 @@ export interface EconomySettings {
   surpriseRewardAmount?: number;
   surpriseRewardCurrency?: CurrencyType;
   nextCouponAvailableDate?: any; // Firestore Timestamp
+  couponConditions?: CouponCondition[];
 }
 
 export interface Transaction {

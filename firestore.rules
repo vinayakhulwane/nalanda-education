@@ -1,3 +1,4 @@
+
 /**
  * # Firestore Security Rules
  *
@@ -141,8 +142,8 @@ service cloud.firestore {
       allow read: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
       allow list: if (request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) && request.query.userId == request.auth.uid) || isTeacher() || isAdmin();
 
-      // 3. Update is allowed ONLY to claim rewards. No other changes permitted.
-      allow update: if isOwner(resource.data.userId) && isClaimingRewards();
+      // 3. Update is allowed ONLY to claim rewards or unlock solutions. No other changes permitted.
+      allow update: if isOwner(resource.data.userId) && (isClaimingRewards() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unlockedSolutions']));
       allow delete: if false; // Deleting history is not allowed.
     }
 

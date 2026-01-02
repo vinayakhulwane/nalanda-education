@@ -1,18 +1,19 @@
 
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift, Calendar as CalendarIcon, Target } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { doc } from 'firebase/firestore';
-import type { EconomySettings, CurrencyType } from '@/types';
+import type { EconomySettings, CurrencyType, CouponCondition } from '@/types';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,6 +41,7 @@ export default function EconomySettingsPage() {
     surpriseRewardAmount: 100,
     surpriseRewardCurrency: 'coin',
     nextCouponAvailableDate: new Date(),
+    couponConditions: [],
   });
 
   const [day, setDay] = useState('');
@@ -53,33 +55,7 @@ export default function EconomySettingsPage() {
   }, [firestore]);
 
   const { data: remoteSettings, isLoading: areSettingsLoading } = useDoc<EconomySettings>(settingsDocRef);
-
-  useEffect(() => {
-    if (remoteSettings) {
-      const newSettings: Partial<EconomySettings> = { ...remoteSettings };
-      if (remoteSettings.nextCouponAvailableDate && remoteSettings.nextCouponAvailableDate.seconds) {
-        const date = new Date(remoteSettings.nextCouponAvailableDate.seconds * 1000);
-        newSettings.nextCouponAvailableDate = date;
-        // Pre-fill dropdowns from loaded settings
-        setYear(date.getFullYear().toString());
-        setMonth((date.getMonth() + 1).toString());
-        setDay(date.getDate().toString());
-        setTime(format(date, 'HH:mm'));
-      }
-      setSettings(newSettings);
-    }
-  }, [remoteSettings]);
-
-
-  useEffect(() => {
-    if (!isUserProfileLoading && userProfile?.role !== 'admin') {
-      router.push('/dashboard');
-    }
-  }, [userProfile, isUserProfileLoading, router]);
-
-  const isLoading = isUserProfileLoading || areSettingsLoading;
   
-  // Date dropdown logic
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1; // 1-indexed
@@ -107,6 +83,32 @@ export default function EconomySettingsPage() {
       }
       return days;
   }, [daysInMonth, year, month, currentYear, currentMonth, currentDay]);
+
+  useEffect(() => {
+    if (remoteSettings) {
+      const newSettings: Partial<EconomySettings> = { ...remoteSettings };
+      if (remoteSettings.nextCouponAvailableDate && remoteSettings.nextCouponAvailableDate.seconds) {
+        const date = new Date(remoteSettings.nextCouponAvailableDate.seconds * 1000);
+        newSettings.nextCouponAvailableDate = date;
+        // Pre-fill dropdowns from loaded settings
+        setYear(date.getFullYear().toString());
+        setMonth((date.getMonth() + 1).toString());
+        setDay(date.getDate().toString());
+        setTime(format(date, 'HH:mm'));
+      }
+      setSettings(newSettings);
+    }
+  }, [remoteSettings]);
+
+
+  useEffect(() => {
+    if (!isUserProfileLoading && userProfile?.role !== 'admin') {
+      router.push('/dashboard');
+    }
+  }, [userProfile, isUserProfileLoading, router]);
+
+  const isLoading = isUserProfileLoading || areSettingsLoading;
+  
 
   // Combine local date/time into the main settings object before saving
   const handleSave = () => {
@@ -151,6 +153,21 @@ export default function EconomySettingsPage() {
       setMonth(newMonth);
       setDay('');
   }
+
+  const handleConditionChange = (type: CouponCondition['type'], value: string) => {
+    const numValue = parseInt(value) || 0;
+    const existingConditions = settings.couponConditions || [];
+    const newConditions = existingConditions.filter(c => c.type !== type);
+    if (numValue > 0) {
+      newConditions.push({ type, value: numValue, description: '' }); // Description can be set later if needed
+    }
+    setSettings({ ...settings, couponConditions: newConditions });
+  };
+  
+  const getConditionValue = (type: CouponCondition['type']): number => {
+    return settings.couponConditions?.find(c => c.type === type)?.value || 0;
+  };
+
 
   return (
     <div>
@@ -404,6 +421,42 @@ export default function EconomySettingsPage() {
                  </div>
             </CardContent>
         </Card>
+        
+        {/* SECTION 5: COUPON ELIGIBILITY */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <CardTitle>Coupon Eligibility Conditions</CardTitle>
+            </div>
+            <CardDescription>Set optional criteria students must meet to claim the recurring coupon.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                  <div className="space-y-2">
+                      <Label>Min. Classroom Assignments</Label>
+                      <Input type="number" placeholder="e.g., 5" value={getConditionValue('minClassroomAssignments')} onChange={(e) => handleConditionChange('minClassroomAssignments', e.target.value)}/>
+                      <p className="text-xs text-muted-foreground">Completed since last coupon claim.</p>
+                  </div>
+                   <div className="space-y-2">
+                      <Label>Min. Practice Worksheets</Label>
+                      <Input type="number" placeholder="e.g., 7" value={getConditionValue('minPracticeAssignments')} onChange={(e) => handleConditionChange('minPracticeAssignments', e.target.value)} />
+                      <p className="text-xs text-muted-foreground">Completed since last coupon claim.</p>
+                  </div>
+                  <div className="space-y-2">
+                      <Label>Min. Gold Questions Solved</Label>
+                      <Input type="number" placeholder="e.g., 10" value={getConditionValue('minGoldQuestions')} onChange={(e) => handleConditionChange('minGoldQuestions', e.target.value)} />
+                      <p className="text-xs text-muted-foreground">Number of questions with a 'Gold' reward type.</p>
+                  </div>
+                   <div className="space-y-2">
+                      <Label>Min. Academic Health (%)</Label>
+                      <Input type="number" placeholder="e.g., 50" max="100" value={getConditionValue('minAcademicHealth')} onChange={(e) => handleConditionChange('minAcademicHealth', e.target.value)} />
+                      <p className="text-xs text-muted-foreground">Required health score across all subjects.</p>
+                  </div>
+              </div>
+          </CardContent>
+        </Card>
+
 
         <CardFooter className="px-0">
             <Button onClick={handleSave} size="lg" className="w-full md:w-auto">
@@ -415,3 +468,4 @@ export default function EconomySettingsPage() {
     </div>
   );
 }
+
