@@ -40,7 +40,6 @@ export function calculateWorksheetCost(
         // AI Graded questions have a flat AI Credit cost
         if (question.gradingMode === 'ai') {
             totalCost.aiCredits = (totalCost.aiCredits || 0) + 1;
-            continue; // Skip other currency cost for AI questions
         }
 
         // Safe lowercase check
