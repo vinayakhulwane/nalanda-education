@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift, Calendar as CalendarIcon, Target } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift, Target } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -17,10 +17,7 @@ import type { EconomySettings, CurrencyType, CouponCondition } from '@/types';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 export default function EconomySettingsPage() {
   const { userProfile, isUserProfileLoading } = useUser();
@@ -48,6 +45,8 @@ export default function EconomySettingsPage() {
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
   const [time, setTime] = useState('09:00');
+  
+  const [isSaving, setIsSaving] = useState(false);
 
   const settingsDocRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -60,8 +59,8 @@ export default function EconomySettingsPage() {
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1; // 1-indexed
   const currentDay = today.getDate();
-
-  const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
+  
+  const years = useMemo(() => Array.from({ length: 10 }, (_, i) => currentYear + i), [currentYear]);
     
   const availableMonths = useMemo(() => {
       const allMonths = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
@@ -94,8 +93,8 @@ export default function EconomySettingsPage() {
   useEffect(() => {
     if (remoteSettings) {
       const newSettings: Partial<EconomySettings> = { ...remoteSettings };
-      if (remoteSettings.nextCouponAvailableDate && remoteSettings.nextCouponAvailableDate.seconds) {
-        const date = new Date(remoteSettings.nextCouponAvailableDate.seconds * 1000);
+      if (remoteSettings.nextCouponAvailableDate && (remoteSettings.nextCouponAvailableDate as any).seconds) {
+        const date = new Date((remoteSettings.nextCouponAvailableDate as any).seconds * 1000);
         newSettings.nextCouponAvailableDate = date;
         // Pre-fill dropdowns from loaded settings
         setYear(date.getFullYear().toString());
@@ -110,25 +109,28 @@ export default function EconomySettingsPage() {
   const isLoading = isUserProfileLoading || areSettingsLoading;
   
 
-  // Combine local date/time into the main settings object before saving
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!settingsDocRef) return;
     
-    // Construct date from dropdowns and time
-    const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    const [hours, minutes] = time.split(':').map(Number);
-    newDate.setHours(hours, minutes, 0, 0);
+    setIsSaving(true);
+    let settingsToSave = { ...settings };
 
-    const settingsToSave = {
-      ...settings,
-      nextCouponAvailableDate: newDate,
-    };
+    // Construct date from dropdowns and time if they are set
+    if (year && month && day) {
+        const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const [hours, minutes] = time.split(':').map(Number);
+        newDate.setHours(hours, minutes, 0, 0);
+        settingsToSave.nextCouponAvailableDate = newDate;
+    }
     
-    setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
+    await setDocumentNonBlocking(settingsDocRef, settingsToSave, { merge: true });
+    
     toast({
         title: 'Settings Saved',
         description: 'Economy settings have been updated globally.',
     });
+    
+    setIsSaving(false);
   };
 
   if (isLoading) {
@@ -159,7 +161,7 @@ export default function EconomySettingsPage() {
     const existingConditions = settings.couponConditions || [];
     const newConditions = existingConditions.filter(c => c.type !== type);
     if (numValue > 0) {
-      newConditions.push({ type, value: numValue, description: '' }); // Description can be set later if needed
+      newConditions.push({ type, value: numValue, description: '' });
     }
     setSettings({ ...settings, couponConditions: newConditions });
   };
@@ -219,6 +221,12 @@ export default function EconomySettingsPage() {
               </div>
             </div>
           </CardContent>
+           <CardFooter className="border-t px-6 py-4">
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save Exchange Rates
+            </Button>
+          </CardFooter>
         </Card>
 
         {/* SECTION 2: CREATION & UNLOCK COSTS */}
@@ -286,6 +294,12 @@ export default function EconomySettingsPage() {
                  </p>
               </div>
           </CardContent>
+           <CardFooter className="border-t px-6 py-4">
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save Content Costs
+            </Button>
+          </CardFooter>
         </Card>
 
         {/* SECTION 3: REWARD RULES */}
@@ -331,6 +345,12 @@ export default function EconomySettingsPage() {
               </div>
             </div>
           </CardContent>
+           <CardFooter className="border-t px-6 py-4">
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save Reward Rules
+            </Button>
+          </CardFooter>
         </Card>
 
         {/* SECTION 4 & 5: SURPRISE COUPON & ELIGIBILITY */}
@@ -422,6 +442,7 @@ export default function EconomySettingsPage() {
 
                  <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
                     <h3 className="font-semibold text-sm flex items-center gap-2"><Target className="h-4 w-4"/>Eligibility Conditions</h3>
+                    <p className="text-xs text-muted-foreground -mt-2">Set optional criteria students must meet to claim the recurring coupon.</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                       <div className="space-y-2">
                           <Label>Min. Classroom Assignments</Label>
@@ -446,14 +467,13 @@ export default function EconomySettingsPage() {
                     </div>
                  </div>
             </CardContent>
+            <CardFooter className="border-t px-6 py-4">
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save Coupon Settings
+                </Button>
+            </CardFooter>
         </Card>
-        
-        <CardFooter className="px-0">
-            <Button onClick={handleSave} size="lg" className="w-full md:w-auto">
-              <Save className="mr-2" />
-              Save All Settings
-            </Button>
-        </CardFooter>
       </div>
     </div>
   );
