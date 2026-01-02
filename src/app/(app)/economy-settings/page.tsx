@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift, Target } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift, Target, Plus, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,30 @@ export default function EconomySettingsPage() {
 
   const { data: remoteSettings, isLoading: areSettingsLoading } = useDoc<EconomySettings>(settingsDocRef);
   
+  useEffect(() => {
+    if (!isUserProfileLoading && userProfile?.role !== 'admin') {
+      router.push('/dashboard');
+    }
+  }, [userProfile, isUserProfileLoading, router]);
+
+  useEffect(() => {
+    if (remoteSettings) {
+      const newSettings: Partial<EconomySettings> = { ...remoteSettings };
+      if (remoteSettings.nextCouponAvailableDate && (remoteSettings.nextCouponAvailableDate as any).seconds) {
+        const date = new Date((remoteSettings.nextCouponAvailableDate as any).seconds * 1000);
+        newSettings.nextCouponAvailableDate = date;
+        // Pre-fill dropdowns from loaded settings
+        setYear(date.getFullYear().toString());
+        setMonth((date.getMonth() + 1).toString());
+        setDay(date.getDate().toString());
+        setTime(format(date, 'HH:mm'));
+      }
+      setSettings(newSettings);
+    }
+  }, [remoteSettings]);
+
+  const isLoading = isUserProfileLoading || areSettingsLoading;
+
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1; // 1-indexed
@@ -88,66 +112,37 @@ export default function EconomySettingsPage() {
       }
       return days;
   }, [daysInMonth, year, month, currentYear, currentMonth, currentDay]);
-
-
-  useEffect(() => {
-    if (!isUserProfileLoading && userProfile?.role !== 'admin') {
-      router.push('/dashboard');
-    }
-  }, [userProfile, isUserProfileLoading, router]);
-
-  useEffect(() => {
-    if (remoteSettings) {
-      const newSettings: Partial<EconomySettings> = { ...remoteSettings };
-      if (remoteSettings.nextCouponAvailableDate && (remoteSettings.nextCouponAvailableDate as any).seconds) {
-        const date = new Date((remoteSettings.nextCouponAvailableDate as any).seconds * 1000);
-        newSettings.nextCouponAvailableDate = date;
-        // Pre-fill dropdowns from loaded settings
-        setYear(date.getFullYear().toString());
-        setMonth((date.getMonth() + 1).toString());
-        setDay(date.getDate().toString());
-        setTime(format(date, 'HH:mm'));
-      }
-      setSettings(newSettings);
-    }
-  }, [remoteSettings]);
-
-  const isLoading = isUserProfileLoading || areSettingsLoading;
   
 
-  const handleSave = async (payload: Partial<EconomySettings>, sectionName: string) => {
+  const handleSaveExchangeRates = async () => {
     if (!settingsDocRef) return;
-    
     setIsSaving(true);
-    await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
-    
-    toast({
-        title: 'Settings Saved',
-        description: `${sectionName} settings have been updated.`,
-    });
-    
-    setIsSaving(false);
-  };
-  
-  const handleSaveExchangeRates = () => {
     const payload = {
         coinToGold: settings.coinToGold,
         goldToDiamond: settings.goldToDiamond,
     };
-    handleSave(payload, 'Exchange Rate');
+    await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
+    toast({ title: 'Settings Saved', description: `Exchange Rate settings have been updated.` });
+    setIsSaving(false);
   };
 
-  const handleSaveContentCosts = () => {
+  const handleSaveContentCosts = async () => {
+    if (!settingsDocRef) return;
+    setIsSaving(true);
     const payload = {
         costPerMark: settings.costPerMark,
         solutionCost: settings.solutionCost,
         solutionCurrency: settings.solutionCurrency,
     };
-    handleSave(payload, 'Content Cost');
+    await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
+    toast({ title: 'Settings Saved', description: `Content Cost settings have been updated.` });
+    setIsSaving(false);
   };
 
-  const handleSaveCouponSettings = () => {
-      let payload: Partial<EconomySettings> = {
+  const handleSaveCouponSettings = async () => {
+    if (!settingsDocRef) return;
+    setIsSaving(true);
+    let payload: Partial<EconomySettings> = {
         welcomeAiCredits: settings.welcomeAiCredits,
         surpriseRewardAmount: settings.surpriseRewardAmount,
         surpriseRewardCurrency: settings.surpriseRewardCurrency,
@@ -164,7 +159,9 @@ export default function EconomySettingsPage() {
         payload.nextCouponAvailableDate = newDate;
     }
     
-    handleSave(payload, 'Coupon and Reward');
+    await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
+    toast({ title: 'Settings Saved', description: `Coupon and Reward settings have been updated.` });
+    setIsSaving(false);
   };
 
 
@@ -191,19 +188,22 @@ export default function EconomySettingsPage() {
       setDay('');
   }
 
-  const handleConditionChange = (type: CouponCondition['type'], value: string) => {
-    const numValue = parseInt(value) || 0;
-    const existingConditions = settings.couponConditions || [];
-    const newConditions = existingConditions.filter(c => c.type !== type);
-    if (numValue > 0) {
-      newConditions.push({ type, value: numValue, description: '' });
-    }
-    setSettings({ ...settings, couponConditions: newConditions });
-  };
-  
-  const getConditionValue = (type: CouponCondition['type']): number => {
-    return settings.couponConditions?.find(c => c.type === type)?.value || 0;
-  };
+  const addCondition = () => {
+    const newCondition: CouponCondition = { type: 'minClassroomAssignments', value: 1, description: '' };
+    setSettings(prev => ({...prev, couponConditions: [...(prev.couponConditions || []), newCondition]}));
+  }
+
+  const removeCondition = (index: number) => {
+      setSettings(prev => ({...prev, couponConditions: prev.couponConditions?.filter((_, i) => i !== index)}));
+  }
+
+  const updateCondition = (index: number, newCondition: Partial<CouponCondition>) => {
+      setSettings(prev => {
+          const newConditions = [...(prev.couponConditions || [])];
+          newConditions[index] = { ...newConditions[index], ...newCondition };
+          return {...prev, couponConditions: newConditions};
+      });
+  }
 
 
   return (
@@ -465,28 +465,45 @@ export default function EconomySettingsPage() {
                  <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
                     <h3 className="font-semibold text-sm flex items-center gap-2"><Target className="h-4 w-4"/>Eligibility Conditions</h3>
                     <p className="text-xs text-muted-foreground -mt-2">Set optional criteria students must meet to claim the recurring coupon.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                      <div className="space-y-2">
-                          <Label>Min. Classroom Assignments</Label>
-                          <Input type="number" placeholder="e.g., 5" value={getConditionValue('minClassroomAssignments')} onChange={(e) => handleConditionChange('minClassroomAssignments', e.target.value)}/>
-                          <p className="text-xs text-muted-foreground">Completed since last coupon claim.</p>
-                      </div>
-                       <div className="space-y-2">
-                          <Label>Min. Practice Worksheets</Label>
-                          <Input type="number" placeholder="e.g., 7" value={getConditionValue('minPracticeAssignments')} onChange={(e) => handleConditionChange('minPracticeAssignments', e.target.value)} />
-                          <p className="text-xs text-muted-foreground">Completed since last coupon claim.</p>
-                      </div>
-                      <div className="space-y-2">
-                          <Label>Min. Gold Questions Solved</Label>
-                          <Input type="number" placeholder="e.g., 10" value={getConditionValue('minGoldQuestions')} onChange={(e) => handleConditionChange('minGoldQuestions', e.target.value)} />
-                          <p className="text-xs text-muted-foreground">Number of questions with a 'Gold' reward type.</p>
-                      </div>
-                       <div className="space-y-2">
-                          <Label>Min. Academic Health (%)</Label>
-                          <Input type="number" placeholder="e.g., 50" max="100" value={getConditionValue('minAcademicHealth')} onChange={(e) => handleConditionChange('minAcademicHealth', e.target.value)} />
-                          <p className="text-xs text-muted-foreground">Required health score across all subjects.</p>
-                      </div>
+                    
+                    <div className="space-y-3">
+                        {settings.couponConditions?.map((condition, index) => (
+                            <div key={index} className="flex items-end gap-2 p-3 border rounded-lg bg-background">
+                                <div className="flex-1 space-y-2">
+                                    <Label>Condition Type</Label>
+                                    <Select 
+                                        value={condition.type}
+                                        onValueChange={(type: CouponCondition['type']) => updateCondition(index, { type, value: 1 })}
+                                    >
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="minClassroomAssignments">Min. Classroom Assignments</SelectItem>
+                                            <SelectItem value="minPracticeAssignments">Min. Practice Assignments</SelectItem>
+                                            <SelectItem value="minGoldQuestions">Min. Gold Questions</SelectItem>
+                                            <SelectItem value="minAcademicHealth">Min. Academic Health</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                     <Label>Value</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={condition.value}
+                                        onChange={(e) => updateCondition(index, { value: parseInt(e.target.value) || 0 })}
+                                        className="w-[120px]"
+                                    />
+                                </div>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive" onClick={() => removeCondition(index)}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
                     </div>
+
+                    <Button variant="outline" className="w-full border-dashed" onClick={addCondition}>
+                        <Plus className="h-4 w-4 mr-2" /> Add Condition
+                    </Button>
                  </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
