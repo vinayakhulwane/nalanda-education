@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, ArrowUpRight, ArrowDownLeft, Sparkles, Coins, Crown, Gem } from "lucide-react";
+import { Loader2, ArrowUpRight, ArrowDownLeft, Sparkles, Coins, Crown, Gem, BrainCircuit } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { CurrencyType, Transaction } from "@/types";
@@ -14,6 +15,7 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
   coin: Coins,
   gold: Crown,
   diamond: Gem,
+  aiCredits: BrainCircuit,
 };
 
 const currencyColors: Record<CurrencyType, string> = {
@@ -21,6 +23,7 @@ const currencyColors: Record<CurrencyType, string> = {
   coin: 'text-yellow-500',
   gold: 'text-amber-500',
   diamond: 'text-blue-500',
+  aiCredits: 'text-indigo-500',
 };
 
 export function TransactionHistory() {
