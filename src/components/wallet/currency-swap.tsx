@@ -7,12 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowRight, AlertTriangle, Loader2, ArrowRightLeft } from 'lucide-react';
+import { ArrowRight, AlertTriangle, Loader2, BrainCircuit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { EconomySettings } from '@/types';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 
-type Currency = 'coins' | 'gold' | 'diamonds';
+type Currency = 'coins' | 'gold' | 'diamonds' | 'aiCredits';
 
 interface CurrencySwapProps {
   userProfile: any; 
@@ -36,6 +36,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
   // 2. Define Base Rates
   const COIN_TO_GOLD = settings?.coinToGold ?? 10;
   const GOLD_TO_DIAMOND = settings?.goldToDiamond ?? 10;
+  const GOLD_TO_AICREDITS = 10; // Placeholder, should be in settings
 
   // Helper: Get 'Value' of a currency relative to Coins (Base Unit)
   const getBaseValue = (currency: Currency) => {
@@ -43,6 +44,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
         case 'coins': return 1;
         case 'gold': return COIN_TO_GOLD;
         case 'diamonds': return GOLD_TO_DIAMOND * COIN_TO_GOLD;
+        case 'aiCredits': return COIN_TO_GOLD / GOLD_TO_AICREDITS;
     }
   };
 
@@ -70,7 +72,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
 
     return { receiveAmount: result, exchangeRateText: rateText };
 
-  }, [swapAmount, fromCurrency, toCurrency, COIN_TO_GOLD, GOLD_TO_DIAMOND]);
+  }, [swapAmount, fromCurrency, toCurrency, COIN_TO_GOLD, GOLD_TO_DIAMOND, GOLD_TO_AICREDITS]);
 
 
   const currentBalance = userProfile?.[fromCurrency] || 0;
@@ -97,11 +99,21 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
       const batch = writeBatch(firestore);
       const userRef = doc(firestore, 'users', user.uid);
       const transactionsCol = collection(firestore, 'transactions');
+      
+      const fieldMap: Record<string, string> = {
+        coins: 'coins',
+        gold: 'gold',
+        diamonds: 'diamonds',
+        aiCredits: 'aiCredits'
+      };
+
+      const fromField = fieldMap[fromCurrency];
+      const toField = fieldMap[toCurrency];
 
       // 1. Update user balance
       batch.update(userRef, {
-        [fromCurrency]: increment(-amount),
-        [toCurrency]: increment(receiveAmount)
+        [fromField]: increment(-amount),
+        [toField]: increment(receiveAmount)
       });
       
       // 2. Log 'spent' transaction
@@ -174,6 +186,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
                    <SelectItem value="coins">Coins</SelectItem>
                    <SelectItem value="gold">Gold</SelectItem>
                    <SelectItem value="diamonds">Diamonds</SelectItem>
+                   <SelectItem value="aiCredits">AI Credits</SelectItem>
                  </SelectContent>
                </Select>
              </div>
@@ -205,6 +218,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
                    <SelectItem value="coins">Coins</SelectItem>
                    <SelectItem value="gold">Gold</SelectItem>
                    <SelectItem value="diamonds">Diamonds</SelectItem>
+                   <SelectItem value="aiCredits">AI Credits</SelectItem>
                  </SelectContent>
                </Select>
              </div>
