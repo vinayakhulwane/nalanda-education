@@ -84,6 +84,13 @@ export default function EconomySettingsPage() {
       return days;
   }, [daysInMonth, year, month, currentYear, currentMonth, currentDay]);
 
+
+  useEffect(() => {
+    if (!isUserProfileLoading && userProfile?.role !== 'admin') {
+      router.push('/dashboard');
+    }
+  }, [userProfile, isUserProfileLoading, router]);
+
   useEffect(() => {
     if (remoteSettings) {
       const newSettings: Partial<EconomySettings> = { ...remoteSettings };
@@ -99,13 +106,6 @@ export default function EconomySettingsPage() {
       setSettings(newSettings);
     }
   }, [remoteSettings]);
-
-
-  useEffect(() => {
-    if (!isUserProfileLoading && userProfile?.role !== 'admin') {
-      router.push('/dashboard');
-    }
-  }, [userProfile, isUserProfileLoading, router]);
 
   const isLoading = isUserProfileLoading || areSettingsLoading;
   
@@ -333,14 +333,14 @@ export default function EconomySettingsPage() {
           </CardContent>
         </Card>
 
-        {/* SECTION 4: SURPRISE COUPON */}
+        {/* SECTION 4 & 5: SURPRISE COUPON & ELIGIBILITY */}
         <Card>
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <Gift className="h-5 w-5 text-primary" />
                     <CardTitle>Surprise Coupon Settings</CardTitle>
                 </div>
-                <CardDescription>Configure the welcome gift and recurring surprise rewards for students.</CardDescription>
+                <CardDescription>Configure gifts, recurring rewards, and eligibility criteria.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
@@ -419,45 +419,35 @@ export default function EconomySettingsPage() {
                         </p>
                     </div>
                  </div>
+
+                 <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
+                    <h3 className="font-semibold text-sm flex items-center gap-2"><Target className="h-4 w-4"/>Eligibility Conditions</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                      <div className="space-y-2">
+                          <Label>Min. Classroom Assignments</Label>
+                          <Input type="number" placeholder="e.g., 5" value={getConditionValue('minClassroomAssignments')} onChange={(e) => handleConditionChange('minClassroomAssignments', e.target.value)}/>
+                          <p className="text-xs text-muted-foreground">Completed since last coupon claim.</p>
+                      </div>
+                       <div className="space-y-2">
+                          <Label>Min. Practice Worksheets</Label>
+                          <Input type="number" placeholder="e.g., 7" value={getConditionValue('minPracticeAssignments')} onChange={(e) => handleConditionChange('minPracticeAssignments', e.target.value)} />
+                          <p className="text-xs text-muted-foreground">Completed since last coupon claim.</p>
+                      </div>
+                      <div className="space-y-2">
+                          <Label>Min. Gold Questions Solved</Label>
+                          <Input type="number" placeholder="e.g., 10" value={getConditionValue('minGoldQuestions')} onChange={(e) => handleConditionChange('minGoldQuestions', e.target.value)} />
+                          <p className="text-xs text-muted-foreground">Number of questions with a 'Gold' reward type.</p>
+                      </div>
+                       <div className="space-y-2">
+                          <Label>Min. Academic Health (%)</Label>
+                          <Input type="number" placeholder="e.g., 50" max="100" value={getConditionValue('minAcademicHealth')} onChange={(e) => handleConditionChange('minAcademicHealth', e.target.value)} />
+                          <p className="text-xs text-muted-foreground">Required health score across all subjects.</p>
+                      </div>
+                    </div>
+                 </div>
             </CardContent>
         </Card>
         
-        {/* SECTION 5: COUPON ELIGIBILITY */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              <CardTitle>Coupon Eligibility Conditions</CardTitle>
-            </div>
-            <CardDescription>Set optional criteria students must meet to claim the recurring coupon.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                  <div className="space-y-2">
-                      <Label>Min. Classroom Assignments</Label>
-                      <Input type="number" placeholder="e.g., 5" value={getConditionValue('minClassroomAssignments')} onChange={(e) => handleConditionChange('minClassroomAssignments', e.target.value)}/>
-                      <p className="text-xs text-muted-foreground">Completed since last coupon claim.</p>
-                  </div>
-                   <div className="space-y-2">
-                      <Label>Min. Practice Worksheets</Label>
-                      <Input type="number" placeholder="e.g., 7" value={getConditionValue('minPracticeAssignments')} onChange={(e) => handleConditionChange('minPracticeAssignments', e.target.value)} />
-                      <p className="text-xs text-muted-foreground">Completed since last coupon claim.</p>
-                  </div>
-                  <div className="space-y-2">
-                      <Label>Min. Gold Questions Solved</Label>
-                      <Input type="number" placeholder="e.g., 10" value={getConditionValue('minGoldQuestions')} onChange={(e) => handleConditionChange('minGoldQuestions', e.target.value)} />
-                      <p className="text-xs text-muted-foreground">Number of questions with a 'Gold' reward type.</p>
-                  </div>
-                   <div className="space-y-2">
-                      <Label>Min. Academic Health (%)</Label>
-                      <Input type="number" placeholder="e.g., 50" max="100" value={getConditionValue('minAcademicHealth')} onChange={(e) => handleConditionChange('minAcademicHealth', e.target.value)} />
-                      <p className="text-xs text-muted-foreground">Required health score across all subjects.</p>
-                  </div>
-              </div>
-          </CardContent>
-        </Card>
-
-
         <CardFooter className="px-0">
             <Button onClick={handleSave} size="lg" className="w-full md:w-auto">
               <Save className="mr-2" />
@@ -468,4 +458,3 @@ export default function EconomySettingsPage() {
     </div>
   );
 }
-
