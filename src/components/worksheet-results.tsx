@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Timer, CheckCircle2, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2, ExternalLink, ArrowLeft, Printer, Lock, Unlock, Zap, GraduationCap } from "lucide-react";
+import { Timer, CheckCircle2, XCircle, Award, Sparkles, Coins, Crown, Gem, Home, Loader2, ExternalLink, ArrowLeft, Printer, Lock, Unlock, Zap, GraduationCap, BrainCircuit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc, increment, collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -51,6 +51,7 @@ const currencyIcons: Record<string, React.ElementType> = {
   gold: Crown,
   diamond: Gem,
   spark: Sparkles,
+  aiCredits: BrainCircuit,
 };
 
 const currencyColors: Record<string, string> = {
@@ -58,15 +59,25 @@ const currencyColors: Record<string, string> = {
   coin: 'text-yellow-600 dark:text-yellow-400',
   gold: 'text-amber-600 dark:text-amber-400',
   diamond: 'text-blue-600 dark:text-blue-400',
+  aiCredits: 'text-indigo-600 dark:text-indigo-400',
 };
+
+const currencyBg: Record<string, string> = {
+    coin: 'bg-yellow-100 dark:bg-yellow-900/30',
+    gold: 'bg-amber-100 dark:bg-amber-900/30',
+    diamond: 'bg-blue-100 dark:bg-blue-900/30',
+    spark: 'bg-slate-100 dark:bg-slate-800',
+    aiCredits: 'bg-indigo-100 dark:bg-indigo-900/30',
+}
 
 const CurrencyDisplay = ({ type, amount }: { type: string, amount: number }) => {
     const Icon = currencyIcons[type] || Coins;
     const colorClass = currencyColors[type] || 'text-slate-500';
+    const bgClass = currencyBg[type] || 'bg-slate-100';
     
     return (
-        <span className={cn("inline-flex items-center gap-1 font-extrabold px-2 py-0.5 rounded-md bg-opacity-10 text-xs tracking-wide", colorClass, type === 'coin' ? 'bg-yellow-100 dark:bg-yellow-900/30' : type === 'gold' ? 'bg-amber-100 dark:bg-amber-900/30' : type === 'diamond' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-slate-100')}>
-            <Icon className="h-3.5 w-3.5 fill-current" /> {amount}
+        <span className={cn("inline-flex items-center gap-1 font-extrabold px-2 py-0.5 rounded-md bg-opacity-10 text-xs tracking-wide", colorClass, bgClass)}>
+            <Icon className="h-3.5 w-3.5" /> {amount}
         </span>
     );
 };
@@ -279,7 +290,6 @@ export function WorksheetResults({
     }
   }
 
-  // ✅ FIXED: Better error handling for AI Solution generation
   const handleGetSolution = async (question: Question) => {
       if (!user || !userProfile || !attempt?.id) return;
       
@@ -287,7 +297,7 @@ export function WorksheetResults({
       const currency = settings?.solutionCurrency ?? 'coin'; 
 
       // @ts-ignore
-      const currentBalance = userProfile[currency === 'coin' ? 'coins' : currency === 'gold' ? 'gold' : 'diamonds'] || 0;
+      const currentBalance = userProfile[currency === 'coin' ? 'coins' : currency === 'aiCredits' ? 'aiCredits' : currency] || 0;
 
       if (currentBalance < cost) {
           toast({
@@ -303,9 +313,8 @@ export function WorksheetResults({
       try {
           const aiResponse = await generateSolutionAction({ questionText: question.mainQuestionText });
           
-          // ✅ CHECK: Log detailed error if API fails
           if (!aiResponse.success || !aiResponse.solution) {
-              console.error("AI Generation Error Details:", aiResponse); // View this in Browser Console
+              console.error("AI Generation Error Details:", aiResponse); 
               throw new Error(aiResponse.error || "AI could not generate a solution.");
           }
 
@@ -314,7 +323,7 @@ export function WorksheetResults({
           const userRef = doc(firestore, 'users', user.uid);
           const attemptRef = doc(firestore, 'worksheet_attempts', attempt.id);
           const updatePayload: any = {};
-          const fieldName = currency === 'coin' ? 'coins' : currency === 'gold' ? 'gold' : 'diamonds';
+          const fieldName = currency === 'coin' ? 'coins' : currency === 'aiCredits' ? 'aiCredits' : currency;
           updatePayload[fieldName] = increment(-cost);
           
           await updateDoc(userRef, updatePayload);
@@ -577,13 +586,11 @@ export function WorksheetResults({
                 </div>
                 
                 {questions.map((question, qIndex) => {
-                    // Local state logic
                     const unlockedSolution = localUnlocked[question.id] || attempt?.unlockedSolutions?.[question.id];
                     const cost = settings?.solutionCost ?? 5;
                     const currency = settings?.solutionCurrency ?? 'coin';
                     const isSolutionLoading = loadingSolutions[question.id];
 
-                    // AI Graded Question
                     if (question.gradingMode === 'ai') {
                         const firstSub = question.solutionSteps[0]?.subQuestions[0];
                         const result = results[firstSub?.id];
@@ -596,7 +603,6 @@ export function WorksheetResults({
                 
                         return (
                             <Card key={question.id} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
-                                {/* Question Header */}
                                 <div className="bg-slate-50 dark:bg-slate-900 border-b p-5">
                                     <div className="flex gap-3">
                                         <span className="flex items-center justify-center h-8 w-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shrink-0">
@@ -607,12 +613,8 @@ export function WorksheetResults({
                                         </div>
                                     </div>
                                 </div>
-
                                 <CardContent className="p-5 space-y-6">
-                                    {/* Skill Breakdown */}
                                     <AIRubricBreakdown rubric={question.aiRubric || null} breakdown={breakdown} maxMarks={qMaxMarks} />
-                                    
-                                    {/* AI Feedback */}
                                     {feedback && (
                                         <div className="relative overflow-hidden rounded-xl border border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-900 p-5">
                                             <div className="absolute top-0 right-0 p-4 opacity-5">
@@ -631,8 +633,6 @@ export function WorksheetResults({
                                             </div>
                                         </div>
                                     )}
-                                    
-                                    {/* View Submission Link */}
                                     {driveLink && (
                                         <div className="flex justify-end">
                                             <a href={driveLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors no-print px-3 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -641,8 +641,6 @@ export function WorksheetResults({
                                             </a>
                                         </div>
                                     )}
-
-                                    {/* AI Solution Block */}
                                     {unlockedSolution ? (
                                         <div className="relative overflow-hidden rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900 p-5 animate-in slide-in-from-bottom-2">
                                             <div className="relative z-10 space-y-3">
@@ -673,7 +671,6 @@ export function WorksheetResults({
                         );
                     }
 
-                    // Standard Question
                     return (
                         <Card key={question.id} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
                             <div className="bg-slate-50 dark:bg-slate-900 border-b p-5">
@@ -686,7 +683,6 @@ export function WorksheetResults({
                                     </div>
                                 </div>
                             </div>
-
                             <CardContent className="p-0">
                                 <div className="divide-y">
                                     {question.solutionSteps.flatMap(step => step.subQuestions).map(subQ => {
@@ -706,7 +702,6 @@ export function WorksheetResults({
                                                         </span>
                                                     </div>
                                                 </div>
-
                                                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <div className="p-3 bg-slate-100 dark:bg-slate-900 rounded-lg">
                                                         <span className="text-xs font-bold uppercase text-slate-500 tracking-wider block mb-1">Your Answer</span>
@@ -723,8 +718,6 @@ export function WorksheetResults({
                                         )
                                     })}
                                 </div>
-
-                                {/* Solution Section for Standard Q */}
                                 <div className="p-5 bg-slate-50/30 dark:bg-slate-900/30 border-t">
                                      {unlockedSolution ? (
                                         <div className="relative overflow-hidden rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900 p-5 animate-in slide-in-from-bottom-2">
