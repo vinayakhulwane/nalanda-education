@@ -2,7 +2,7 @@
 
 import type { User } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Coins, Crown, Gem, Sparkles } from 'lucide-react';
+import { Coins, Crown, Gem, BrainCircuit } from 'lucide-react';
 
 interface WalletBalancesProps {
   userProfile: User | null;
@@ -37,7 +37,7 @@ export function WalletBalances({ userProfile }: WalletBalancesProps) {
         <p className="text-muted-foreground mt-1">Diamonds</p>
       </Card>
       <Card className="flex flex-col items-center justify-center p-6 text-center">
-        <Sparkles className="h-12 w-12 text-indigo-500 mb-4" />
+        <BrainCircuit className="h-12 w-12 text-indigo-500 mb-4" />
         <p className="text-4xl font-bold">{userProfile.aiCredits || 0}</p>
         <p className="text-muted-foreground mt-1">AI Credits</p>
       </Card>

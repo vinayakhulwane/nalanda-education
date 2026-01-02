@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2, Users, Filter, Wallet, BarChart2, Target, TrendingUp, Gem, Coins, Crown, Sparkles } from "lucide-react";
+import { Loader2, Users, Filter, Wallet, BarChart2, Target, TrendingUp, Gem, Coins, Crown, BrainCircuit } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useRouter } from 'next/navigation'; // Import useRouter
@@ -250,7 +250,7 @@ export function StudentProgressList() {
                                                         <span className="flex items-center gap-1 text-yellow-600"><Coins className="h-3 w-3" />{detail.wallet.coins}</span>
                                                         <span className="flex items-center gap-1 text-amber-600"><Crown className="h-3 w-3" />{detail.wallet.gold}</span>
                                                         <span className="flex items-center gap-1 text-blue-600"><Gem className="h-3 w-3" />{detail.wallet.diamonds}</span>
-                                                        <span className="flex items-center gap-1 text-indigo-600"><Sparkles className="h-3 w-3" />{detail.wallet.aiCredits}</span>
+                                                        <span className="flex items-center gap-1 text-indigo-600"><BrainCircuit className="h-3 w-3" />{detail.wallet.aiCredits}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-center font-medium">

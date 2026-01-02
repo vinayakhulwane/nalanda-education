@@ -10,7 +10,7 @@ import {
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { type User } from "@/types";
-import { Coins, Gem, LogOut, Settings, UserCircle, Crown, Sparkles } from "lucide-react";
+import { Coins, Gem, LogOut, Settings, UserCircle, Crown, BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { getAuth, signOut } from "firebase/auth";
 
@@ -89,6 +89,13 @@ export function UserNav({ user }: { user: User }) {
                   <span>Diamonds</span>
                 </div>
                 <span>{user.diamonds || 0}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled className="flex justify-between">
+                <div className="flex items-center">
+                  <BrainCircuit className="mr-2 h-4 w-4 text-indigo-500" />
+                  <span>AI Credits</span>
+                </div>
+                <span>{user.aiCredits || 0}</span>
               </DropdownMenuItem>
             </>
           )}
