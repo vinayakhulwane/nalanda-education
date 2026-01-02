@@ -137,20 +137,29 @@ export default function EconomySettingsPage() {
     toast({ title: 'Settings Saved', description: `Content Cost settings have been updated.` });
     setIsSaving(false);
   };
+  
+  const handleSaveRewardRules = async () => {
+    if (!settingsDocRef) return;
+    setIsSaving(true);
+    const payload = {
+      rewardPractice: Number(settings.rewardPractice) || 0,
+      rewardClassroom: Number(settings.rewardClassroom) || 0,
+      rewardSpark: Number(settings.rewardSpark) || 0,
+    };
+    await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
+    toast({ title: 'Settings Saved', description: `Reward Rule settings have been updated.` });
+    setIsSaving(false);
+  }
 
   const handleSaveCouponSettings = async () => {
     if (!settingsDocRef) return;
     setIsSaving(true);
     
-    // ✅ FIX: Ensure numerical values are numbers, not undefined/NaN
     const payload: Partial<EconomySettings> = {
         welcomeAiCredits: Number(settings.welcomeAiCredits) || 0,
         surpriseRewardAmount: Number(settings.surpriseRewardAmount) || 0,
         surpriseRewardCurrency: settings.surpriseRewardCurrency || 'coin',
         couponConditions: settings.couponConditions || [],
-        rewardPractice: Number(settings.rewardPractice) || 0,
-        rewardClassroom: Number(settings.rewardClassroom) || 0,
-        rewardSpark: Number(settings.rewardSpark) || 0,
     };
 
     if (year && month && day) {
@@ -161,7 +170,7 @@ export default function EconomySettingsPage() {
     }
     
     await setDocumentNonBlocking(settingsDocRef, payload, { merge: true });
-    toast({ title: 'Settings Saved', description: `Coupon and Reward settings have been updated.` });
+    toast({ title: 'Settings Saved', description: `Coupon settings have been updated.` });
     setIsSaving(false);
   };
 
@@ -337,21 +346,17 @@ export default function EconomySettingsPage() {
           </CardFooter>
         </Card>
 
-        {/* SECTION 4 & 5: SURPRISE COUPON & ELIGIBILITY */}
+        {/* SECTION 3: REWARD RULES */}
         <Card>
             <CardHeader>
                 <div className="flex items-center gap-2">
-                    <Gift className="h-5 w-5 text-primary" />
-                    <CardTitle>Rewards & Coupon Settings</CardTitle>
+                    <Trophy className="h-5 w-5 text-primary" />
+                    <CardTitle>Core Reward Rules</CardTitle>
                 </div>
-                <CardDescription>Configure gifts, recurring rewards, and eligibility criteria.</CardDescription>
+                <CardDescription>Configure the multipliers for earning rewards from activities.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                
-                 {/* REWARD RULES */}
-                 <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
-                    <h3 className="font-semibold text-sm flex items-center gap-2"><Trophy className="h-4 w-4"/>Reward Rules</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <CardContent>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="rewardPractice">Practice Test Reward (Multiplier)</Label>
                         <Input 
@@ -382,9 +387,27 @@ export default function EconomySettingsPage() {
                         />
                         <p className="text-xs text-muted-foreground">Rate at which Spark Marks convert to Coins.</p>
                       </div>
-                    </div>
                 </div>
+            </CardContent>
+             <CardFooter className="border-t px-6 py-4">
+                <Button onClick={handleSaveRewardRules} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save Reward Rules
+                </Button>
+            </CardFooter>
+        </Card>
 
+        {/* SECTION 4 & 5: SURPRISE COUPON & ELIGIBILITY */}
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Gift className="h-5 w-5 text-primary" />
+                    <CardTitle>Coupon Settings</CardTitle>
+                </div>
+                <CardDescription>Configure gifts, recurring rewards, and eligibility criteria.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                
                 <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
                     <h3 className="font-semibold text-sm">New User Welcome Gift</h3>
                      <div className="space-y-2">
@@ -509,7 +532,7 @@ export default function EconomySettingsPage() {
             <CardFooter className="border-t px-6 py-4">
                 <Button onClick={handleSaveCouponSettings} disabled={isSaving}>
                   {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Save Rewards & Coupon Settings
+                  Save Coupon Settings
                 </Button>
             </CardFooter>
         </Card>
