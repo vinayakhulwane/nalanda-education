@@ -2,7 +2,7 @@
 // ==========================================
 // 1. CORE ENUMS & CONSTANTS
 // ==========================================
-export type CurrencyType = 'spark' | 'coin' | 'gold' | 'diamond';
+export type CurrencyType = 'spark' | 'coin' | 'gold' | 'diamond' | 'aiCredits';
 
 export type GradingMode = 'system' | 'ai';
 

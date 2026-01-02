@@ -29,8 +29,8 @@ export default function EconomySettingsPage() {
     rewardPractice: 1.0,
     rewardClassroom: 0.5,
     rewardSpark: 0.5,
-    solutionCost: 5,        // ✅ New Flat Cost
-    solutionCurrency: 'coin' // ✅ New Currency Type
+    solutionCost: 5,
+    solutionCurrency: 'coin'
   });
 
   const settingsDocRef = useMemoFirebase(() => {
@@ -182,6 +182,7 @@ export default function EconomySettingsPage() {
                                 <SelectItem value="coin">Coins</SelectItem>
                                 <SelectItem value="gold">Gold</SelectItem>
                                 <SelectItem value="diamond">Diamonds</SelectItem>
+                                <SelectItem value="aiCredits">AI Credits</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
