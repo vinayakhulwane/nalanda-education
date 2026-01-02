@@ -291,70 +291,79 @@ export function WorksheetResults({
   }
 
   const handleGetSolution = async (question: Question) => {
-      if (!user || !userProfile || !attempt?.id) return;
-      
-      const cost = settings?.solutionCost ?? 5; 
-      const currency = settings?.solutionCurrency ?? 'coin'; 
+    if (!user || !userProfile || !attempt?.id) return;
 
-      // @ts-ignore
-      const currentBalance = userProfile[currency === 'coin' ? 'coins' : currency === 'aiCredits' ? 'aiCredits' : currency] || 0;
+    const cost = settings?.solutionCost ?? 5;
+    const currency = settings?.solutionCurrency ?? 'coin';
+    
+    // @ts-ignore
+    const currentBalance = userProfile[currency === 'coin' ? 'coins' : currency === 'aiCredits' ? 'aiCredits' : currency] || 0;
 
-      if (currentBalance < cost) {
-          toast({
-              variant: 'destructive',
-              title: 'Insufficient Funds',
-              description: `You need ${cost} ${currency} to unlock this solution.`
-          });
-          return;
-      }
+    if (currentBalance < cost) {
+        toast({
+            variant: 'destructive',
+            title: 'Insufficient Funds',
+            description: `You need ${cost} ${currency} to unlock this solution.`
+        });
+        return;
+    }
 
-      setLoadingSolutions(prev => ({ ...prev, [question.id]: true }));
+    setLoadingSolutions(prev => ({ ...prev, [question.id]: true }));
 
-      try {
-          const aiResponse = await generateSolutionAction({ questionText: question.mainQuestionText });
-          
-          if (!aiResponse.success || !aiResponse.solution) {
-              console.error("AI Generation Error Details:", aiResponse); 
-              throw new Error(aiResponse.error || "AI could not generate a solution.");
-          }
+    try {
+        // Call Server Action
+        const aiResponse = await generateSolutionAction({ questionText: question.mainQuestionText });
 
-          setLocalUnlocked(prev => ({ ...prev, [question.id]: aiResponse.solution }));
+        // Robust check for failure
+        if (!aiResponse || !aiResponse.success || !aiResponse.solution) {
+            console.error("AI Generation Error Details:", JSON.stringify(aiResponse, null, 2));
+            throw new Error(aiResponse?.error || "AI could not generate a solution.");
+        }
 
-          const userRef = doc(firestore, 'users', user.uid);
-          const attemptRef = doc(firestore, 'worksheet_attempts', attempt.id);
-          const updatePayload: any = {};
-          const fieldName = currency === 'coin' ? 'coins' : currency === 'aiCredits' ? 'aiCredits' : currency;
-          updatePayload[fieldName] = increment(-cost);
-          
-          await updateDoc(userRef, updatePayload);
-          await addDoc(collection(firestore, 'transactions'), {
-              userId: user.uid, amount: cost, currency: currency,
-              type: 'spent', description: `Unlocked solution for: ${question.name}`,
-              createdAt: serverTimestamp()
-          });
-          await updateDoc(attemptRef, {
-              [`unlockedSolutions.${question.id}`]: aiResponse.solution
-          });
+        setLocalUnlocked(prev => ({ ...prev, [question.id]: aiResponse.solution }));
 
-          toast({ title: 'Solution Unlocked!' });
-      } catch (error: any) {
-          console.error("handleGetSolution Error:", error);
-          toast({ 
-              variant: 'destructive', 
-              title: 'Generation Failed', 
-              description: error.message || 'Could not unlock solution. Check console for details.' 
-          });
-          
-          setLocalUnlocked(prev => {
-              const newState = { ...prev };
-              delete newState[question.id];
-              return newState;
-          });
-      } finally {
-          setLoadingSolutions(prev => ({ ...prev, [question.id]: false }));
-      }
-  };
-  
+        const userRef = doc(firestore, 'users', user.uid);
+        const attemptRef = doc(firestore, 'worksheet_attempts', attempt.id);
+        const updatePayload: any = {};
+        const fieldName = currency === 'coin' ? 'coins' : currency === 'aiCredits' ? 'aiCredits' : currency;
+
+        updatePayload[fieldName] = increment(-cost);
+
+        await updateDoc(userRef, updatePayload);
+        
+        await addDoc(collection(firestore, 'transactions'), {
+            userId: user.uid, 
+            amount: cost, 
+            currency: currency,
+            type: 'spent', 
+            description: `Unlocked solution for: ${question.name}`,
+            createdAt: serverTimestamp()
+        });
+
+        await updateDoc(attemptRef, {
+            [`unlockedSolutions.${question.id}`]: aiResponse.solution
+        });
+
+        toast({ title: 'Solution Unlocked!' });
+
+    } catch (error: any) {
+        console.error("handleGetSolution Error:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Generation Failed',
+            description: error.message || 'Could not unlock solution. Check console for details.'
+        });
+
+        setLocalUnlocked(prev => {
+            const newState = { ...prev };
+            delete newState[question.id];
+            return newState;
+        });
+    } finally {
+        setLoadingSolutions(prev => ({ ...prev, [question.id]: false }));
+    }
+};
+
   const handleBackClick = () => {
     if (studentId) {
         router.push(`/user-management/${studentId}/progress`);
