@@ -7,7 +7,7 @@ import { doc, writeBatch, serverTimestamp, collection, increment } from 'firebas
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Coins, Crown, Gem, Plus, Minus, Loader2 } from 'lucide-react';
+import { Coins, Crown, Gem, Plus, Minus, Loader2, BrainCircuit } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -24,7 +24,7 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
   const { toast } = useToast();
   
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<CurrencyType>('coin');
+  const [currency, setCurrency] = useState<CurrencyType | 'aiCredits'>('coin');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [operation, setOperation] = useState<'add' | 'remove'>('add');
@@ -45,11 +45,11 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
     }
 
     // Determine the correct database field name
-    // ✅ FIX: Ensure 'diamond' maps to 'diamonds' (plural) to match DB schema
     const fieldMap: Record<string, string> = {
         coin: 'coins',
         gold: 'gold',
-        diamond: 'diamonds'
+        diamond: 'diamonds',
+        aiCredits: 'aiCredits'
     };
     const dbField = fieldMap[currency] || currency;
 
@@ -142,7 +142,7 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
                 </div>
             </CardContent>
             <CardFooter>
-                <div className="grid grid-cols-3 gap-4 w-full bg-muted/50 rounded-xl p-4">
+                <div className="grid grid-cols-4 gap-4 w-full bg-muted/50 rounded-xl p-4">
                     <div className="flex flex-col items-center">
                         <Coins className="h-6 w-6 text-yellow-500 mb-2" />
                         <p className="text-xl font-bold">{student.coins || 0}</p>
@@ -157,6 +157,11 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
                         <Gem className="h-6 w-6 text-blue-500 mb-2" />
                         <p className="text-xl font-bold">{student.diamonds || 0}</p>
                         <p className="text-xs text-muted-foreground mt-1">Diamonds</p>
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <BrainCircuit className="h-6 w-6 text-indigo-500 mb-2" />
+                        <p className="text-xl font-bold">{student.aiCredits || 0}</p>
+                        <p className="text-xs text-muted-foreground mt-1">AI Credits</p>
                     </div>
                 </div>
             </CardFooter>
@@ -184,6 +189,7 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
                             <SelectItem value="coin"><div className="flex items-center gap-2"><Coins className="h-4 w-4 text-yellow-500" /> Coins</div></SelectItem>
                             <SelectItem value="gold"><div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Gold</div></SelectItem>
                             <SelectItem value="diamond"><div className="flex items-center gap-2"><Gem className="h-4 w-4 text-blue-500" /> Diamonds</div></SelectItem>
+                            <SelectItem value="aiCredits"><div className="flex items-center gap-2"><BrainCircuit className="h-4 w-4 text-indigo-500" /> AI Credits</div></SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
