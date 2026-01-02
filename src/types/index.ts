@@ -237,7 +237,7 @@ export interface EconomySettings {
   welcomeAiCredits?: number;
   surpriseRewardAmount?: number;
   surpriseRewardCurrency?: CurrencyType;
-  surpriseRewardCooldownHours?: number;
+  nextCouponAvailableDate?: any; // Firestore Timestamp
 }
 
 export interface Transaction {

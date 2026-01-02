@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, Coins, ScrollText, Trophy, BrainCircuit, Gift, Calendar as CalendarIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,12 @@ import { Button } from '@/components/ui/button';
 import { doc } from 'firebase/firestore';
 import type { EconomySettings, CurrencyType } from '@/types';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 export default function EconomySettingsPage() {
   const { userProfile, isUserProfileLoading } = useUser();
@@ -34,7 +38,7 @@ export default function EconomySettingsPage() {
     welcomeAiCredits: 5,
     surpriseRewardAmount: 100,
     surpriseRewardCurrency: 'coin',
-    surpriseRewardCooldownHours: 24
+    nextCouponAvailableDate: new Date(),
   });
 
   const settingsDocRef = useMemoFirebase(() => {
@@ -46,7 +50,12 @@ export default function EconomySettingsPage() {
 
   useEffect(() => {
     if (remoteSettings) {
-      setSettings(remoteSettings);
+      // Ensure date comes in as a Date object
+      const newSettings = { ...remoteSettings };
+      if (remoteSettings.nextCouponAvailableDate && remoteSettings.nextCouponAvailableDate.seconds) {
+        newSettings.nextCouponAvailableDate = new Date(remoteSettings.nextCouponAvailableDate.seconds * 1000);
+      }
+      setSettings(newSettings);
     }
   }, [remoteSettings]);
 
@@ -78,6 +87,24 @@ export default function EconomySettingsPage() {
   if (userProfile?.role !== 'admin') {
     return null;
   }
+
+  const handleDateChange = (date: Date | undefined) => {
+      if (!date) return;
+      const current = settings.nextCouponAvailableDate || new Date();
+      const newDate = new Date(date);
+      // Preserve time from existing state
+      newDate.setHours(current.getHours(), current.getMinutes());
+      setSettings({ ...settings, nextCouponAvailableDate: newDate });
+  };
+  
+  const handleTimeChange = (time: string) => {
+      const [hours, minutes] = time.split(':').map(Number);
+      const current = settings.nextCouponAvailableDate || new Date();
+      const newDate = new Date(current);
+      newDate.setHours(hours, minutes, 0, 0);
+      setSettings({ ...settings, nextCouponAvailableDate: newDate });
+  };
+
 
   return (
     <div>
@@ -297,15 +324,39 @@ export default function EconomySettingsPage() {
                         </div>
                     </div>
                      <div className="space-y-2">
-                        <Label htmlFor="cooldownHours">Cooldown Period (in Hours)</Label>
-                        <Input 
-                            id="cooldownHours"
-                            type="number" 
-                            value={settings.surpriseRewardCooldownHours ?? 24} 
-                            onChange={(e) => setSettings({...settings, surpriseRewardCooldownHours: parseInt(e.target.value)})} 
-                        />
+                        <Label htmlFor="cooldownHours">Next Coupon Availability Date</Label>
+                         <div className="flex flex-wrap gap-2">
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                        "w-[240px] justify-start text-left font-normal",
+                                        !settings.nextCouponAvailableDate && "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {settings.nextCouponAvailableDate ? format(settings.nextCouponAvailableDate, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={settings.nextCouponAvailableDate}
+                                    onSelect={handleDateChange}
+                                    initialFocus
+                                />
+                                </PopoverContent>
+                            </Popover>
+                            <Input
+                                type="time"
+                                value={settings.nextCouponAvailableDate ? format(settings.nextCouponAvailableDate, 'HH:mm') : ''}
+                                onChange={e => handleTimeChange(e.target.value)}
+                                className="w-auto"
+                            />
+                        </div>
                          <p className="text-xs text-muted-foreground">
-                            How long a student must wait after claiming a coupon before a new one is available.
+                            Set the exact date and time the next coupon becomes available for all users.
                         </p>
                     </div>
                  </div>

@@ -59,16 +59,24 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const { data: settings } = useDoc<EconomySettings>(settingsDocRef);
   
   const lastClaimedDate = userProfile.lastCouponClaimedAt?.toDate();
-  const cooldownHours = settings?.surpriseRewardCooldownHours ?? 24;
-  const nextAvailableDate = lastClaimedDate ? new Date(lastClaimedDate.getTime() + cooldownHours * 60 * 60 * 1000) : new Date();
+  const nextAvailableDate = settings?.nextCouponAvailableDate?.toDate() ?? new Date();
 
   useEffect(() => {
-    if (userProfile.hasClaimedWelcomeCoupon) {
-      setIsReadyToClaim(new Date() >= nextAvailableDate);
-    } else {
-      setIsReadyToClaim(true); // Always ready for the first claim
+    // If it's the first welcome gift, it's always ready.
+    if (!userProfile.hasClaimedWelcomeCoupon) {
+      setIsReadyToClaim(true);
+      return;
     }
-  }, [userProfile, nextAvailableDate]);
+    
+    // For subsequent rewards, check if the last claim was before the scheduled date.
+    if (lastClaimedDate && nextAvailableDate) {
+      setIsReadyToClaim(new Date() >= nextAvailableDate && lastClaimedDate < nextAvailableDate);
+    } else {
+      // Fallback if dates are somehow invalid
+      setIsReadyToClaim(false);
+    }
+
+  }, [userProfile, lastClaimedDate, nextAvailableDate]);
 
   const handleClaim = async () => {
     if (!firestore || !userProfile.id || !settings) return;
