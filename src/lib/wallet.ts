@@ -6,6 +6,7 @@ import type { Question, WalletTransaction, ResultState, Worksheet, EconomySettin
 const DEFAULT_SETTINGS: EconomySettings = {
     coinToGold: 10, goldToDiamond: 10, 
     costPerMark: 0.5,
+    aiGradingCostMultiplier: 1, // Default multiplier
     rewardPractice: 1.0,
     rewardClassroom: 0.5,
     rewardSpark: 0.5
@@ -34,12 +35,13 @@ export function calculateWorksheetCost(
     const activeSettings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
     
     const totalCost: WalletTransaction = { coins: 0, gold: 0, diamonds: 0, aiCredits: 0 };
-    const multiplier = getSafeNumber(activeSettings.costPerMark, 0.5);
+    const costPerMarkMultiplier = getSafeNumber(activeSettings.costPerMark, 0.5);
+    const aiCostMultiplier = getSafeNumber(activeSettings.aiGradingCostMultiplier, 1);
 
     for (const question of questions) {
-        // AI Graded questions have a flat AI Credit cost
+        // AI Graded questions have a flat AI Credit cost based on multiplier
         if (question.gradingMode === 'ai') {
-            totalCost.aiCredits = (totalCost.aiCredits || 0) + 1;
+            totalCost.aiCredits = (totalCost.aiCredits || 0) + (1 * aiCostMultiplier);
         }
 
         // Safe lowercase check
@@ -52,7 +54,7 @@ export function calculateWorksheetCost(
             0
         ) || 0;
         
-        const costValue = Math.ceil(totalMarks * multiplier);
+        const costValue = Math.ceil(totalMarks * costPerMarkMultiplier);
 
         if (type === 'coin') totalCost.coins += costValue;
         else if (type === 'gold') totalCost.gold += costValue;

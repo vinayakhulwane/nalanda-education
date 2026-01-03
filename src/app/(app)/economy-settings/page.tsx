@@ -29,6 +29,7 @@ export default function EconomySettingsPage() {
     coinToGold: 10,
     goldToDiamond: 10,
     costPerMark: 0.5,
+    aiGradingCostMultiplier: 1,
     rewardPractice: 1.0,
     rewardClassroom: 0.5,
     rewardSpark: 0.5,
@@ -130,6 +131,7 @@ export default function EconomySettingsPage() {
     setIsSaving(true);
     const payload = {
         costPerMark: settings.costPerMark || 0,
+        aiGradingCostMultiplier: settings.aiGradingCostMultiplier || 0,
         solutionCost: settings.solutionCost || 0,
         solutionCurrency: settings.solutionCurrency || 'coin',
     };
@@ -299,6 +301,23 @@ export default function EconomySettingsPage() {
                   </span>
                 </div>
               </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="aiGradingCostMultiplier">AI Grading Cost (Multiplier)</Label>
+                <div className="flex gap-4 items-center">
+                    <Input
+                        id="aiGradingCostMultiplier"
+                        className="max-w-[150px]"
+                        type="number"
+                        step="0.5"
+                        value={settings.aiGradingCostMultiplier ?? 1}
+                        onChange={(e) => setSettings({ ...settings, aiGradingCostMultiplier: parseFloat(e.target.value) })}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                        AI Credits per AI-graded question.
+                    </span>
+                </div>
+            </div>
 
               <div className="p-4 border rounded-lg bg-muted/20">
                  <div className="flex items-center gap-2 mb-4">

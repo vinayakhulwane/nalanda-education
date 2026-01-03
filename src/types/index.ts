@@ -231,6 +231,7 @@ export interface EconomySettings {
 
   // Creation Costs
   costPerMark: number;
+  aiGradingCostMultiplier?: number;
   solutionCost?: number; 
   solutionCurrency?: CurrencyType;
 
