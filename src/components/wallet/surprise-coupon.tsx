@@ -75,19 +75,19 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
   const isAlreadyClaimed = lastClaimedMillis >= referenceTimeMillis;
   const hasNotClaimedThisCycle = !isAlreadyClaimed;
 
-  // --- TASK PROGRESS LOGIC ---
+  // --- DEBUGGING VERSION OF TASK PROGRESS ---
   const { conditionsMet, taskProgress } = useMemo(() => {
     if (!coupon.conditions || coupon.conditions.length === 0) {
       return { conditionsMet: true, taskProgress: [] };
     }
 
-    // 1. Time Filter: Only count attempts done AFTER the coupon was created
+    // 1. Log Key Data Points
     const couponCreationTime = (coupon as any).createdAt?.toMillis?.() || 0;
-    
-    const validAttempts = recentAttempts.filter(a => {
-        const attemptTime = (a.attemptedAt as any)?.toMillis?.() || 0;
-        return attemptTime >= couponCreationTime;
-    });
+    console.groupCollapsed(`[DEBUG] Calculating Coupon: ${coupon.name}`);
+    console.log("User ID:", userProfile.id);
+    console.log("Coupon Created At:", new Date(couponCreationTime).toLocaleString());
+    console.log("Total Recent Attempts Fetched:", recentAttempts.length);
+    console.log("Total Worksheets Fetched:", worksheets.length);
 
     let allMet = true;
     
@@ -95,42 +95,65 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       let current = 0;
       let label = "";
 
-      // ---------------------------------------------------------
-      // ✅ LOGIC FIX: Check "Created by Self" for Practice
-      // ---------------------------------------------------------
+      // Filter attempts by time
+      const validAttempts = recentAttempts.filter(a => {
+          const attemptTime = (a.attemptedAt as any)?.toMillis?.() || 0;
+          const isNewEnough = attemptTime >= couponCreationTime;
+          
+          // LOG WHY AN ATTEMPT MIGHT BE REJECTED
+          if (!isNewEnough) {
+             console.log(`❌ Attempt rejected (Too Old):`, {
+                 attemptId: a.id,
+                 attemptDate: new Date(attemptTime).toLocaleString(),
+                 couponDate: new Date(couponCreationTime).toLocaleString()
+             });
+          }
+          return isNewEnough;
+      });
+
+      console.log(`[DEBUG] Valid (Time-Fresh) Attempts: ${validAttempts.length}`);
+
       if (condition.type === 'minPracticeAssignments') {
          label = "Complete Practice Exercises";
          
+         // Detailed Loop to see why practice isn't counting
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
              
-             // Check A: Is it labeled "practice"? (Case insensitive)
-             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' 
-                                 || (a as any).worksheetType?.toLowerCase() === 'practice';
-             
-             // Check B: Did the student create it? (Author ID == User ID)
-             const isSelfCreated = w?.authorId === userProfile.id;
+             // Check 1: Is Worksheet Found?
+             if (!w) {
+                 console.warn(`⚠️ Worksheet Data Missing for Attempt ${a.id} (ID: ${a.worksheetId}). Cannot verify author.`);
+                 return false;
+             }
 
-             // It counts if EITHER condition is true
-             return isTypePractice || isSelfCreated;
+             // Check 2: Check Author ID
+             const isSelfCreated = w.authorId === userProfile.id;
+             const isTypePractice = w.worksheetType?.toLowerCase() === 'practice';
+
+             console.log(`Checking Attempt ${a.id}:`, {
+                 worksheetId: w.id,
+                 worksheetAuthor: w.authorId,
+                 myUserId: userProfile.id,
+                 isSelfCreated: isSelfCreated,
+                 type: w.worksheetType
+             });
+
+             // CRITICAL: Return true if self-created
+             return isSelfCreated || isTypePractice;
          }).length;
+
+         console.log(`>>> Total Practice Counted: ${current} / ${condition.value}`);
 
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
          
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
+             if (!w) return false;
              
-             // Check A: Is it labeled "classroom"?
-             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom'
-                                  || (a as any).worksheetType?.toLowerCase() === 'classroom';
-             
-             // Check B: Is it NOT self-created? (Usually created by teacher/admin)
-             const isNotSelfCreated = w?.authorId !== userProfile.id;
-
-             return isTypeClassroom && isNotSelfCreated;
+             // Check: Must be classroom AND NOT created by student
+             return w.worksheetType?.toLowerCase() === 'classroom' && w.authorId !== userProfile.id;
          }).length;
-
       } else {
          label = "Special Mission";
       }
@@ -147,6 +170,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       };
     });
 
+    console.groupEnd(); // End Debug Group
     return { conditionsMet: allMet, taskProgress: progress };
   }, [coupon.conditions, recentAttempts, worksheets, coupon, userProfile.id]);
 
