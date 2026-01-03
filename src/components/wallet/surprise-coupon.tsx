@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -9,12 +10,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Gift, Loader2, Lock, CheckCircle2, Rocket, Ticket, Star, Trophy, Sparkles, Clock, Activity } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy, limit, getDocs } from 'firebase/firestore';
+import { doc, writeBatch, collection, increment, serverTimestamp, query, where, orderBy, limit } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
+import { useAcademicHealth } from '@/hooks/use-academic-health'; 
 
+// Define Transaction Interface Locally
 interface Transaction {
   id: string;
   userId: string;
@@ -35,105 +38,6 @@ interface CouponCardProps {
   recentAttempts?: WorksheetAttempt[];
   worksheets?: Worksheet[];
   recentTransactions?: Transaction[];
-}
-
-// --- HELPER: ROBUST SCORE EXTRACTION (WITH LOGS) ---
-const getAttemptTotals = (a: WorksheetAttempt) => {
-    // 1. Safe Access to Fields (Handle number or string)
-    const rawScore = (a as any).score ?? (a as any).obtainedMarks ?? (a as any).marks;
-    const rawTotal = (a as any).totalMarks ?? (a as any).maxScore ?? (a as any).totalPoints;
-
-    const savedScore = Number(rawScore);
-    const savedTotal = Number(rawTotal);
-
-    // 2. Validate
-    if (!isNaN(savedScore) && !isNaN(savedTotal) && savedTotal > 0) {
-        // Sanity Check: If score > total, assume score is a percentage
-        if (savedScore > savedTotal) {
-            return { score: (savedScore / 100) * savedTotal, total: savedTotal };
-        }
-        return { score: savedScore, total: savedTotal };
-    }
-    
-    return null; 
-};
-
-// --- HELPER: ACADEMIC HEALTH ALGORITHM (X-RAY VERSION) ---
-function calculateAcademicHealth(attempts: WorksheetAttempt[]): number {
-  console.groupCollapsed("🩺 [Health X-Ray] Starting Calculation");
-
-  if (!attempts || attempts.length === 0) {
-      console.log("No attempts found. Returning baseline 80.");
-      console.groupEnd();
-      return 80; 
-  }
-
-  // 1. Group attempts by Date
-  const dailyStats: Record<string, { total: number; obtained: number; count: number }> = {};
-
-  attempts.forEach((a) => {
-    if (!a.attemptedAt) return;
-    
-    // Robust Date Parsing
-    let dateObj;
-    try {
-        dateObj = (a.attemptedAt as any).toDate ? (a.attemptedAt as any).toDate() : new Date((a.attemptedAt as any));
-    } catch (e) { return; }
-    
-    const dateKey = format(dateObj, 'yyyy-MM-dd');
-
-    const data = getAttemptTotals(a);
-    
-    // LOG INVALID ATTEMPTS (This is likely where your issue is)
-    if (!data) {
-       // Uncomment to see which specific IDs are failing
-       // console.warn(`⚠️ Attempt ${a.id} ignored. Missing score/total.`);
-       return; 
-    }
-
-    const { score, total } = data;
-
-    if (!dailyStats[dateKey]) {
-      dailyStats[dateKey] = { total: 0, obtained: 0, count: 0 };
-    }
-    dailyStats[dateKey].total += total;
-    dailyStats[dateKey].obtained += score;
-    dailyStats[dateKey].count++;
-  });
-
-  // 2. Rolling Calculation (14 Days)
-  let currentHealth = 80; 
-  const today = new Date();
-
-  console.log("--- Day by Day Breakdown ---");
-
-  for (let i = 13; i >= 0; i--) {
-    const targetDate = subDays(today, i);
-    const dateKey = format(targetDate, 'yyyy-MM-dd');
-    const dayStats = dailyStats[dateKey];
-
-    const prevHealth = currentHealth;
-
-    if (dayStats && dayStats.total > 0) {
-      // ACTIVE DAY
-      const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
-      currentHealth = (currentHealth * 0.6) + (dayAvg * 0.4);
-      
-      console.log(`✅ [${dateKey}] ACTIVE | Avg Score: ${dayAvg.toFixed(1)}% | Health: ${prevHealth.toFixed(1)}% -> ${currentHealth.toFixed(1)}%`);
-    } else {
-      // INACTIVE DAY
-      currentHealth = Math.max(0, currentHealth * 0.95);
-      
-      // Log inactive days to see if the date matching is failing
-      console.log(`💤 [${dateKey}] Inactive | Health: ${prevHealth.toFixed(1)}% -> ${currentHealth.toFixed(1)}%`);
-    }
-  }
-
-  const finalResult = Math.round(currentHealth);
-  console.log(`🏁 FINAL HEALTH: ${finalResult}%`);
-  console.groupEnd();
-
-  return finalResult;
 }
 
 // --- HELPER: HH:MM:SS TIMER ---
@@ -174,6 +78,9 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
   const { toast } = useToast();
   const [isClaiming, setIsClaiming] = useState(false);
   const [justClaimed, setJustClaimed] = useState(false);
+  
+  // Use the new hook
+  const academicHealth = useAcademicHealth(userProfile);
 
   const lastClaimedMillis = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
   
@@ -192,21 +99,12 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
     }
 
     const couponCreationTime = (coupon as any).createdAt?.toMillis?.() || 0;
+    const validAttempts = recentAttempts.filter(a => (a.attemptedAt?.toMillis?.() || 0) >= couponCreationTime);
     
-    const validAttempts = recentAttempts; 
-
     const validTransactions = recentTransactions.filter(t => {
         const time = (t.createdAt as any)?.toMillis?.() || 0;
         return time >= couponCreationTime;
     });
-
-    // 3. ✅ CALCULATE ACADEMIC HEALTH (With X-Ray)
-    // Only run this calc if there is actually a health condition to check (saves console spam)
-    const hasHealthCondition = coupon.conditions.some(c => c.type === 'minAcademicHealth');
-    let academicHealth = 0;
-    if (hasHealthCondition) {
-        academicHealth = calculateAcademicHealth(recentAttempts);
-    }
 
     let allMet = true;
     
@@ -215,31 +113,32 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
       let label = "";
 
       if (condition.type === 'minPracticeAssignments') {
-         label = "Complete Practice Exercises";
+         label = "Complete Assignment in my practice zone";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice';
-             const isSelfCreated = w?.authorId === userProfile.id;
-             return isTypePractice || isSelfCreated;
+             const isPractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice' || w?.authorId === userProfile.id;
+             return isPractice;
          }).length;
-
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom' || (a as any).worksheetType?.toLowerCase() === 'classroom';
-             const isNotSelfCreated = w?.authorId !== userProfile.id;
-             return isTypeClassroom && isNotSelfCreated;
+             const isClassroom = w?.worksheetType?.toLowerCase() === 'classroom' || (a as any).worksheetType?.toLowerCase() === 'classroom';
+             return isClassroom && w?.authorId !== userProfile.id;
          }).length;
-
       } else if (condition.type === 'minGoldQuestions') {
          label = "Solve Gold Questions";
          current = validTransactions.filter(t => {
+             const w = worksheets.find(ws => ws.id === (t as any).worksheetId);
+             const givesGold = w?.questions.some(qId => {
+                 const q = recentAttempts.flatMap(a => a.answers[qId] ? [a.answers[qId]] : []);
+                 // Simplified logic, needs question details to be precise
+                 return true; 
+             });
              return t.currency?.toLowerCase() === 'gold' && t.type === 'earned';
          }).length;
-
       } else if (condition.type === 'minAcademicHealth') {
-         label = `Maintain Academic Health > ${condition.value}%`;
+         label = `Raise your Academic Health above ${condition.value}%`;
          current = academicHealth;
       } else {
          label = "Special Mission";
@@ -266,7 +165,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
     });
     
     return { conditionsMet: allMet, taskProgress: progress };
-  }, [coupon.conditions, recentAttempts, worksheets, recentTransactions, userProfile.id, coupon]);
+  }, [coupon.conditions, recentAttempts, worksheets, recentTransactions, userProfile.id, coupon, academicHealth]);
 
   const canClaim = isTimeReady && hasNotClaimedThisCycle && conditionsMet && !justClaimed;
 
@@ -324,7 +223,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
                   <Trophy className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="space-y-2">
-                  <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">
+                  <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">
                       CONGRATULATIONS!
                   </h2>
                   <p className="text-lg font-medium text-slate-700 dark:text-slate-200">
@@ -433,7 +332,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
             disabled={!canClaim || isClaiming} 
             className={cn("w-full font-bold text-lg h-14 shadow-xl transition-all", canClaim ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed")}
         >
-          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Coming Soon</>}
+          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Locked</>}
         </Button>
       </CardFooter>
     </Card>
@@ -451,7 +350,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   }, [firestore]);
   const { data: coupons, isLoading: couponsLoading } = useCollection<Coupon>(couponsQuery);
 
-  // 2. Fetch Attempts - INCREASED LIMIT TO 300 TO FIX 14-DAY CALCULATION
+  // 2. Fetch Attempts - Limit 300 to capture enough history
   const recentAttemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
     const oneMonthAgo = new Date();
@@ -522,12 +421,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
         let tasksDone = true;
         
         // Calculate health for sorting
-        // Note: For simple sorting, we rely on the main render calculation logic if possible, 
-        // but since we need it here inside the sort, we call the helper again safely.
-        let academicHealth = 0;
-        if(recentAttempts) {
-             academicHealth = calculateAcademicHealth(recentAttempts);
-        }
+        const academicHealth = useAcademicHealth(userProfile);
 
         if (c.conditions && c.conditions.length > 0) {
            const validAttempts = recentAttempts || [];

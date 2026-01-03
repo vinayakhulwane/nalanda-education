@@ -1,3 +1,4 @@
+
 'use client';
 import { useMemo, useState } from 'react';
 import type { User, Subject, WorksheetAttempt, Unit, Category, Worksheet, Question } from '@/types';
@@ -12,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { useAcademicHealth } from '@/hooks/use-academic-health';
 
 type PerformanceMetric = {
   id: string;
@@ -74,6 +75,8 @@ interface StudentProgressDetailProps {
 export function StudentProgressDetail({ student }: StudentProgressDetailProps) {
   const firestore = useFirestore();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const academicHealth = useAcademicHealth(student);
+
 
   const enrolledSubjectsQuery = useMemoFirebase(() => {
     if (!firestore || !student.enrollments || student.enrollments.length === 0) return null;
@@ -104,9 +107,8 @@ export function StudentProgressDetail({ student }: StudentProgressDetailProps) {
 
   const subjectStats = useMemo(() => {
     if (!subjects || !attempts || !lookups) return {};
-    const stats: Record<string, { total: number, obtained: number, count: number, health: number }> = {};
-    subjects.forEach(s => stats[s.id] = { total: 0, obtained: 0, count: 0, health: 80 });
-    const attemptsBySubjectByDate: Record<string, Map<string, { total: number; obtained: number }>> = {};
+    const stats: Record<string, { total: number, obtained: number, count: number }> = {};
+    subjects.forEach(s => stats[s.id] = { total: 0, obtained: 0, count: 0 });
     attempts.forEach(a => {
         const w = lookups.worksheetMap.get(a.worksheetId);
         if (w && stats[w.subjectId]) {
@@ -116,32 +118,8 @@ export function StudentProgressDetail({ student }: StudentProgressDetailProps) {
                 stats[w.subjectId].obtained += score;
                 stats[w.subjectId].total += total;
                 stats[w.subjectId].count++;
-                if(a.attemptedAt) {
-                     const dateKey = format(a.attemptedAt.toDate(), 'yyyy-MM-dd');
-                     if (!attemptsBySubjectByDate[w.subjectId]) attemptsBySubjectByDate[w.subjectId] = new Map();
-                     if (!attemptsBySubjectByDate[w.subjectId].has(dateKey)) attemptsBySubjectByDate[w.subjectId].set(dateKey, { total: 0, obtained: 0 });
-                     const dayData = attemptsBySubjectByDate[w.subjectId].get(dateKey)!;
-                     dayData.total += total;
-                     dayData.obtained += score;
-                }
             }
         }
-    });
-    Object.keys(stats).forEach(subjectId => {
-        const attemptsByDate = attemptsBySubjectByDate[subjectId];
-        if (!attemptsByDate) return;
-        let healthScore = 80;
-        for (let i = 13; i >= 0; i--) {
-            const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
-            const dayStats = attemptsByDate.get(dateKey);
-            if (dayStats && dayStats.total > 0) {
-                const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
-                healthScore = (healthScore * 0.6) + (dayAvg * 0.4);
-            } else {
-                healthScore = Math.max(0, healthScore * 0.95);
-            }
-        }
-        stats[subjectId].health = Math.round(healthScore);
     });
     return stats;
   }, [subjects, attempts, lookups]);
@@ -258,8 +236,7 @@ export function StudentProgressDetail({ student }: StudentProgressDetailProps) {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                     {subjects && subjects.length > 0 ? subjects.map((subject) => {
-                      const stats = subjectStats[subject.id];
-                      const health = stats?.health ?? 0;
+                      const health = academicHealth;
                       const healthColor = health > 75 ? "bg-green-500" : health > 50 ? "bg-yellow-500" : "bg-primary";
                       return (
                         <Card key={subject.id}>

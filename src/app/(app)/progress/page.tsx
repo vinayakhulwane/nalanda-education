@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -15,6 +16,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { format, subDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { StudentAttemptHistory } from '@/components/user-management/student-attempt-history';
+import { useAcademicHealth } from '@/hooks/use-academic-health';
 
 type PerformanceMetric = {
   id: string;
@@ -83,10 +85,13 @@ const getAttemptTotals = (a: WorksheetAttempt, worksheet: Worksheet | undefined,
 };
 
 export default function ProgressPage() {
-  // ✅ FIXED: Added isUserProfileLoading back to destructuring
   const { user, userProfile, isUserProfileLoading } = useUser();
   const firestore = useFirestore();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  
+  // Use the new hook for overall health
+  const academicHealth = useAcademicHealth(userProfile!);
+
 
   // --- 1. DATA FETCHING ---
 
@@ -121,10 +126,8 @@ export default function ProgressPage() {
 
   const subjectStats = useMemo(() => {
     if (!subjects || !attempts || !lookups) return {};
-    const stats: Record<string, { total: number, obtained: number, count: number, health: number }> = {};
-    subjects.forEach(s => stats[s.id] = { total: 0, obtained: 0, count: 0, health: 80 });
-
-    const attemptsBySubjectByDate: Record<string, Map<string, { total: number; obtained: number }>> = {};
+    const stats: Record<string, { total: number, obtained: number, count: number }> = {};
+    subjects.forEach(s => stats[s.id] = { total: 0, obtained: 0, count: 0 });
 
     attempts.forEach(a => {
         const w = lookups.worksheetMap.get(a.worksheetId);
@@ -136,44 +139,13 @@ export default function ProgressPage() {
                 stats[w.subjectId].obtained += score;
                 stats[w.subjectId].total += total;
                 stats[w.subjectId].count++;
-
-                // Health Data
-                if (!attemptsBySubjectByDate[w.subjectId]) attemptsBySubjectByDate[w.subjectId] = new Map();
-                if(a.attemptedAt) {
-                     const dateKey = format(a.attemptedAt.toDate(), 'yyyy-MM-dd');
-                     if (!attemptsBySubjectByDate[w.subjectId].has(dateKey)) {
-                         attemptsBySubjectByDate[w.subjectId].set(dateKey, { total: 0, obtained: 0 });
-                     }
-                     const dayData = attemptsBySubjectByDate[w.subjectId].get(dateKey)!;
-                     dayData.total += total;
-                     dayData.obtained += score;
-                }
             }
         }
-    });
-
-    Object.keys(stats).forEach(subjectId => {
-        const attemptsByDate = attemptsBySubjectByDate[subjectId];
-        if (!attemptsByDate) return;
-
-        let healthScore = 80;
-        for (let i = 13; i >= 0; i--) {
-            const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
-            const dayStats = attemptsByDate.get(dateKey);
-            if (dayStats && dayStats.total > 0) {
-                // Calculation: Weighted Average
-                const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
-                healthScore = (healthScore * 0.6) + (dayAvg * 0.4);
-            } else {
-                // Decay on inactive days
-                healthScore = Math.max(0, healthScore * 0.95);
-            }
-        }
-        stats[subjectId].health = Math.round(healthScore);
     });
 
     return stats;
   }, [subjects, attempts, lookups]);
+
 
   // --- DETAILED ANALYTICS ---
   const analytics = useMemo(() => {
@@ -343,14 +315,13 @@ export default function ProgressPage() {
               {subjects && subjects.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {subjects.map((subject) => {
-                      const stats = subjectStats[subject.id];
-                      const health = stats?.health ?? 0;
+                      const health = academicHealth; 
                       const healthColor = health > 75 ? "bg-green-500" : health > 50 ? "bg-yellow-500" : "bg-primary";
                       return (
                         <Card key={subject.id}>
                           <CardHeader>
                             <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" />{subject.name}</CardTitle>
-                            <CardDescription>{stats?.count || 0} Worksheets Completed</CardDescription>
+                            <CardDescription>{subjectStats[subject.id]?.count || 0} Worksheets Completed</CardDescription>
                           </CardHeader>
                           <CardContent>
                              <div className="space-y-3">
