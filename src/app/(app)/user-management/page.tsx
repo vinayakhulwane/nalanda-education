@@ -4,7 +4,6 @@ import { PageHeader } from "@/components/page-header";
 import { EnrollmentList } from "@/components/user-management/enrollment-list";
 import { StudentProgressList } from "@/components/user-management/student-progress-list";
 import { UserList } from "@/components/user-management/user-list";
-import { RoleManagement } from "@/components/user-management/role-management"; 
 import { PermissionMatrix } from "@/components/user-management/permission-matrix";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/firebase";
@@ -43,25 +42,25 @@ export default function UserManagementPage() {
             <Tabs defaultValue="users">
                 <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="users">All Users</TabsTrigger>
-                    <TabsTrigger value="matrix">Permission Matrix</TabsTrigger>
                     <TabsTrigger value="progress">Student Progress</TabsTrigger>
                     <TabsTrigger value="enrollment">Enrollment</TabsTrigger>
+                    <TabsTrigger value="matrix">Permission Matrix</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="users">
                     <UserList />
                 </TabsContent>
                 
-                <TabsContent value="matrix">
-                    <PermissionMatrix />
-                </TabsContent>
-
                 <TabsContent value="progress">
                     <StudentProgressList />
                 </TabsContent>
 
                 <TabsContent value="enrollment">
                     <EnrollmentList />
+                </TabsContent>
+
+                <TabsContent value="matrix">
+                    <PermissionMatrix />
                 </TabsContent>
             </Tabs>
         </div>
