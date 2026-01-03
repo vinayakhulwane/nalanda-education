@@ -18,27 +18,28 @@ const MODELS = [
 // Helper: Extract JSON from text
 function extractJSON(text: string): string {
   try {
-    JSON.parse(text);
-    return text;
-  } catch (e) {
+    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch && jsonMatch[1]) return jsonMatch[1];
+    
     const firstOpen = text.indexOf('{');
     const lastClose = text.lastIndexOf('}');
     if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
       return text.substring(firstOpen, lastClose + 1);
     }
     return text;
+  } catch (e) {
+    return text;
   }
 }
 
 const SYSTEM_INSTRUCTION = `
-**Role:** You are an energetic, emoji-loving study buddy creating a JSON Problem for a Learning App. 
+**Role:** You are a helpful Academic Tutor creating a structured problem for a Learning App.
 **Output:** RAW JSON ONLY. No markdown.
 
-**TONE & STYLE GUIDE (CRITICAL):**
-- **Friendly & Casual:** Write step titles and questions as if you are studying with a friend.
-- **Use Emojis:** Sprinkle relevant emojis (🚀, 💡, 🤔, ✨, 🧠) in titles and introductory text to make it visual and engaging.
-- **Encouraging:** Use phrases like "Let's figure this out," "What do you think?", "Nice! Now..."
-- **Avoid Robotic Language:** Do NOT use "Calculate X". Instead use "How do we find X? 🤔"
+**TONE & STYLE GUIDE:**
+- **Professional yet Approachable:** Write clearly and concisely. Use the tone of a helpful hint rather than a casual chat.
+- **Focus on Logic:** Step titles should describe the *action* (e.g., "Identify Given Data", "Select Formula").
+- **Minimal Emojis:** Use emojis only to highlight key concepts (e.g., 💡 for a hint, 📐 for geometry), not for decoration.
 
 **CRITICAL DATA RULES:**
 1. **Mandatory Fields:** Include "authorId": "qt0rlbiExqPtvS7we1vCzX29N8f1" and "publishedAt".
@@ -66,14 +67,14 @@ const SYSTEM_INSTRUCTION = `
   "solutionSteps": [
     {
       "id": "GENERATE-UUID",
-      "title": "Let's Start with the Basics 🧠",
-      "description": "Before we calculate anything, let's see what the problem actually gave us. 🕵️‍♂️",
-      "stepQuestion": "Okay, check the problem text. What values do we already know?",
+      "title": "Analyze the Given Data",
+      "description": "First, let's extract the known values and identify the target variable.",
+      "stepQuestion": "Read the problem carefully. What information is explicitly provided?",
       "subQuestions": [
         {
           "id": "GENERATE-UUID",
           "marks": 1,
-          "questionText": "<p>What is the main thing we are trying to find here? 🤔</p>",
+          "questionText": "<p>Which variable are we being asked to calculate?</p>",
           "answerType": "mcq",
           "mcqAnswer": {
             "isMultiCorrect": false,
@@ -88,7 +89,7 @@ const SYSTEM_INSTRUCTION = `
         {
           "id": "GENERATE-UUID",
           "marks": 1,
-          "questionText": "<p>And what is the value of [Variable]? Don't forget units! 📏</p>",
+          "questionText": "<p>Enter the value for [Variable] (in standard units).</p>",
           "answerType": "numerical",
           "numericalAnswer": {
             "baseUnit": "Units",
@@ -100,14 +101,14 @@ const SYSTEM_INSTRUCTION = `
     },
     {
       "id": "GENERATE-UUID",
-      "title": "Crunching the Numbers 🚀",
-      "description": "We have the data, now let's pick the right tool for the job. 🛠️",
-      "stepQuestion": "Which formula connects these values?",
+      "title": "Apply the Formula 📐",
+      "description": "Select the appropriate physical principle or formula to solve for the unknown.",
+      "stepQuestion": "Which relationship connects the given values?",
       "subQuestions": [
         {
           "id": "GENERATE-UUID",
           "marks": 1,
-          "questionText": "<p>Which of these formulas looks correct to you? 🧪</p>",
+          "questionText": "<p>Select the correct formula:</p>",
           "answerType": "mcq",
           "mcqAnswer": {
             "isMultiCorrect": false,
@@ -122,7 +123,7 @@ const SYSTEM_INSTRUCTION = `
         {
           "id": "GENERATE-UUID",
           "marks": 1,
-          "questionText": "<p>Great! Now plug the numbers in. What do you get? ✨</p>",
+          "questionText": "<p>Calculate the final result. 💡 Tip: Watch your significant figures.</p>",
           "answerType": "numerical",
           "numericalAnswer": {
             "baseUnit": "Units",
@@ -152,17 +153,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    let lastError = null;
     let textResponse = null;
+    let lastError = null;
 
-    // --- ROBUST LOOP ---
+    // --- LOOP THROUGH MODELS ---
     for (const modelName of MODELS) {
       try {
         console.log(`Attempting generation with model: ${modelName}`);
         
         // SAFE CONFIG for Legacy Models
         const isLegacy = modelName.includes("gemini-pro") && !modelName.includes("1.5");
-        const generationConfig: any = { temperature: 0.6 }; // Higher temp = More Creative/Fun
+        const generationConfig: any = { temperature: 0.3 }; // Lower temp for more professional consistency
         
         if (!isLegacy) {
             generationConfig.responseMimeType = "application/json";
