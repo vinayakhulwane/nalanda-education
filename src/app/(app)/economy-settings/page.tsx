@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { doc, collection } from 'firebase/firestore';
+import { doc, collection, serverTimestamp } from 'firebase/firestore';
 import type { EconomySettings, CurrencyType, CouponCondition, Coupon } from '@/types';
 import { setDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
@@ -169,7 +169,7 @@ export default function EconomySettingsPage() {
   const currentDay = today.getDate();
   
   const years = useMemo(() => Array.from({ length: 10 }, (_, i) => currentYear + i), [currentYear]);
-  const availableMonths = useMemo(() => Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) })), [];
+  const availableMonths = useMemo(() => Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: new Date(0, i).toLocaleString('default', { month: 'long' }) })), []);
   const availableDays = useMemo(() => Array.from({ length: 31 }, (_, i) => i + 1), []);
 
   const handleSaveSettings = async (payload: Partial<EconomySettings>, message: string) => {
