@@ -96,53 +96,64 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const worksheetIdsKey = worksheetIds.join(','); 
 
   const worksheetsQuery = useMemoFirebase(() => {
+    // If no IDs, return null (skip query)
     if (!firestore || worksheetIds.length === 0) return null;
     return query(collection(firestore, 'worksheets'), where('id', 'in', worksheetIds.slice(0, 10)));
   }, [firestore, worksheetIdsKey]);
 
-  const { data: worksheets } = useCollection<Worksheet>(worksheetsQuery);
-// =========================================================
-  // 👇 PASTE YOUR CONSOLE LOGS HERE 👇
-  // =========================================================
-  console.log("Attempts Loaded:", recentAttempts !== undefined);
-  console.log("Worksheet IDs:", worksheetIds);
-  console.log("Worksheets Data:", worksheets);
-  console.log("Is Skeleton Active?", !recentAttempts || !worksheets);
-  // =========================================================
-  // 4. Calculate Task Progress (With Fallback Defaults)
+  const { data: worksheetsRaw } = useCollection<Worksheet>(worksheetsQuery);
+
+  // Force 'worksheets' to be an empty array [] if there are no IDs.
+  const worksheets = worksheetIds.length === 0 ? [] : worksheetsRaw;
+
+  // 4. Calculate Task Progress (Robust & Case-Insensitive)
   const { conditionsMet, taskProgress, hasTasks } = useMemo(() => {
     
-    // ✅ FIX: Define Default Tasks if the database list is empty
-    // This ensures the "Missions" section ALWAYS appears
     const defaultConditions = [
         { type: 'minPracticeAssignments', value: 3 },
         { type: 'minClassroomAssignments', value: 1 }
     ];
 
-    // Use settings if available, otherwise use defaults
     const conditionsToUse = (settings?.couponConditions && settings.couponConditions.length > 0) 
         ? settings.couponConditions 
         : defaultConditions;
 
-    // Loading state fallback
     if (!recentAttempts || !worksheets) {
-      // Even while loading, we return hasTasks: true so the UI skeleton exists
       return { conditionsMet: false, taskProgress: [], hasTasks: true };
     }
 
+    // DEBUGGING LOGS (Check your browser console!)
+    console.log("DEBUG: Total Attempts fetched:", recentAttempts.length);
+    console.log("DEBUG: Worksheets Details:", worksheets.map(w => ({ id: w.id, type: w.worksheetType })));
+
     let allMet = true;
     
-    // Map over the conditions (either real ones or defaults)
     const progress = conditionsToUse.map(condition => {
       let current = 0;
       let label = "";
       
+      // Helper to check type safely (Case Insensitive)
+      const checkType = (w: Worksheet | undefined, targetType: string) => {
+          if (!w || !w.worksheetType) return false;
+          return w.worksheetType.trim().toLowerCase() === targetType.toLowerCase();
+      };
+
       if (condition.type === 'minClassroomAssignments') {
-         current = recentAttempts.filter(a => worksheets.find(w => w.id === a.worksheetId)?.worksheetType === 'classroom').length;
+         // Count matches
+         current = recentAttempts.filter(a => {
+             const w = worksheets.find(sheet => sheet.id === a.worksheetId);
+             return checkType(w, 'classroom');
+         }).length;
          label = "Complete Classroom Assignments";
+
       } else if (condition.type === 'minPracticeAssignments') {
-         current = recentAttempts.filter(a => worksheets.find(w => w.id === a.worksheetId)?.worksheetType === 'practice').length;
+         // Count matches
+         current = recentAttempts.filter(a => {
+             const w = worksheets.find(sheet => sheet.id === a.worksheetId);
+             return checkType(w, 'practice'); 
+         }).length;
          label = "Complete Practice Exercises";
+         
       } else {
          label = "Special Mission";
       }
@@ -165,8 +176,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   // 5. Final Status
   const isWelcomeGift = !userProfile.hasClaimedWelcomeCoupon;
   
-  // Logic: Can claim if Welcome Gift OR (Settings exist AND Time is ready AND Cycle is fresh AND Tasks done)
-  // We relax the "settings check" now that we have defaults
+  // Logic: Can claim if Welcome Gift OR (Time is ready AND Cycle is fresh AND Tasks done)
   const canClaim = isWelcomeGift 
     ? true 
     : (isTimeReady && hasNotClaimedThisCycle && conditionsMet);
@@ -288,7 +298,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
                     </div>
 
                     {!hasTasks || taskProgress.length === 0 ? (
-                         // Fallback Loading Skeleton if defaults haven't generated yet
+                         // Fallback Loading Skeleton 
                          <div className="space-y-3">
                             {[1, 2].map((i) => (
                                 <div key={i} className="h-16 w-full bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
