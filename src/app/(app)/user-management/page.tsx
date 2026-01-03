@@ -39,13 +39,13 @@ export default function UserManagementPage() {
                 title="User Management"
                 description="Manage users, track progress, and handle enrollments."
             />
-            <Tabs defaultValue="users">
+            <Tabs defaultValue="permissions">
                 <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="users">Users</TabsTrigger>
+                    <TabsTrigger value="permissions">Permissions & Roles</TabsTrigger>
                     <TabsTrigger value="progress">Student Progress</TabsTrigger>
                     <TabsTrigger value="enrollment">Enrollment</TabsTrigger>
                 </TabsList>
-                <TabsContent value="users">
+                <TabsContent value="permissions">
                     <UserList />
                 </TabsContent>
                 <TabsContent value="progress">
