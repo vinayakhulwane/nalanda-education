@@ -4,9 +4,10 @@ import React from 'react';
 import { Question } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from '@/components/ui/button';
 import { 
   Calculator, Bot, FileText, Layers, 
-  Hash, ListChecks, CheckCircle2 
+  Hash, ListChecks, CheckCircle2, Download
 } from 'lucide-react';
 
 interface Step5Props {
@@ -24,6 +25,26 @@ const cleanHtml = (html: string = '') => {
 export function Step5Preview({ question }: Step5Props) {
   
   const isAiGraded = question.gradingMode === 'ai';
+
+  const handleExportJson = () => {
+    // 1. Create a clean JSON string
+    const jsonString = JSON.stringify(question, null, 2);
+    // 2. Create a Blob from the string
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    // 3. Create a URL for the Blob
+    const url = URL.createObjectURL(blob);
+    // 4. Create a temporary anchor element to trigger the download
+    const a = document.createElement('a');
+    a.href = url;
+    // Sanitize the question name for use as a filename
+    const fileName = (question.name || 'untitled-question').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    a.download = `${fileName}.json`;
+    // 5. Trigger download and clean up
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20 w-full">
@@ -48,6 +69,13 @@ export function Step5Preview({ question }: Step5Props) {
           {/* ✅ ADDED: break-words to title */}
           <h1 className="text-3xl font-bold text-slate-900 break-words">{question.name || 'Untitled Question'}</h1>
           <p className="text-slate-500 text-sm mt-1">ID: <span className="font-mono text-xs">{question.id}</span></p>
+        </div>
+        {/* ✅ NEW: Export Button */}
+        <div>
+          <Button onClick={handleExportJson} variant="outline">
+            <Download className="mr-2 h-4 w-4" />
+            Export JSON
+          </Button>
         </div>
       </div>
 

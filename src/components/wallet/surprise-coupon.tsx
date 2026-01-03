@@ -9,14 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Gift, Loader2, Lock, CheckCircle2, Rocket, Ticket, Star, Trophy, Sparkles, Clock, Activity } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy, getDocs } from 'firebase/firestore';
+// ✅ FIXED: Added 'limit' to the imports
+import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy, limit, getDocs } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
-import { useAcademicHealth } from '@/hooks/use-academic-health'; 
+import { useAcademicHealth } from '@/hooks/use-academic-health';
 
-// Define Transaction Interface
 interface Transaction {
   id: string;
   userId: string;
@@ -24,6 +24,7 @@ interface Transaction {
   currency: string;
   amount: number;
   createdAt: any;
+  description?: string;
 }
 
 interface SurpriseCouponProps {
@@ -95,7 +96,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
       let label = "";
 
       if (condition.type === 'minPracticeAssignments') {
-         label = "Complete Assignments in my Practice Zone";
+         label = "Complete Practice Exercises";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
              const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice';
@@ -117,7 +118,8 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
          current = validTransactions.filter(t => t.currency?.toLowerCase() === 'gold' && t.type === 'earned').length;
 
       } else if (condition.type === 'minAcademicHealth') {
-         label = `Raise your Academic Health above ${condition.value}%`;
+         label = `Maintain Academic Health > ${condition.value}%`;
+         // ✅ USE THE PROP FROM THE HOOK
          current = academicHealth; 
       } else {
          label = "Special Mission";
@@ -188,13 +190,13 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
   if (justClaimed || isAlreadyClaimed) {
     return (
       <Card className={cn("relative overflow-hidden border-none shadow-xl bg-gradient-to-br from-yellow-50 via-orange-50 to-yellow-100 dark:from-yellow-950/30 dark:to-orange-950/30", justClaimed ? "animate-in fade-in zoom-in duration-500" : "opacity-80 grayscale-[0.3]")}>
-          
+          <div className="absolute inset-0 bg-[url('/grid.svg')] bg-repeat opacity-10"></div>
           <CardContent className="pt-8 pb-8 px-8 text-center relative z-10 space-y-6">
               <div className="mx-auto bg-yellow-100 dark:bg-yellow-900/50 p-4 rounded-full w-fit shadow-inner ring-4 ring-yellow-200 dark:ring-yellow-800">
                   <Trophy className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="space-y-2">
-                  <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">CONGRATULATIONS!</h2>
+                  <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">CONGRATULATIONS!</h2>
                   <p className="text-lg font-medium text-slate-700 dark:text-slate-200">You earned <span className="font-bold text-yellow-600">{coupon.rewardAmount} {coupon.rewardCurrency}</span> from this coupon.</p>
               </div>
               {taskProgress.length > 0 && (<div className="grid gap-2 text-left bg-white/40 dark:bg-black/20 p-4 rounded-xl"><span className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Completed Missions</span>{taskProgress.map((task, idx) => (<div key={idx} className="flex items-center gap-3 text-sm"><div className="bg-green-100 dark:bg-green-900/50 p-1 rounded-full"><CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" /></div><span className="font-semibold text-slate-700 dark:text-slate-300 line-through decoration-green-500/50">{task.label}</span></div>))}</div>)}
@@ -232,6 +234,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const recentAttemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
     const oneMonthAgo = new Date(); oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    // ✅ FIXED: Added 'limit' to query
     return query(collection(firestore, 'worksheet_attempts'), where('userId', '==', userProfile.id), where('attemptedAt', '>', oneMonthAgo), orderBy('attemptedAt', 'desc'), limit(100));
   }, [firestore, userProfile.id]);
   const { data: recentAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
@@ -239,6 +242,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const transactionsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
     const oneMonthAgo = new Date(); oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    // ✅ FIXED: Added 'limit' to query
     return query(collection(firestore, 'transactions'), where('userId', '==', userProfile.id), where('createdAt', '>', oneMonthAgo), orderBy('createdAt', 'desc'), limit(50));
   }, [firestore, userProfile.id]);
   const { data: recentTransactions, isLoading: transactionsLoading } = useCollection<Transaction>(transactionsQuery);

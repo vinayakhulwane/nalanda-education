@@ -1,13 +1,12 @@
-
 'use client';
 
 import { useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, limit, documentId, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, documentId } from 'firebase/firestore';
 import { format, subDays } from 'date-fns';
 import type { User, WorksheetAttempt, Worksheet } from '@/types';
 
-// --- HELPER: ROBUST SCORE CALCULATION (Exact replica of Progress Page logic) ---
+// --- HELPER: ROBUST SCORE EXTRACTION ---
 const getAttemptTotals = (
   a: WorksheetAttempt, 
   worksheet: Worksheet | undefined, 
@@ -25,7 +24,6 @@ const getAttemptTotals = (
   }
 
   // 2. Fail-safe: Manual Calculation using Question Definitions
-  // This fixes the "Inactive" bug when metadata is missing
   let calcScore = 0;
   let calcTotal = 0;
   const results = a.results || {};
@@ -34,13 +32,11 @@ const getAttemptTotals = (
     worksheet.questions.forEach(qId => {
       const question = questionMap.get(qId);
       if (question) {
-        // Calculate Max Marks from Question Steps
         const qMax = question.solutionSteps?.reduce((acc: number, s: any) => 
           acc + s.subQuestions.reduce((ss: number, sub: any) => ss + (sub.marks || 0), 0), 0) || 0;
         
         calcTotal += qMax;
 
-        // Calculate Earned Score from Results
         let qEarned = 0;
         question.solutionSteps?.forEach((step: any) => {
           step.subQuestions.forEach((sub: any) => {
@@ -52,7 +48,6 @@ const getAttemptTotals = (
           });
         });
 
-        // Sanitizer
         if (qEarned > qMax && qMax > 0) {
           qEarned = (qEarned / 100) * qMax;
         }
@@ -68,7 +63,7 @@ const getAttemptTotals = (
 export function useAcademicHealth(userProfile: User) {
   const firestore = useFirestore();
 
-  // 1. Fetch Recent Attempts (Last 30 days to be safe for 14-day window)
+  // 1. Fetch Recent Attempts (Last 30 days)
   const attemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile?.id) return null;
     const oneMonthAgo = new Date();
@@ -82,15 +77,13 @@ export function useAcademicHealth(userProfile: User) {
   }, [firestore, userProfile?.id]);
   const { data: attempts } = useCollection<WorksheetAttempt>(attemptsQuery);
 
-  // 2. Fetch All Worksheets (Needed to map questions)
-  // Optimization: In a real large app, you might chunk this. 
-  // For parity with Progress Page, we fetch the collection or map from IDs.
+  // 2. Fetch All Worksheets
   const allWorksheetsQuery = useMemoFirebase(() => {
      return firestore ? collection(firestore, 'worksheets') : null;
   }, [firestore]);
   const { data: allWorksheets } = useCollection<Worksheet>(allWorksheetsQuery);
 
-  // 3. Fetch All Questions (CRITICAL: This allows the Deep Calculation)
+  // 3. Fetch All Questions
   const allQuestionsQuery = useMemoFirebase(() => {
      return firestore ? collection(firestore, 'questions') : null;
   }, [firestore]);
@@ -100,18 +93,13 @@ export function useAcademicHealth(userProfile: User) {
   const health = useMemo(() => {
     if (!attempts || !allWorksheets || !allQuestions) return 0;
 
-    // Create Lookups for speed
     const worksheetMap = new Map(allWorksheets.map(w => [w.id, w]));
     const questionMap = new Map(allQuestions.map(q => [q.id, q]));
-
-    // Daily Aggregation
     const dailyStats: Record<string, { total: number; obtained: number }> = {};
 
     attempts.forEach(a => {
       if (!a.attemptedAt) return;
-      
       const w = worksheetMap.get(a.worksheetId);
-      // Use the Robust Helper
       const data = getAttemptTotals(a, w, questionMap);
       
       if (data) {
@@ -124,8 +112,8 @@ export function useAcademicHealth(userProfile: User) {
       }
     });
 
-    // 14-Day Rolling Window
-    let currentHealth = 80; // Baseline
+    // 14-Day Rolling Window (Baseline 80)
+    let currentHealth = 80; 
     const today = new Date();
 
     for (let i = 13; i >= 0; i--) {
@@ -134,11 +122,9 @@ export function useAcademicHealth(userProfile: User) {
       const dayStats = dailyStats[dateKey];
 
       if (dayStats && dayStats.total > 0) {
-        // Active Day
         const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
         currentHealth = (currentHealth * 0.6) + (dayAvg * 0.4);
       } else {
-        // Inactive Day (Decay)
         currentHealth = Math.max(0, currentHealth * 0.95);
       }
     }
