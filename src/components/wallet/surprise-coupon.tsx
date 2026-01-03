@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -9,10 +10,22 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Gift, Loader2, Lock, CheckCircle2, Rocket, Ticket, Star, Trophy, Sparkles, Clock } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy, limit } from 'firebase/firestore';
+import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy, limit, getDocs } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { subDays } from 'date-fns';
+
+// Define Transaction Interface Locally (to ensure safety)
+interface Transaction {
+  id: string;
+  userId: string;
+  type: 'earned' | 'spent' | 'bought';
+  currency: string;
+  amount: number;
+  createdAt: any;
+  description?: string;
+}
 
 interface SurpriseCouponProps {
   userProfile: User;
@@ -23,6 +36,7 @@ interface CouponCardProps {
   userProfile: User;
   recentAttempts?: WorksheetAttempt[];
   worksheets?: Worksheet[];
+  recentTransactions?: Transaction[]; 
 }
 
 // --- HELPER: HH:MM:SS TIMER ---
@@ -57,7 +71,7 @@ function CountdownTimer({ targetDate }: { targetDate: Date }) {
 }
 
 // --- SUB-COMPONENT: COUPON CARD ---
-function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] }: CouponCardProps) {
+function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [], recentTransactions = [] }: CouponCardProps) {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
@@ -74,15 +88,51 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
   const isAlreadyClaimed = lastClaimedMillis >= referenceTimeMillis;
   const hasNotClaimedThisCycle = !isAlreadyClaimed;
 
-  // --- DEBUGGING ENABLED: TASK PROGRESS LOGIC ---
+  // --- TASK PROGRESS LOGIC ---
   const { conditionsMet, taskProgress } = useMemo(() => {
     if (!coupon.conditions || coupon.conditions.length === 0) {
       return { conditionsMet: true, taskProgress: [] };
     }
 
-    console.groupCollapsed(`[DEBUG] Checking Coupon: ${coupon.name}`);
-    const validAttempts = recentAttempts; 
-    console.log(`Checking ${validAttempts.length} attempts...`);
+    const couponCreationTime = (coupon as any).createdAt?.toMillis?.() || 0;
+    
+    // 1. Filter Attempts by Time (For Practice/Classroom)
+    const validAttempts = recentAttempts.filter(a => {
+        const t = (a.attemptedAt as any)?.toMillis?.() || 0;
+        return t >= couponCreationTime;
+    });
+
+    // 2. Filter Transactions by Time (For Gold Mission)
+    const validTransactions = recentTransactions.filter(t => {
+        const time = (t.createdAt as any)?.toMillis?.() || 0;
+        return time >= couponCreationTime;
+    });
+    
+    // 3. Calculate Overall Academic Health
+    let totalScore = 0;
+    let totalPossible = 0;
+    validAttempts.forEach(attempt => {
+        const worksheet = worksheets.find(w => w.id === attempt.worksheetId);
+        if (worksheet) {
+            worksheet.questions.forEach(qId => {
+                const question = (worksheets as any).find((q: any) => q.id === qId);
+                if (question) {
+                    const marks = question.solutionSteps?.reduce((sum: number, s: any) => sum + s.subQuestions.reduce((subSum: number, sub: any) => subSum + (sub.marks || 0), 0), 0) || 0;
+                    totalPossible += marks;
+
+                    const results = attempt.results || {};
+                    question.solutionSteps?.forEach((step: any) => {
+                        step.subQuestions.forEach((sub: any) => {
+                            if (results[sub.id]?.isCorrect) {
+                                totalScore += sub.marks || 0;
+                            }
+                        });
+                    });
+                }
+            });
+        }
+    });
+    const academicHealth = totalPossible > 0 ? (totalScore / totalPossible) * 100 : 0;
 
     let allMet = true;
     
@@ -91,59 +141,35 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       let label = "";
 
       if (condition.type === 'minPracticeAssignments') {
-         label = "Complete Practice Exercises";
+         label = "Complete Assignments in My Practice Zone";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             
-             // Check if Practice (Explicit type OR Self-Created)
-             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' 
-                                 || (a as any).worksheetType?.toLowerCase() === 'practice';
+             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice';
              const isSelfCreated = w?.authorId === userProfile.id;
-
-             const match = isTypePractice || isSelfCreated;
-             if (match) console.log(`  -> Found Practice Attempt: ${a.id}`);
-             return match;
+             return isTypePractice || isSelfCreated;
          }).length;
 
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             
-             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom'
-                                  || (a as any).worksheetType?.toLowerCase() === 'classroom';
+             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom' || (a as any).worksheetType?.toLowerCase() === 'classroom';
              const isNotSelfCreated = w?.authorId !== userProfile.id;
-
              return isTypeClassroom && isNotSelfCreated;
          }).length;
 
       } else if (condition.type === 'minGoldQuestions') {
          label = "Solve Gold Questions";
-         console.log("  --- Checking Gold ---");
-         
-         current = validAttempts.filter(a => {
-             const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             
-             // Cast to 'any' to avoid TS error
-             // We check BOTH the worksheet config AND the earned currency on the attempt
-             const wsCurrency = (w as any)?.rewardCurrency || (w as any)?.currency;
-             const attCurrency = (a as any)?.earnedCurrency || (a as any)?.rewardCurrency;
-
-             const givesGold = wsCurrency === 'gold';
-             const earnedGold = attCurrency === 'gold';
-             const isMatch = givesGold || earnedGold;
-
-             if (isMatch) {
-                 console.log(`  ✅ MATCH! Attempt ${a.id} | WS Currency: ${wsCurrency} | Earned: ${attCurrency}`);
-             } else {
-                 // Log failures so you can see what they ARE (e.g. 'coin')
-                 // console.log(`  ❌ Fail. Attempt ${a.id} | WS Currency: ${wsCurrency} | Earned: ${attCurrency}`);
-             }
-
-             return isMatch;
+         current = validTransactions.filter(t => {
+             const isGold = t.currency?.toLowerCase() === 'gold';
+             const isEarned = t.type === 'earned';
+             return isGold && isEarned;
          }).length;
-         
-         console.log(`  >>> Total Gold Found: ${current}`);
+      
+      } else if (condition.type === 'minAcademicHealth') {
+          label = `Raise your Academic Health above ${condition.value}%`;
+          current = academicHealth;
+      
       } else {
          label = "Special Mission";
       }
@@ -160,9 +186,8 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       };
     });
     
-    console.groupEnd();
     return { conditionsMet: allMet, taskProgress: progress };
-  }, [coupon.conditions, recentAttempts, worksheets, userProfile.id]);
+  }, [coupon.conditions, recentAttempts, worksheets, recentTransactions, userProfile.id, coupon]);
 
   const canClaim = isTimeReady && hasNotClaimedThisCycle && conditionsMet && !justClaimed;
 
@@ -276,8 +301,6 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       </CardHeader>
 
       <CardContent className="space-y-6 relative z-10 px-8">
-        
-        {/* TIME REQUIREMENT SECTION */}
         {coupon.availableDate && (
            <div className={cn("rounded-xl border p-4 transition-colors", !isTimeReady ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900" : "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900")}>
              <div className={cn("text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2", !isTimeReady ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400")}>
@@ -289,7 +312,6 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
            </div>
         )}
 
-        {/* TASKS SECTION */}
         {taskProgress.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -327,23 +349,25 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
             disabled={!canClaim || isClaiming} 
             className={cn("w-full font-bold text-lg h-14 shadow-xl transition-all", canClaim ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed")}
         >
-          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Coming Soon</>}
+          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Locked</>}
         </Button>
       </CardFooter>
     </Card>
   )
 }
 
-// --- MAIN COMPONENT: DATA LOADER ---
+// --- MAIN COMPONENT ---
 export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const firestore = useFirestore();
 
+  // 1. Fetch Coupons
   const couponsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'coupons'), orderBy('availableDate', 'asc'));
   }, [firestore]);
   const { data: coupons, isLoading: couponsLoading } = useCollection<Coupon>(couponsQuery);
 
+  // 2. Fetch Attempts
   const recentAttemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
     const oneMonthAgo = new Date();
@@ -358,14 +382,45 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   }, [firestore, userProfile.id]);
   const { data: recentAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
 
-  const worksheetIds = useMemo(() => recentAttempts ? [...new Set(recentAttempts.map(a => a.worksheetId))] : [], [recentAttempts]);
+  // 3. ✅ FETCH TRANSACTIONS (For Gold Mission)
+  const transactionsQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile.id) return null;
+    const oneMonthAgo = subDays(new Date(), 30); // Use date-fns for safety
+    return query(
+      collection(firestore, 'transactions'),
+      where('userId', '==', userProfile.id),
+      where('createdAt', '>', oneMonthAgo),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+  }, [firestore, userProfile.id]);
+  const { data: recentTransactions, isLoading: transactionsLoading } = useCollection<Transaction>(transactionsQuery);
+
+  // 4. Robust Worksheet Fetching
+  const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
   
-  const worksheetsQuery = useMemoFirebase(() => {
-    if (!firestore || worksheetIds.length === 0) return null;
-    return query(collection(firestore, 'worksheets'), where(documentId(), 'in', worksheetIds.slice(0, 30)));
-  }, [firestore, worksheetIds.join(',')]);
-  
-  const { data: worksheets, isLoading: worksheetsLoading } = useCollection<Worksheet>(worksheetsQuery);
+  useEffect(() => {
+    const fetchWorksheets = async () => {
+        if (!firestore || !recentAttempts || recentAttempts.length === 0) return;
+        const allIds = [...new Set(recentAttempts.map(a => a.worksheetId))];
+        const chunks = [];
+        for (let i = 0; i < allIds.length; i += 30) chunks.push(allIds.slice(i, i + 30));
+
+        try {
+            const results: Worksheet[] = [];
+            for (const chunk of chunks) {
+                if (chunk.length === 0) continue;
+                const q = query(collection(firestore, 'worksheets'), where(documentId(), 'in', chunk));
+                const snap = await getDocs(q);
+                snap.forEach(doc => results.push({ id: doc.id, ...doc.data() } as Worksheet));
+            }
+            setWorksheets(results);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+    fetchWorksheets();
+  }, [firestore, recentAttempts]);
 
   // --- SORTING LOGIC ---
   const sortedCoupons = useMemo(() => {
@@ -382,6 +437,8 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
         let tasksDone = true;
         if (c.conditions && c.conditions.length > 0) {
            const validAttempts = recentAttempts || [];
+           const validTransactions = recentTransactions || [];
+           
            for (const cond of c.conditions) {
               const check = (w: Worksheet | undefined, a: WorksheetAttempt, t: string) => {
                   const typeMatch = w?.worksheetType?.toLowerCase() === t.toLowerCase() || (a as any).worksheetType?.toLowerCase() === t.toLowerCase();
@@ -395,15 +452,8 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
                  count = validAttempts.filter(a => check((worksheets || []).find(w => w.id === a.worksheetId), a, 'classroom')).length;
               } else if (cond.type === 'minPracticeAssignments') {
                  count = validAttempts.filter(a => check((worksheets || []).find(w => w.id === a.worksheetId), a, 'practice')).length;
-              
-              // ✅ Added Gold Logic to Sorter
               } else if (cond.type === 'minGoldQuestions') {
-                 count = validAttempts.filter(a => {
-                     const w = (worksheets || []).find(sheet => sheet.id === a.worksheetId);
-                     const givesGold = (w as any)?.rewardCurrency === 'gold' || (w as any)?.currency === 'gold';
-                     const earnedGold = (a as any)?.earnedCurrency === 'gold' || (a as any)?.rewardCurrency === 'gold';
-                     return givesGold || earnedGold;
-                 }).length;
+                 count = validTransactions.filter(t => t.currency?.toLowerCase() === 'gold' && t.type === 'earned').length;
               }
               if (count < cond.value) { tasksDone = false; break; }
            }
@@ -414,9 +464,9 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
     };
 
     return [...coupons].sort((a, b) => getRank(a) - getRank(b));
-  }, [coupons, userProfile, recentAttempts, worksheets]);
+  }, [coupons, userProfile, recentAttempts, worksheets, recentTransactions]);
 
-  const isLoading = couponsLoading || attemptsLoading || worksheetsLoading;
+  const isLoading = couponsLoading || attemptsLoading || transactionsLoading;
 
   if(isLoading) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
@@ -439,7 +489,8 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
             coupon={coupon} 
             userProfile={userProfile} 
             recentAttempts={recentAttempts ?? []} 
-            worksheets={worksheets ?? []} 
+            worksheets={worksheets ?? []}
+            recentTransactions={recentTransactions ?? []} // Pass transactions
         />
       ))}
     </div>
