@@ -3,7 +3,6 @@
 import { PageHeader } from "@/components/page-header";
 import { WalletBalances } from "@/components/wallet/wallet-balances";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useUser } from "@/firebase";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -39,13 +38,16 @@ export default function WalletPage() {
       
       <WalletBalances userProfile={userProfile} />
 
-      <SurpriseCoupon userProfile={userProfile} />
-
-      <Tabs defaultValue="swap" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs defaultValue="coupon" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="coupon">Surprise Coupon</TabsTrigger>
           <TabsTrigger value="swap">Currency Swap</TabsTrigger>
           <TabsTrigger value="history">Transaction History</TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="coupon" className="mt-6">
+          <SurpriseCoupon userProfile={userProfile} />
+        </TabsContent>
         
         <TabsContent value="swap" className="mt-6">
           <CurrencySwap userProfile={userProfile} />

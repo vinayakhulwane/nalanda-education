@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Gift, Loader2, Lock, Clock, CheckCircle2, Rocket, Ticket, Star, Trophy } from 'lucide-react';
+import { Gift, Loader2, Lock, Clock, CheckCircle2, Rocket, Ticket, Star, Trophy, Sparkles, PartyPopper } from 'lucide-react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
-import { doc, writeBatch, collection, increment, serverTimestamp, query, where } from 'firebase/firestore';
+import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -60,18 +60,23 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  
+  // UI States
   const [isClaiming, setIsClaiming] = useState(false);
   const [isScratched, setIsScratched] = useState(false);
+  
+  // Success Data States (Snapshots to hold data after claim resets DB queries)
+  const [claimedReward, setClaimedReward] = useState<{ amount: number, currency: string } | null>(null);
+  const [completedTasksSnapshot, setCompletedTasksSnapshot] = useState<any[]>([]);
 
   // 1. Fetch Settings
   const settingsDocRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
   const { data: settings } = useDoc<EconomySettings>(settingsDocRef);
 
-  // 2. Dates - Primitive dependencies
+  // 2. Dates
   const lastClaimedMillis = userProfile.lastCouponClaimedAt?.toMillis() || 0;
   const nextAvailableMillis = settings?.nextCouponAvailableDate?.toMillis() || Date.now();
   
-  // Logic
   const isTimeReady = Date.now() >= nextAvailableMillis;
   const hasNotClaimedThisCycle = lastClaimedMillis < nextAvailableMillis;
 
@@ -96,19 +101,18 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const worksheetIdsKey = worksheetIds.join(','); 
 
   const worksheetsQuery = useMemoFirebase(() => {
-    // If no IDs, return null (skip query)
     if (!firestore || worksheetIds.length === 0) return null;
-    return query(collection(firestore, 'worksheets'), where('id', 'in', worksheetIds.slice(0, 10)));
+    // ✅ FIX: Use documentId() to query by ID properly
+    return query(collection(firestore, 'worksheets'), where(documentId(), 'in', worksheetIds.slice(0, 10)));
   }, [firestore, worksheetIdsKey]);
 
   const { data: worksheetsRaw } = useCollection<Worksheet>(worksheetsQuery);
 
-  // Force 'worksheets' to be an empty array [] if there are no IDs.
+  // ✅ FIX: Force empty array if no IDs to prevent loading state
   const worksheets = worksheetIds.length === 0 ? [] : worksheetsRaw;
 
-  // 4. Calculate Task Progress (Robust & Case-Insensitive)
+  // 4. Calculate Task Progress
   const { conditionsMet, taskProgress, hasTasks } = useMemo(() => {
-    
     const defaultConditions = [
         { type: 'minPracticeAssignments', value: 3 },
         { type: 'minClassroomAssignments', value: 1 }
@@ -118,42 +122,35 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
         ? settings.couponConditions 
         : defaultConditions;
 
+    // Strict undefined check to handle loading vs empty
     if (!recentAttempts || !worksheets) {
       return { conditionsMet: false, taskProgress: [], hasTasks: true };
     }
-
-    // DEBUGGING LOGS (Check your browser console!)
-    console.log("DEBUG: Total Attempts fetched:", recentAttempts.length);
-    console.log("DEBUG: Worksheets Details:", worksheets.map(w => ({ id: w.id, type: w.worksheetType })));
 
     let allMet = true;
     
     const progress = conditionsToUse.map(condition => {
       let current = 0;
       let label = "";
-      
-      // Helper to check type safely (Case Insensitive)
+
+      // ✅ FIX: Case-insensitive check
       const checkType = (w: Worksheet | undefined, targetType: string) => {
           if (!w || !w.worksheetType) return false;
           return w.worksheetType.trim().toLowerCase() === targetType.toLowerCase();
       };
-
+      
       if (condition.type === 'minClassroomAssignments') {
-         // Count matches
          current = recentAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
              return checkType(w, 'classroom');
          }).length;
          label = "Complete Classroom Assignments";
-
       } else if (condition.type === 'minPracticeAssignments') {
-         // Count matches
          current = recentAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             return checkType(w, 'practice'); 
+             return checkType(w, 'practice');
          }).length;
          label = "Complete Practice Exercises";
-         
       } else {
          label = "Special Mission";
       }
@@ -175,8 +172,6 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
 
   // 5. Final Status
   const isWelcomeGift = !userProfile.hasClaimedWelcomeCoupon;
-  
-  // Logic: Can claim if Welcome Gift OR (Time is ready AND Cycle is fresh AND Tasks done)
   const canClaim = isWelcomeGift 
     ? true 
     : (isTimeReady && hasNotClaimedThisCycle && conditionsMet);
@@ -190,6 +185,10 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
     const rewardCurrency: CurrencyType = isWelcomeGift ? 'aiCredits' : (safeSettings.surpriseRewardCurrency ?? 'coin');
 
     try {
+      // 1. Snapshot the tasks BEFORE they disappear (due to date reset)
+      setCompletedTasksSnapshot(taskProgress);
+      setClaimedReward({ amount: rewardAmount, currency: rewardCurrency });
+
       const batch = writeBatch(firestore);
       const userRef = doc(firestore, 'users', userProfile.id);
       const transactionRef = doc(collection(firestore, 'transactions'));
@@ -214,7 +213,10 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
       await batch.commit();
       confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });
       toast({ title: 'Reward Unlocked!', description: `You received ${rewardAmount} ${rewardCurrency}` });
+      
+      // Show Success Screen
       setIsScratched(true);
+
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } finally {
@@ -222,8 +224,74 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
     }
   };
 
-  if (isScratched) return null;
+  // --- RENDER SUCCESS STATE ---
+  if (isScratched && claimedReward) {
+      return (
+        <Card className="relative overflow-hidden border-none shadow-xl bg-gradient-to-br from-yellow-50 via-orange-50 to-yellow-100 dark:from-yellow-950/30 dark:to-orange-950/30 animate-in fade-in zoom-in duration-500">
+            <div className="absolute inset-0 bg-[url('/grid.svg')] bg-repeat opacity-10"></div>
+            <div className="absolute top-0 right-0 p-12 opacity-10">
+                <Trophy className="w-48 h-48 text-yellow-500" />
+            </div>
 
+            <CardContent className="pt-8 pb-8 px-8 text-center relative z-10 space-y-6">
+                
+                <div className="mx-auto bg-yellow-100 dark:bg-yellow-900/50 p-4 rounded-full w-fit shadow-inner ring-4 ring-yellow-200 dark:ring-yellow-800">
+                    <Trophy className="h-10 w-10 text-yellow-600 dark:text-yellow-400 animate-bounce" />
+                </div>
+
+                <div className="space-y-2">
+                    <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">
+                        CONGRATULATIONS!
+                    </h2>
+                    <p className="text-lg font-medium text-slate-700 dark:text-slate-200">
+                        You won a surprise coupon reward!
+                    </p>
+                </div>
+
+                <div className="py-6 px-4 bg-white/60 dark:bg-black/20 rounded-2xl border border-yellow-200 dark:border-yellow-800/50 backdrop-blur-sm">
+                    <span className="text-sm font-bold uppercase tracking-widest text-slate-500">You Received</span>
+                    <div className="text-5xl font-black text-yellow-600 dark:text-yellow-400 mt-2 flex items-center justify-center gap-2 filter drop-shadow-sm">
+                        {claimedReward.amount} <span className="text-2xl mt-3 capitalize">{claimedReward.currency}</span>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-2">
+                        <Star className="h-4 w-4 text-orange-500 fill-orange-500" />
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                            Mission Accomplished
+                        </h4>
+                        <Star className="h-4 w-4 text-orange-500 fill-orange-500" />
+                    </div>
+
+                    <div className="grid gap-2 text-left bg-white/40 dark:bg-black/20 p-4 rounded-xl">
+                        {completedTasksSnapshot.length > 0 ? completedTasksSnapshot.map((task, idx) => (
+                            <div key={idx} className="flex items-center gap-3 text-sm">
+                                <div className="bg-green-100 dark:bg-green-900/50 p-1 rounded-full">
+                                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                </div>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300 line-through decoration-green-500/50">
+                                    {task.label}
+                                </span>
+                            </div>
+                        )) : (
+                            <div className="flex items-center gap-3 text-sm justify-center">
+                                <span className="font-medium text-slate-600">Welcome Bonus Claimed!</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </CardContent>
+            <CardFooter className="justify-center pb-8 pt-0">
+                <Button variant="outline" className="border-yellow-300 bg-yellow-50 hover:bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200 dark:border-yellow-800" onClick={() => window.location.reload()}>
+                    <Sparkles className="mr-2 h-4 w-4" /> Awesome!
+                </Button>
+            </CardFooter>
+        </Card>
+      );
+  }
+
+  // --- RENDER STANDARD STATE ---
   const nextAvailableDate = new Date(nextAvailableMillis);
 
   return (
