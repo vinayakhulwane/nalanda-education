@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Gift, Loader2, Lock, CheckCircle2, Rocket, Ticket, Star, Trophy, Sparkles, Clock } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy } from 'firebase/firestore';
+import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy, limit } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -66,7 +67,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
 
   const lastClaimedMillis = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
   
-  // Reference Time for Claim Cycle
+  // Reference Time for Claim Cycle (availableDate or CreatedAt)
   const referenceTimeMillis = coupon.availableDate 
       ? coupon.availableDate.toDate().getTime() 
       : ((coupon as any).createdAt ? (coupon as any).createdAt.toMillis() : 0);
@@ -75,19 +76,18 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
   const isAlreadyClaimed = lastClaimedMillis >= referenceTimeMillis;
   const hasNotClaimedThisCycle = !isAlreadyClaimed;
 
-  // --- DEBUGGING VERSION OF TASK PROGRESS ---
+  // --- TASK PROGRESS LOGIC ---
   const { conditionsMet, taskProgress } = useMemo(() => {
     if (!coupon.conditions || coupon.conditions.length === 0) {
       return { conditionsMet: true, taskProgress: [] };
     }
 
-    // 1. Log Key Data Points
-    const couponCreationTime = (coupon as any).createdAt?.toMillis?.() || 0;
-    console.groupCollapsed(`[DEBUG] Calculating Coupon: ${coupon.name}`);
-    console.log("User ID:", userProfile.id);
-    console.log("Coupon Created At:", new Date(couponCreationTime).toLocaleString());
-    console.log("Total Recent Attempts Fetched:", recentAttempts.length);
-    console.log("Total Worksheets Fetched:", worksheets.length);
+    const validAttempts = recentAttempts.filter(a => {
+        const attemptTime = (a.attemptedAt as any)?.toMillis?.();
+        if (!attemptTime) return false;
+        // This attempt must be newer than the last time the user claimed a coupon of this type
+        return attemptTime > lastClaimedMillis;
+    });
 
     let allMet = true;
     
@@ -95,65 +95,32 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       let current = 0;
       let label = "";
 
-      // Filter attempts by time
-      const validAttempts = recentAttempts.filter(a => {
-          const attemptTime = (a.attemptedAt as any)?.toMillis?.() || 0;
-          const isNewEnough = attemptTime >= couponCreationTime;
-          
-          // LOG WHY AN ATTEMPT MIGHT BE REJECTED
-          if (!isNewEnough) {
-             console.log(`❌ Attempt rejected (Too Old):`, {
-                 attemptId: a.id,
-                 attemptDate: new Date(attemptTime).toLocaleString(),
-                 couponDate: new Date(couponCreationTime).toLocaleString()
-             });
-          }
-          return isNewEnough;
-      });
-
-      console.log(`[DEBUG] Valid (Time-Fresh) Attempts: ${validAttempts.length}`);
-
       if (condition.type === 'minPracticeAssignments') {
-         label = "Complete Practice Exercises";
-         
-         // Detailed Loop to see why practice isn't counting
+         label = "Complete Assignment in my practice zone";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             
-             // Check 1: Is Worksheet Found?
-             if (!w) {
-                 console.warn(`⚠️ Worksheet Data Missing for Attempt ${a.id} (ID: ${a.worksheetId}). Cannot verify author.`);
-                 return false;
-             }
-
-             // Check 2: Check Author ID
-             const isSelfCreated = w.authorId === userProfile.id;
-             const isTypePractice = w.worksheetType?.toLowerCase() === 'practice';
-
-             console.log(`Checking Attempt ${a.id}:`, {
-                 worksheetId: w.id,
-                 worksheetAuthor: w.authorId,
-                 myUserId: userProfile.id,
-                 isSelfCreated: isSelfCreated,
-                 type: w.worksheetType
-             });
-
-             // CRITICAL: Return true if self-created
-             return isSelfCreated || isTypePractice;
+             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' 
+                                 || (a as any).worksheetType?.toLowerCase() === 'practice';
+             const isSelfCreated = w?.authorId === userProfile.id;
+             return isTypePractice || isSelfCreated;
          }).length;
-
-         console.log(`>>> Total Practice Counted: ${current} / ${condition.value}`);
-
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
-         
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             if (!w) return false;
-             
-             // Check: Must be classroom AND NOT created by student
-             return w.worksheetType?.toLowerCase() === 'classroom' && w.authorId !== userProfile.id;
+             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom'
+                                  || (a as any).worksheetType?.toLowerCase() === 'classroom';
+             const isNotSelfCreated = w?.authorId !== userProfile.id;
+             return isTypeClassroom && isNotSelfCreated;
          }).length;
+      } else if (condition.type === 'minGoldQuestions') {
+          label = "Solve Gold Question";
+          // This logic would need to be implemented if questions were fetched
+          current = 0; // Placeholder
+      } else if (condition.type === 'minAcademicHealth') {
+          label = "Raise your Academic health";
+          // This logic would need to be implemented if health was calculated
+          current = 0; // Placeholder
       } else {
          label = "Special Mission";
       }
@@ -170,13 +137,11 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       };
     });
 
-    console.groupEnd(); // End Debug Group
     return { conditionsMet: allMet, taskProgress: progress };
-  }, [coupon.conditions, recentAttempts, worksheets, coupon, userProfile.id]);
+  }, [coupon.conditions, recentAttempts, worksheets, userProfile.id, lastClaimedMillis]);
 
   const canClaim = isTimeReady && hasNotClaimedThisCycle && conditionsMet && !justClaimed;
 
-  // Status Message Logic
   let statusMessage = "Complete tasks to unlock.";
   if (canClaim) statusMessage = "Your reward is unlocked!";
   else if (!isTimeReady) statusMessage = "Coming soon! Opens in...";
@@ -209,10 +174,8 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       });
 
       await batch.commit();
-      
       confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });
       toast({ title: 'Reward Claimed!', description: `You received ${coupon.rewardAmount} ${coupon.rewardCurrency}.` });
-      
       setJustClaimed(true); 
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -221,7 +184,6 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
     }
   };
 
-  // --- RENDER SUCCESS STATE ---
   if (justClaimed || isAlreadyClaimed) {
     return (
       <Card className={cn(
@@ -272,7 +234,6 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
     );
   }
 
-  // --- RENDER ACTIVE STATE ---
   return (
     <Card className="relative overflow-hidden border-2 border-dashed border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-white dark:from-slate-900 dark:to-slate-950 shadow-lg group hover:shadow-xl transition-all duration-300">
       <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-black rounded-full border-r-2 border-indigo-200 dark:border-indigo-800" />
@@ -361,12 +322,16 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
 
   const recentAttemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
+    // Get attempts from the last month for performance
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    
     return query(
       collection(firestore, 'worksheet_attempts'),
       where('userId', '==', userProfile.id),
-      where('attemptedAt', '>', oneMonthAgo)
+      orderBy('attemptedAt', 'desc'), 
+      where('attemptedAt', '>', oneMonthAgo),
+      limit(50) // Limit to a reasonable number of recent attempts
     );
   }, [firestore, userProfile.id]);
   const { data: recentAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
@@ -376,13 +341,12 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   
   const worksheetsQuery = useMemoFirebase(() => {
     if (!firestore || worksheetIds.length === 0) return null;
-    // Limit to 30 for safety
     return query(collection(firestore, 'worksheets'), where(documentId(), 'in', worksheetIds.slice(0, 30)));
-  }, [firestore, worksheetIds.join(',')]);
+  }, [firestore, worksheetIds.join(',')]); // Join to create stable dependency
   
   const { data: worksheets, isLoading: worksheetsLoading } = useCollection<Worksheet>(worksheetsQuery);
 
-  // --- SORTING LOGIC: Ready -> Coming Soon -> Claimed ---
+  // --- SORTING LOGIC ---
   const sortedCoupons = useMemo(() => {
     if (!coupons) return [];
 
@@ -390,16 +354,18 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
         const lastClaimed = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
         const refTime = c.availableDate ? c.availableDate.toDate().getTime() : ((c as any).createdAt?.toMillis?.() || 0);
         
-        // Priority 3: Already Claimed
+        // Lowest rank: already claimed this cycle
         if (lastClaimed >= refTime) return 3;
 
         const isTimeReady = !c.availableDate || Date.now() >= refTime;
         
         let tasksDone = true;
         if (c.conditions && c.conditions.length > 0) {
-           const creationTime = (c as any).createdAt?.toMillis?.() || 0;
-           const validAttempts = (recentAttempts || []).filter(a => ((a.attemptedAt as any)?.toMillis?.() || 0) >= creationTime);
-           
+           const validAttempts = (recentAttempts || []).filter(a => {
+               const attemptTime = (a.attemptedAt as any)?.toMillis?.();
+               return attemptTime ? attemptTime > lastClaimed : false;
+           });
+
            for (const cond of c.conditions) {
               const check = (w: Worksheet | undefined, a: WorksheetAttempt, t: string) => {
                   const typeMatch = w?.worksheetType?.toLowerCase() === t.toLowerCase() || (a as any).worksheetType?.toLowerCase() === t.toLowerCase();
@@ -418,10 +384,10 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
            }
         }
 
-        // Priority 1: Ready to Claim
+        // Highest rank: ready and all tasks done
         if (isTimeReady && tasksDone) return 1;
-        
-        // Priority 2: Coming Soon
+
+        // Middle rank: pending
         return 2;
     };
 
