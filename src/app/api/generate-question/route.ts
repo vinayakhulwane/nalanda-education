@@ -6,16 +6,16 @@ export const dynamic = 'force-dynamic';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// --- LIST OF MODELS TO TRY IN ORDER ---
-// We try the newest 2.0 first. If 404, we fallback to specific 1.5 versions.
+// --- ROBUST MODEL LIST ---
 const MODELS = [
-  "gemini-2.0-flash-exp",   // Newest, smartest, fast
-  "gemini-1.5-flash",       // Standard alias
-  "gemini-1.5-flash-001",   // Specific stable version (often fixes 404s)
-  "gemini-1.5-pro",         // Slower but reliable fallback
+  "gemini-2.0-flash-exp",   
+  "gemini-1.5-flash",       
+  "gemini-1.5-flash-001",   
+  "gemini-1.5-pro",
+  "gemini-pro"              
 ];
 
-// Helper: Extract JSON from markdown
+// Helper: Extract JSON from text
 function extractJSON(text: string): string {
   try {
     JSON.parse(text);
@@ -31,13 +31,19 @@ function extractJSON(text: string): string {
 }
 
 const SYSTEM_INSTRUCTION = `
-**Role:** You are a specialized JSON Data Generator for a React Learning Management System. 
-**Output:** RAW JSON ONLY. No markdown. No explanations.
+**Role:** You are an energetic, emoji-loving study buddy creating a JSON Problem for a Learning App. 
+**Output:** RAW JSON ONLY. No markdown.
 
-**CRITICAL RULES:**
-1. **Mandatory Fields:** Must include "authorId": "qt0rlbiExqPtvS7we1vCzX29N8f1" and "publishedAt" timestamps.
-2. **NO Real Line Breaks:** All HTML strings (e.g., "<p>...</p>") MUST be single-line.
-3. **MCQ Logic:** For "Given Data" step, set "isMultiCorrect": false.
+**TONE & STYLE GUIDE (CRITICAL):**
+- **Friendly & Casual:** Write step titles and questions as if you are studying with a friend.
+- **Use Emojis:** Sprinkle relevant emojis (🚀, 💡, 🤔, ✨, 🧠) in titles and introductory text to make it visual and engaging.
+- **Encouraging:** Use phrases like "Let's figure this out," "What do you think?", "Nice! Now..."
+- **Avoid Robotic Language:** Do NOT use "Calculate X". Instead use "How do we find X? 🤔"
+
+**CRITICAL DATA RULES:**
+1. **Mandatory Fields:** Include "authorId": "qt0rlbiExqPtvS7we1vCzX29N8f1" and "publishedAt".
+2. **NO Real Line Breaks:** All HTML strings must be single-line.
+3. **MCQ Logic:** For the "Given Data" step, set "isMultiCorrect": false.
 4. **Strict UUIDs:** Generate unique v4 UUIDs for all IDs.
 
 **Target JSON Schema (Follow EXACTLY):**
@@ -60,14 +66,14 @@ const SYSTEM_INSTRUCTION = `
   "solutionSteps": [
     {
       "id": "GENERATE-UUID",
-      "title": "GIVEN DATA",
-      "description": "",
-      "stepQuestion": "Identify the knowns.",
+      "title": "Let's Start with the Basics 🧠",
+      "description": "Before we calculate anything, let's see what the problem actually gave us. 🕵️‍♂️",
+      "stepQuestion": "Okay, check the problem text. What values do we already know?",
       "subQuestions": [
         {
           "id": "GENERATE-UUID",
           "marks": 1,
-          "questionText": "<p>What do we need to calculate?</p>",
+          "questionText": "<p>What is the main thing we are trying to find here? 🤔</p>",
           "answerType": "mcq",
           "mcqAnswer": {
             "isMultiCorrect": false,
@@ -82,7 +88,7 @@ const SYSTEM_INSTRUCTION = `
         {
           "id": "GENERATE-UUID",
           "marks": 1,
-          "questionText": "<p>Enter value for [Variable].</p>",
+          "questionText": "<p>And what is the value of [Variable]? Don't forget units! 📏</p>",
           "answerType": "numerical",
           "numericalAnswer": {
             "baseUnit": "Units",
@@ -94,14 +100,14 @@ const SYSTEM_INSTRUCTION = `
     },
     {
       "id": "GENERATE-UUID",
-      "title": "CALCULATION",
-      "description": "",
-      "stepQuestion": "Perform calculation.",
+      "title": "Crunching the Numbers 🚀",
+      "description": "We have the data, now let's pick the right tool for the job. 🛠️",
+      "stepQuestion": "Which formula connects these values?",
       "subQuestions": [
         {
           "id": "GENERATE-UUID",
           "marks": 1,
-          "questionText": "<p>Select formula.</p>",
+          "questionText": "<p>Which of these formulas looks correct to you? 🧪</p>",
           "answerType": "mcq",
           "mcqAnswer": {
             "isMultiCorrect": false,
@@ -116,7 +122,7 @@ const SYSTEM_INSTRUCTION = `
         {
           "id": "GENERATE-UUID",
           "marks": 1,
-          "questionText": "<p>Final Answer.</p>",
+          "questionText": "<p>Great! Now plug the numbers in. What do you get? ✨</p>",
           "answerType": "numerical",
           "numericalAnswer": {
             "baseUnit": "Units",
@@ -146,21 +152,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    // --- ROBUST MODEL LOOP ---
-    // Try models one by one until success
     let lastError = null;
     let textResponse = null;
 
+    // --- ROBUST LOOP ---
     for (const modelName of MODELS) {
       try {
         console.log(`Attempting generation with model: ${modelName}`);
         
+        // SAFE CONFIG for Legacy Models
+        const isLegacy = modelName.includes("gemini-pro") && !modelName.includes("1.5");
+        const generationConfig: any = { temperature: 0.6 }; // Higher temp = More Creative/Fun
+        
+        if (!isLegacy) {
+            generationConfig.responseMimeType = "application/json";
+        }
+
         const model = genAI.getGenerativeModel({ 
             model: modelName,
-            generationConfig: { 
-                responseMimeType: "application/json",
-                temperature: 0.2 
-            } 
+            generationConfig
         });
 
         const result = await model.generateContent([
@@ -170,39 +180,36 @@ export async function POST(req: Request) {
 
         textResponse = result.response.text();
         
-        // If we get here, it worked! Break the loop.
-        if (textResponse) break;
+        if (textResponse) {
+            console.log(`Success with model: ${modelName}`);
+            break;
+        }
 
       } catch (error: any) {
         console.warn(`Model ${modelName} failed:`, error.message);
         lastError = error;
-        // Continue to next model...
       }
     }
 
-    // If all models failed
     if (!textResponse) {
-      console.error("All models failed. Last error:", lastError);
       return NextResponse.json({ 
-        error: "AI Service Unavailable. All models failed.", 
+        error: "All AI models failed. Please try again later.", 
         details: lastError?.message 
       }, { status: 503 });
     }
 
-    // Process Success
     const cleanJson = extractJSON(textResponse);
 
     try {
         const jsonResponse = JSON.parse(cleanJson);
         return NextResponse.json(jsonResponse);
     } catch (parseError) {
-        console.error("JSON Parse Error:", parseError);
-        console.error("Raw Text:", textResponse);
+        console.error("JSON Parse Error. Raw text:", textResponse);
         return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
     }
 
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("API Route Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

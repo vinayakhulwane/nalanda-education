@@ -258,7 +258,7 @@ export default function ProgressPage() {
     }
 
     const healthChartData = [];
-    let healthScore = 80; 
+    let healthScore = academicHealth; 
     for (let i = 13; i >= 0; i--) {
         const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
         const dayStats = attemptsByDate.get(dateKey);
@@ -299,7 +299,7 @@ export default function ProgressPage() {
         catMetrics, 
         activeAttemptsCount: attempts.filter(a => lookups.worksheetMap.get(a.worksheetId)?.subjectId === selectedSubjectId).length 
     };
-  }, [attempts, lookups, selectedSubjectId]);
+  }, [attempts, lookups, selectedSubjectId, academicHealth]);
 
 
   const isLoading = isUserProfileLoading || subjectsLoading || attemptsLoading || !lookups;

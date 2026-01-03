@@ -82,7 +82,6 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
 
     const couponCreationTime = (coupon as any).createdAt?.toMillis?.() || 0;
     
-    // Time Filters for specific tasks
     const validAttempts = recentAttempts;
     const validTransactions = recentTransactions.filter(t => {
         const time = (t.createdAt as any)?.toMillis?.() || 0;
@@ -96,31 +95,27 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
       let label = "";
 
       if (condition.type === 'minPracticeAssignments') {
-         label = "Complete Practice Exercises";
+         label = "Complete Assignment in my practice zone";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice';
-             const isSelfCreated = w?.authorId === userProfile.id;
-             return isTypePractice || isSelfCreated;
+             const isPractice = w?.worksheetType === 'practice' || w?.authorId === userProfile.id;
+             return isPractice;
          }).length;
 
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom' || (a as any).worksheetType?.toLowerCase() === 'classroom';
-             const isNotSelfCreated = w?.authorId !== userProfile.id;
-             return isTypeClassroom && isNotSelfCreated;
+             return w?.worksheetType === 'classroom';
          }).length;
 
       } else if (condition.type === 'minGoldQuestions') {
-         label = "Solve Gold Questions";
+         label = "Solve Gold Question";
          current = validTransactions.filter(t => t.currency?.toLowerCase() === 'gold' && t.type === 'earned').length;
 
       } else if (condition.type === 'minAcademicHealth') {
-         label = `Maintain Academic Health > ${condition.value}%`;
-         // ✅ USE THE PROP FROM THE HOOK
-         current = academicHealth; 
+         label = `Raise your Academic Health above ${condition.value}%`;
+         current = academicHealth;
       } else {
          label = "Special Mission";
       }
@@ -196,7 +191,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
                   <Trophy className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="space-y-2">
-                  <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">CONGRATULATIONS!</h2>
+                  <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">CONGRATULATIONS!</h2>
                   <p className="text-lg font-medium text-slate-700 dark:text-slate-200">You earned <span className="font-bold text-yellow-600">{coupon.rewardAmount} {coupon.rewardCurrency}</span> from this coupon.</p>
               </div>
               {taskProgress.length > 0 && (<div className="grid gap-2 text-left bg-white/40 dark:bg-black/20 p-4 rounded-xl"><span className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Completed Missions</span>{taskProgress.map((task, idx) => (<div key={idx} className="flex items-center gap-3 text-sm"><div className="bg-green-100 dark:bg-green-900/50 p-1 rounded-full"><CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" /></div><span className="font-semibold text-slate-700 dark:text-slate-300 line-through decoration-green-500/50">{task.label}</span></div>))}</div>)}
@@ -218,14 +213,13 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
         {taskProgress.length > 0 && (<div><div className="flex items-center gap-2 mb-3"><Star className="h-4 w-4 text-indigo-500" /><h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">Mission Requirements</h4></div><div className="space-y-3">{taskProgress.map((task, idx) => (<div key={idx} className="bg-white dark:bg-slate-900/50 p-3 rounded-lg border shadow-sm"><div className="flex justify-between items-start mb-2"><span className={cn("text-sm font-bold block", task.isMet ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-200")}>{task.label}</span>{task.isMet ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">Done</Badge> : <Badge variant="outline" className="text-indigo-600 border-indigo-200 bg-indigo-50">Pending</Badge>}</div><Progress value={task.percentage} className={cn("h-2", task.isMet ? "bg-emerald-100" : "")} /><div className="mt-2 text-xs flex justify-end">{task.isMet ? <span className="text-emerald-600 font-bold flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" /> Eligible</span> : <span className="text-indigo-600 font-bold flex items-center gap-1.5 animate-pulse">{task.suffix ? <><Activity className="h-3.5 w-3.5" /> Current: {task.current}{task.suffix}</> : <><Rocket className="h-3.5 w-3.5" /> {task.required - task.current} to go!</>}</span>}</div></div>))}</div></div>)}
       </CardContent>
       <Separator className="bg-indigo-100 dark:bg-indigo-900" />
-      <CardFooter className="pt-6 pb-6 bg-indigo-50/50 dark:bg-indigo-950/30 flex justify-center"><Button size="lg" onClick={handleClaim} disabled={!canClaim || isClaiming} className={cn("w-full font-bold text-lg h-14 shadow-xl transition-all", canClaim ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed")}>{isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Coming Soon</>}</Button></CardFooter>
+      <CardFooter className="pt-6 pb-6 bg-indigo-50/50 dark:bg-indigo-950/30 flex justify-center"><Button size="lg" onClick={handleClaim} disabled={!canClaim || isClaiming} className={cn("w-full font-bold text-lg h-14 shadow-xl transition-all", canClaim ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed")}>{isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Complete Missions</>}</Button></CardFooter>
     </Card>
   )
 }
 
 export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const firestore = useFirestore();
-  // ✅ 1. USE THE NEW SHARED HOOK
   const academicHealth = useAcademicHealth(userProfile);
 
   const couponsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'coupons'), orderBy('availableDate', 'asc')) : null, [firestore]);
@@ -234,7 +228,6 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const recentAttemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
     const oneMonthAgo = new Date(); oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    // ✅ FIXED: Added 'limit' to query
     return query(collection(firestore, 'worksheet_attempts'), where('userId', '==', userProfile.id), where('attemptedAt', '>', oneMonthAgo), orderBy('attemptedAt', 'desc'), limit(100));
   }, [firestore, userProfile.id]);
   const { data: recentAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
@@ -242,7 +235,6 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const transactionsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
     const oneMonthAgo = new Date(); oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    // ✅ FIXED: Added 'limit' to query
     return query(collection(firestore, 'transactions'), where('userId', '==', userProfile.id), where('createdAt', '>', oneMonthAgo), orderBy('createdAt', 'desc'), limit(50));
   }, [firestore, userProfile.id]);
   const { data: recentTransactions, isLoading: transactionsLoading } = useCollection<Transaction>(transactionsQuery);

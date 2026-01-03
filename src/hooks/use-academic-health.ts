@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, documentId } from 'firebase/firestore';
+import { collection, query, where, orderBy, documentId, getDocs } from 'firebase/firestore';
 import { format, subDays } from 'date-fns';
-import type { User, WorksheetAttempt, Worksheet } from '@/types';
+import type { User, WorksheetAttempt, Worksheet, Question } from '@/types';
 
-// --- HELPER: ROBUST SCORE EXTRACTION ---
+// --- HELPER: ROBUST SCORE EXTRACTION (Exact replica of Progress Page logic) ---
 const getAttemptTotals = (
   a: WorksheetAttempt, 
   worksheet: Worksheet | undefined, 
@@ -62,8 +62,11 @@ const getAttemptTotals = (
 
 export function useAcademicHealth(userProfile: User) {
   const firestore = useFirestore();
+  
+  const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
 
-  // 1. Fetch Recent Attempts (Last 30 days)
+  // 1. Fetch Recent Attempts
   const attemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile?.id) return null;
     const oneMonthAgo = new Date();
@@ -76,29 +79,61 @@ export function useAcademicHealth(userProfile: User) {
     );
   }, [firestore, userProfile?.id]);
   const { data: attempts } = useCollection<WorksheetAttempt>(attemptsQuery);
+  
+  // 2. Fetch related Worksheets and Questions based on attempts
+  useEffect(() => {
+    const fetchRelatedData = async () => {
+        if (!firestore || !attempts || attempts.length === 0) {
+            setWorksheets([]);
+            setQuestions([]);
+            return;
+        }
+        
+        const worksheetIds = [...new Set(attempts.map(a => a.worksheetId))];
 
-  // 2. Fetch All Worksheets
-  const allWorksheetsQuery = useMemoFirebase(() => {
-     return firestore ? collection(firestore, 'worksheets') : null;
-  }, [firestore]);
-  const { data: allWorksheets } = useCollection<Worksheet>(allWorksheetsQuery);
+        // Fetch Worksheets
+        const wsChunks = [];
+        for (let i = 0; i < worksheetIds.length; i += 30) {
+            wsChunks.push(worksheetIds.slice(i, i + 30));
+        }
+        const worksheetPromises = wsChunks.map(chunk => 
+            getDocs(query(collection(firestore, 'worksheets'), where(documentId(), 'in', chunk)))
+        );
+        const worksheetSnapshots = await Promise.all(worksheetPromises);
+        const fetchedWorksheets = worksheetSnapshots.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Worksheet)));
+        setWorksheets(fetchedWorksheets);
 
-  // 3. Fetch All Questions
-  const allQuestionsQuery = useMemoFirebase(() => {
-     return firestore ? collection(firestore, 'questions') : null;
-  }, [firestore]);
-  const { data: allQuestions } = useCollection<any>(allQuestionsQuery);
+        // Fetch Questions from the fetched worksheets
+        const questionIds = [...new Set(fetchedWorksheets.flatMap(w => w.questions))];
+        if (questionIds.length > 0) {
+            const qChunks = [];
+            for (let i = 0; i < questionIds.length; i += 30) {
+                qChunks.push(questionIds.slice(i, i + 30));
+            }
+            const questionPromises = qChunks.map(chunk => 
+                getDocs(query(collection(firestore, 'questions'), where(documentId(), 'in', chunk)))
+            );
+            const questionSnapshots = await Promise.all(questionPromises);
+            const fetchedQuestions = questionSnapshots.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Question)));
+            setQuestions(fetchedQuestions);
+        } else {
+            setQuestions([]);
+        }
+    };
+    fetchRelatedData();
+  }, [firestore, attempts]);
 
-  // 4. Calculate Health
+  // 3. Calculate Health
   const health = useMemo(() => {
-    if (!attempts || !allWorksheets || !allQuestions) return 0;
+    if (!attempts || worksheets.length === 0 || questions.length === 0) return 80; // Return baseline if no data
 
-    const worksheetMap = new Map(allWorksheets.map(w => [w.id, w]));
-    const questionMap = new Map(allQuestions.map(q => [q.id, q]));
+    const worksheetMap = new Map(worksheets.map(w => [w.id, w]));
+    const questionMap = new Map(questions.map(q => [q.id, q]));
     const dailyStats: Record<string, { total: number; obtained: number }> = {};
 
     attempts.forEach(a => {
       if (!a.attemptedAt) return;
+      
       const w = worksheetMap.get(a.worksheetId);
       const data = getAttemptTotals(a, w, questionMap);
       
@@ -112,7 +147,7 @@ export function useAcademicHealth(userProfile: User) {
       }
     });
 
-    // 14-Day Rolling Window (Baseline 80)
+    // 14-Day Rolling Window
     let currentHealth = 80; 
     const today = new Date();
 
@@ -130,7 +165,7 @@ export function useAcademicHealth(userProfile: User) {
     }
 
     return Math.round(currentHealth);
-  }, [attempts, allWorksheets, allQuestions]);
+  }, [attempts, worksheets, questions]);
 
   return health;
 }
