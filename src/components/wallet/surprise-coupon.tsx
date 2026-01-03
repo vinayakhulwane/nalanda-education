@@ -145,21 +145,16 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
          label = "Complete Assignments in My Practice Zone";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice';
-             // A practice worksheet is one created by the user themselves
              const isSelfCreated = w?.authorId === userProfile.id;
-             return isTypePractice || isSelfCreated;
+             return isSelfCreated;
          }).length;
-
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom' || (a as any).worksheetType?.toLowerCase() === 'classroom';
              const isNotSelfCreated = w?.authorId !== userProfile.id;
-             return isTypeClassroom && isNotSelfCreated;
+             return isNotSelfCreated;
          }).length;
-
       } else if (condition.type === 'minGoldQuestions') {
          label = "Solve Gold Questions";
          current = validTransactions.filter(t => {
@@ -167,9 +162,8 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
              const isEarned = t.type === 'earned';
              return isGold && isEarned;
          }).length;
-      
       } else if (condition.type === 'minAcademicHealth') {
-          label = `Bring Academic Health above ${condition.value}%`;
+          label = `Raise your Academic Health above ${condition.value}%`;
           current = academicHealth;
       
       } else {
@@ -247,7 +241,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
                   <Trophy className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="space-y-2">
-                  <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">
+                  <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">
                       CONGRATULATIONS!
                   </h2>
                   <p className="text-lg font-medium text-slate-700 dark:text-slate-200">
