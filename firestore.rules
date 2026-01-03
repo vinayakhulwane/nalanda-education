@@ -38,6 +38,21 @@ service cloud.firestore {
       return isRole('admin');
     }
 
+    /**
+     * ✅ NEW: Checks if user's role has a specific permission.
+     * Reads from the /settings/permissions document.
+     */
+    function hasPermission(permissionKey) {
+      // Admin always has permission, regardless of the doc.
+      if (isAdmin()) { return true; }
+      
+      let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      let permissionDoc = get(/databases/$(database)/documents/settings/permissions).data;
+      
+      // Check if the permissionKey exists and if the user's role is in the array.
+      return permissionKey in permissionDoc && userRole in permissionDoc[permissionKey];
+    }
+
     function hasValidAndConsistentUserDataOnCreate(userId) {
       return request.resource.data.id == userId;
     }
@@ -100,48 +115,36 @@ service cloud.firestore {
 
     /**
      * Questions Collection
-     * ✅ Teachers must be able to write here
+     * ✅ UPDATED: Use dynamic permission
      */
     match /questions/{questionId} {
       allow read: if isSignedIn();
-      allow write: if isTeacher() || isAdmin();
+      allow write: if hasPermission('question_create');
     }
 
     /**
      * Worksheets Collection
      */
     match /worksheets/{worksheetId} {
-      // Read: Author can read own, Admins can read all, Signed in users can read.
-      allow get: if isOwner(resource.data.authorId) || isAdmin() || isSignedIn();
+      // ✅ UPDATED: Read uses dynamic permission
+      allow get: if hasPermission('worksheet_read');
+      allow list: if isSignedIn() && (hasPermission('worksheet_read') || request.query.subjectId == resource.data.subjectId);
       
-      // List: Admins can see all. Users can list if filtering by authorId or subjectId
-      allow list: if isSignedIn() && (isAdmin() || request.query.subjectId == resource.data.subjectId);
-      
-      // Create: 
-      // - Teachers/Admins can create any type.
-      // - Students can ONLY create 'practice' worksheets for themselves.
-      allow create: if (isTeacher() || isAdmin()) ||
+      // ✅ UPDATED: Create uses dynamic permission
+      allow create: if hasPermission('worksheet_create') ||
                        (request.resource.data.worksheetType == 'practice' && isOwner(request.resource.data.authorId));
 
-      // Update & Delete: Only Teachers and Admins can modify existing worksheets.
-      allow update, delete: if isTeacher() || isAdmin();
+      // ✅ UPDATED: Update/Delete uses dynamic permission
+      allow update, delete: if hasPermission('worksheet_delete');
     }
 
     /**
      * Worksheet Attempts
-     * ✅ Renamed from /attempts to match your App Code
      */
     match /worksheet_attempts/{attemptId} {
-      // 1. Create: Must match the user's ID
       allow create: if isOwner(request.resource.data.userId);
-
-      // 2. Read (Get & List): 
-      // - Students can see ONLY their own data
-      // - Teachers/Admins can see everything.
-      allow read: if isOwner(resource.data.userId) || isTeacher() || isAdmin();
-      allow list: if (request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) && request.query.userId == request.auth.uid) || isTeacher() || isAdmin();
-
-      // 3. Update is allowed ONLY to claim rewards or unlock solutions. No other changes permitted.
+      allow read: if isOwner(resource.data.userId) || hasPermission('worksheet_read');
+      allow list: if (request.query.keys().hasOnly(['userId', 'worksheetId', 'limit', 'orderBy', 'attemptedAt']) && request.query.userId == request.auth.uid) || hasPermission('worksheet_read');
       allow update: if isOwner(resource.data.userId) && (isClaimingRewards() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unlockedSolutions']));
       allow delete: if false; // Deleting history is not allowed.
     }
@@ -154,16 +157,15 @@ service cloud.firestore {
         allow write: if isAdmin();
     }
 
+    /**
+     * Transactions Collection
+     * ✅ UPDATED: Use dynamic permission for read/create
+     */
     match /transactions/{transactionId} {
-      // A user can create their own transactions.
-      allow create: if isOwner(request.resource.data.userId);
-      
-      // A user can only list/read their own transactions.
-      allow get: if isOwner(resource.data.userId) || isAdmin();
-      allow list: if request.query.keys().hasOnly(['userId', 'orderBy']) &&
-                   request.query.userId == request.auth.uid;
-
-      // Transactions are immutable.
+      allow create: if isOwner(request.resource.data.userId) || hasPermission('transaction_create');
+      allow get: if isOwner(resource.data.userId) || hasPermission('transaction_view');
+      allow list: if (request.query.keys().hasOnly(['userId', 'orderBy']) &&
+                   request.query.userId == request.auth.uid) || hasPermission('transaction_view');
       allow update, delete: if false;
     }
   }
