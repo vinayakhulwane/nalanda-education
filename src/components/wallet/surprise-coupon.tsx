@@ -2,239 +2,385 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { User, EconomySettings, CurrencyType, Worksheet, WorksheetAttempt } from '@/types';
-import { Card, CardContent } from '../ui/card';
-import { Button } from '../ui/button';
-import { Gift, Loader2, CheckCircle2, Lock } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Gift, Loader2, Lock, Clock, CheckCircle2, Rocket, Ticket, Star, Trophy } from 'lucide-react';
 import { useFirestore, useDoc, useMemoFirebase, useCollection, useUser } from '@/firebase';
-import { doc, updateDoc, writeBatch, collection, increment, serverTimestamp, query, where } from 'firebase/firestore';
+import { doc, writeBatch, collection, increment, serverTimestamp, query, where } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Progress } from '../ui/progress';
 
 interface SurpriseCouponProps {
   userProfile: User;
 }
 
+// --- MODERN COUNTDOWN TIMER ---
 function CountdownTimer({ targetDate }: { targetDate: Date }) {
   const calculateTimeLeft = () => {
     const difference = +targetDate - +new Date();
-    let timeLeft = { hours: 0, minutes: 0, seconds: 0 };
-    if (difference > 0) {
-      timeLeft = {
-        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((difference / 1000 / 60) % 60),
-        seconds: Math.floor((difference / 1000) % 60),
-      };
-    }
-    return timeLeft;
+    if (difference <= 0) return null;
+    return {
+      hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+      minutes: Math.floor((difference / 1000 / 60) % 60),
+      seconds: Math.floor((difference / 1000) % 60),
+    };
   };
 
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = setInterval(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
-    return () => clearTimeout(timer);
-  });
+    return () => clearInterval(timer);
+  }, [targetDate]);
 
-  const timerComponents = Object.entries(timeLeft).map(([interval, value]) => (
-    <span key={interval} className="font-mono text-lg font-bold">
-      {value.toString().padStart(2, '0')}{interval.charAt(0)}
-    </span>
-  ));
+  if (!timeLeft) return <span className="text-emerald-600 font-bold flex items-center gap-1 text-sm"><CheckCircle2 className="h-4 w-4"/> Ready Now</span>;
 
-  return timerComponents.length ? <div className="flex gap-1.5">{timerComponents}</div> : <span>Ready!</span>;
+  return (
+    <div className="flex gap-2 justify-center items-center py-2">
+        {['hours', 'minutes', 'seconds'].map((unit) => (
+            <div key={unit} className="flex flex-col items-center">
+                <div className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 rounded-lg px-3 py-2 min-w-[3.5rem] shadow-inner font-mono text-xl font-bold">
+                    {/* @ts-ignore */}
+                    {timeLeft[unit].toString().padStart(2, '0')}
+                </div>
+                <span className="text-[10px] uppercase text-slate-500 mt-1 font-bold tracking-wider">{unit.charAt(0)}</span>
+            </div>
+        ))}
+    </div>
+  );
 }
-
 
 export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
   const [isClaiming, setIsClaiming] = useState(false);
-  const [isReadyToClaim, setIsReadyToClaim] = useState(false);
   const [isScratched, setIsScratched] = useState(false);
-  
+
+  // 1. Fetch Settings
   const settingsDocRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
   const { data: settings } = useDoc<EconomySettings>(settingsDocRef);
+
+  // 2. Dates - Primitive dependencies
+  const lastClaimedMillis = userProfile.lastCouponClaimedAt?.toMillis() || 0;
+  const nextAvailableMillis = settings?.nextCouponAvailableDate?.toMillis() || Date.now();
   
-  const lastClaimedDate = userProfile.lastCouponClaimedAt?.toDate();
-  const nextAvailableDate = settings?.nextCouponAvailableDate?.toDate() ?? new Date();
+  // Logic
+  const isTimeReady = Date.now() >= nextAvailableMillis;
+  const hasNotClaimedThisCycle = lastClaimedMillis < nextAvailableMillis;
 
-  // --- DATA FETCHING FOR CONDITIONS ---
-    const recentAttemptsQuery = useMemoFirebase(() => {
-        if (!firestore || !userProfile.id || !lastClaimedDate) return null;
-        return query(
-            collection(firestore, 'worksheet_attempts'),
-            where('userId', '==', userProfile.id),
-            where('attemptedAt', '>', lastClaimedDate)
-        );
-    }, [firestore, userProfile.id, lastClaimedDate]);
+  // 3. Data Fetching
+  const recentAttemptsQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile.id || !lastClaimedMillis) return null;
+    const dateObj = new Date(lastClaimedMillis);
+    return query(
+      collection(firestore, 'worksheet_attempts'),
+      where('userId', '==', userProfile.id),
+      where('attemptedAt', '>', dateObj)
+    );
+  }, [firestore, userProfile.id, lastClaimedMillis]);
 
-    const { data: recentAttempts } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
+  const { data: recentAttempts } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
 
-    const worksheetIds = useMemo(() => {
-        if (!recentAttempts) return [];
-        return [...new Set(recentAttempts.map(a => a.worksheetId))];
-    }, [recentAttempts]);
+  const worksheetIds = useMemo(() => {
+    if (!recentAttempts) return [];
+    return [...new Set(recentAttempts.map(a => a.worksheetId))].sort();
+  }, [recentAttempts]);
 
-    const worksheetsQuery = useMemoFirebase(() => {
-        if (!firestore || worksheetIds.length === 0) return null;
-        return query(collection(firestore, 'worksheets'), where('id', 'in', worksheetIds.slice(0, 10)));
-    }, [firestore, worksheetIds]);
-    const { data: worksheets } = useCollection<Worksheet>(worksheetsQuery);
+  const worksheetIdsKey = worksheetIds.join(','); 
+
+  const worksheetsQuery = useMemoFirebase(() => {
+    if (!firestore || worksheetIds.length === 0) return null;
+    return query(collection(firestore, 'worksheets'), where('id', 'in', worksheetIds.slice(0, 10)));
+  }, [firestore, worksheetIdsKey]);
+
+  const { data: worksheets } = useCollection<Worksheet>(worksheetsQuery);
+// =========================================================
+  // 👇 PASTE YOUR CONSOLE LOGS HERE 👇
+  // =========================================================
+  console.log("Attempts Loaded:", recentAttempts !== undefined);
+  console.log("Worksheet IDs:", worksheetIds);
+  console.log("Worksheets Data:", worksheets);
+  console.log("Is Skeleton Active?", !recentAttempts || !worksheets);
+  // =========================================================
+  // 4. Calculate Task Progress (With Fallback Defaults)
+  const { conditionsMet, taskProgress, hasTasks } = useMemo(() => {
     
-    // --- ELIGIBILITY LOGIC ---
-    const { conditionsMet, progress } = useMemo(() => {
-        if (!settings?.couponConditions || settings.couponConditions.length === 0) {
-            return { conditionsMet: true, progress: [] };
-        }
-        if (!recentAttempts || !worksheets) {
-            return { conditionsMet: false, progress: [] };
-        }
+    // ✅ FIX: Define Default Tasks if the database list is empty
+    // This ensures the "Missions" section ALWAYS appears
+    const defaultConditions = [
+        { type: 'minPracticeAssignments', value: 3 },
+        { type: 'minClassroomAssignments', value: 1 }
+    ];
 
-        let allConditionsMet = true;
-        const progressData = settings.couponConditions.map(condition => {
-            let currentCount = 0;
-            switch (condition.type) {
-                case 'minClassroomAssignments':
-                    currentCount = recentAttempts.filter(a => worksheets.find(w => w.id === a.worksheetId)?.worksheetType === 'classroom').length;
-                    break;
-                case 'minPracticeAssignments':
-                    currentCount = recentAttempts.filter(a => worksheets.find(w => w.id === a.worksheetId)?.worksheetType === 'practice').length;
-                    break;
-                // Add logic for other conditions here...
-            }
-            const isMet = currentCount >= condition.value;
-            if (!isMet) allConditionsMet = false;
-            
-            return {
-                description: `Complete ${condition.value} ${condition.type === 'minClassroomAssignments' ? 'Classroom' : 'Practice'} Assignments`,
-                current: currentCount,
-                required: condition.value,
-                isMet
-            };
-        });
-        
-        return { conditionsMet: allConditionsMet, progress: progressData };
+    // Use settings if available, otherwise use defaults
+    const conditionsToUse = (settings?.couponConditions && settings.couponConditions.length > 0) 
+        ? settings.couponConditions 
+        : defaultConditions;
 
-    }, [settings, recentAttempts, worksheets]);
-
-  useEffect(() => {
-    // If it's the first welcome gift, it's always ready.
-    if (!userProfile.hasClaimedWelcomeCoupon) {
-      setIsReadyToClaim(true);
-      return;
-    }
-    
-    // For subsequent rewards, check date AND conditions
-    if (settings) {
-        const dateIsReady = new Date() >= nextAvailableDate;
-        const lastClaimWasBeforeCycle = !lastClaimedDate || lastClaimedDate < nextAvailableDate;
-        setIsReadyToClaim(dateIsReady && lastClaimWasBeforeCycle && conditionsMet);
+    // Loading state fallback
+    if (!recentAttempts || !worksheets) {
+      // Even while loading, we return hasTasks: true so the UI skeleton exists
+      return { conditionsMet: false, taskProgress: [], hasTasks: true };
     }
 
-  }, [userProfile, lastClaimedDate, nextAvailableDate, conditionsMet, settings]);
+    let allMet = true;
+    
+    // Map over the conditions (either real ones or defaults)
+    const progress = conditionsToUse.map(condition => {
+      let current = 0;
+      let label = "";
+      
+      if (condition.type === 'minClassroomAssignments') {
+         current = recentAttempts.filter(a => worksheets.find(w => w.id === a.worksheetId)?.worksheetType === 'classroom').length;
+         label = "Complete Classroom Assignments";
+      } else if (condition.type === 'minPracticeAssignments') {
+         current = recentAttempts.filter(a => worksheets.find(w => w.id === a.worksheetId)?.worksheetType === 'practice').length;
+         label = "Complete Practice Exercises";
+      } else {
+         label = "Special Mission";
+      }
+
+      const isMet = current >= condition.value;
+      if (!isMet) allMet = false;
+
+      return { 
+          label, 
+          current, 
+          required: condition.value, 
+          isMet, 
+          percentage: Math.min(100, (current / condition.value) * 100) 
+      };
+    });
+
+    return { conditionsMet: allMet, taskProgress: progress, hasTasks: true };
+  }, [settings, recentAttempts, worksheets]);
+
+  // 5. Final Status
+  const isWelcomeGift = !userProfile.hasClaimedWelcomeCoupon;
+  
+  // Logic: Can claim if Welcome Gift OR (Settings exist AND Time is ready AND Cycle is fresh AND Tasks done)
+  // We relax the "settings check" now that we have defaults
+  const canClaim = isWelcomeGift 
+    ? true 
+    : (isTimeReady && hasNotClaimedThisCycle && conditionsMet);
 
   const handleClaim = async () => {
-    if (!firestore || !userProfile.id || !settings || !user) return;
+    if (!firestore || !userProfile.id || !user) return;
     setIsClaiming(true);
 
-    const isWelcomeGift = !userProfile.hasClaimedWelcomeCoupon;
-    const rewardAmount = isWelcomeGift ? (settings.welcomeAiCredits ?? 5) : (settings.surpriseRewardAmount ?? 100);
-    const rewardCurrency: CurrencyType = isWelcomeGift ? 'aiCredits' : (settings.surpriseRewardCurrency ?? 'coin');
-    
+    const safeSettings = settings || {} as Partial<EconomySettings>;
+    const rewardAmount = isWelcomeGift ? (safeSettings.welcomeAiCredits ?? 5) : (safeSettings.surpriseRewardAmount ?? 100);
+    const rewardCurrency: CurrencyType = isWelcomeGift ? 'aiCredits' : (safeSettings.surpriseRewardCurrency ?? 'coin');
+
     try {
-        const batch = writeBatch(firestore);
-        const userRef = doc(firestore, 'users', userProfile.id);
-        const transactionRef = doc(collection(firestore, 'transactions'));
-        
-        const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds', aiCredits: 'aiCredits' };
-        const dbField = fieldMap[rewardCurrency];
+      const batch = writeBatch(firestore);
+      const userRef = doc(firestore, 'users', userProfile.id);
+      const transactionRef = doc(collection(firestore, 'transactions'));
+      const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds', aiCredits: 'aiCredits' };
+      
+      batch.update(userRef, {
+        [fieldMap[rewardCurrency]]: increment(rewardAmount),
+        lastCouponClaimedAt: serverTimestamp(),
+        ...(isWelcomeGift && { hasClaimedWelcomeCoupon: true })
+      });
 
-        batch.update(userRef, {
-            [dbField]: increment(rewardAmount),
-            lastCouponClaimedAt: serverTimestamp(),
-            ...(isWelcomeGift && { hasClaimedWelcomeCoupon: true })
-        });
+      batch.set(transactionRef, {
+        userId: userProfile.id,
+        type: 'earned',
+        description: isWelcomeGift ? 'Welcome Gift' : 'Daily Surprise Reward',
+        amount: rewardAmount,
+        currency: rewardCurrency,
+        createdAt: serverTimestamp(),
+        adminId: 'system',
+      });
 
-        batch.set(transactionRef, {
-            userId: userProfile.id,
-            type: 'earned',
-            description: isWelcomeGift ? 'Welcome Gift Coupon' : 'Surprise Coupon Reward',
-            amount: rewardAmount,
-            currency: rewardCurrency,
-            createdAt: serverTimestamp(),
-            adminId: user.uid,
-        });
-        
-        await batch.commit();
-
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-        toast({ title: 'Reward Claimed!', description: `You received ${rewardAmount} ${rewardCurrency}!` });
-        setIsScratched(true);
-
+      await batch.commit();
+      confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });
+      toast({ title: 'Reward Unlocked!', description: `You received ${rewardAmount} ${rewardCurrency}` });
+      setIsScratched(true);
     } catch (error: any) {
-        console.error("Failed to claim reward:", error);
-        toast({ variant: 'destructive', title: 'Claim Failed', description: error.message });
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
     } finally {
-        setIsClaiming(false);
+      setIsClaiming(false);
     }
   };
 
-  const isWithinClaimWindow = new Date() >= nextAvailableDate;
+  if (isScratched) return null;
+
+  const nextAvailableDate = new Date(nextAvailableMillis);
 
   return (
-    <Card className={cn("relative overflow-hidden transition-all duration-500", isScratched ? 'h-0 opacity-0 p-0 border-none' : 'h-auto')}>
-      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-repeat opacity-[0.03] dark:opacity-[0.02]"></div>
-      <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="p-4 bg-primary/10 rounded-full border border-primary/20">
-            <Gift className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold">Surprise Coupon</h3>
-            <p className="text-sm text-muted-foreground">A special reward is waiting for you!</p>
-          </div>
+    <Card className="relative overflow-hidden border-2 border-dashed border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-white dark:from-slate-900 dark:to-slate-950 shadow-lg group hover:shadow-xl transition-all duration-300">
+      
+      {/* Decorative "Ticket" Circles (Cutouts) */}
+      <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-black rounded-full border-r-2 border-indigo-200 dark:border-indigo-800" />
+      <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-black rounded-full border-l-2 border-indigo-200 dark:border-indigo-800" />
+
+      {/* Header */}
+      <CardHeader className="pb-2 text-center relative z-10">
+        <div className="mx-auto bg-indigo-100 dark:bg-indigo-900/50 p-3 rounded-full w-fit mb-2">
+            <Ticket className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
         </div>
+        <CardTitle className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+            {isWelcomeGift ? "Welcome Bonus" : "Mystery Coupon"}
+        </CardTitle>
+        <CardDescription className="text-base font-medium">
+            {canClaim 
+                ? "Your reward is unlocked and ready!" 
+                : "Complete tasks & wait for the timer to unlock."}
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-6 relative z-10 px-8">
         
-        {isReadyToClaim ? (
-          <Button 
-            size="lg" 
-            className="h-12 text-base font-semibold w-full sm:w-auto shadow-lg shadow-primary/20 hover:shadow-primary/30"
-            onClick={handleClaim}
-            disabled={isClaiming}
-          >
-            {isClaiming ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-            {isClaiming ? 'Claiming...' : 'Scratch & Win!'}
-          </Button>
-        ) : !isWithinClaimWindow ? (
-          <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-muted/70 text-muted-foreground">
-             <span className="text-xs font-semibold mb-1">Next reward in</span>
-             <CountdownTimer targetDate={nextAvailableDate} />
-          </div>
-        ) : (
-             <div className="w-full sm:w-auto">
-                <Button size="lg" className="w-full h-12 text-base font-semibold" disabled>
-                    <Lock className="mr-2 h-5 w-5" />
-                    Complete Tasks to Unlock
-                </Button>
-                <div className="mt-2 space-y-2">
-                    {progress.map((p, i) => (
-                        <div key={i} className="text-xs">
-                            <div className="flex justify-between mb-0.5">
-                                <span className={cn("font-medium", p.isMet ? "text-green-600" : "text-muted-foreground")}>{p.description}</span>
-                                <span className="font-mono font-bold">{p.current}/{p.required}</span>
-                            </div>
-                            <Progress value={(p.current / p.required) * 100} className="h-1" />
+        {/* State 1: Welcome Gift */}
+        {isWelcomeGift && (
+           <div className="text-center py-6">
+              <p className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">
+                  🎉 Exclusive Starter Pack
+              </p>
+              <p className="text-sm text-muted-foreground">
+                  Tap the button below to claim your free AI Credits!
+              </p>
+           </div>
+        )}
+
+        {/* State 2: Recurring Timer & Tasks */}
+        {!isWelcomeGift && (
+            <div className="space-y-6">
+                
+                {/* Timer Section */}
+                <div className={cn("rounded-xl border p-4 transition-colors", 
+                    !isTimeReady ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900" : "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900"
+                )}>
+                    <div className="flex items-center justify-between mb-2">
+                        <span className={cn("text-xs font-bold uppercase tracking-wider", 
+                            !isTimeReady ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"
+                        )}>
+                            {!isTimeReady ? "Locked by Time" : "Time Requirement"}
+                        </span>
+                        {!isTimeReady ? <Lock className="h-3 w-3 text-amber-500"/> : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                    </div>
+                    
+                    {isTimeReady ? (
+                        <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                            Timer Complete! You are eligible for this cycle.
+                        </p>
+                    ) : (
+                        <CountdownTimer targetDate={nextAvailableDate} />
+                    )}
+                </div>
+
+                {/* Tasks Section */}
+                <div>
+                    <div className="flex items-center gap-2 mb-3">
+                        <Star className="h-4 w-4 text-indigo-500 fill-indigo-500" />
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                            Mission Requirements
+                        </h4>
+                    </div>
+
+                    {!hasTasks || taskProgress.length === 0 ? (
+                         // Fallback Loading Skeleton if defaults haven't generated yet
+                         <div className="space-y-3">
+                            {[1, 2].map((i) => (
+                                <div key={i} className="h-16 w-full bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
+                            ))}
+                         </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {taskProgress.map((task, idx) => (
+                                <div key={idx} className="bg-white dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800 shadow-sm">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="space-y-0.5">
+                                            <span className={cn("text-sm font-bold block", task.isMet ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-200")}>
+                                                {task.label}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                Required: {task.required} | Completed: {task.current}
+                                            </span>
+                                        </div>
+                                        
+                                        {task.isMet ? (
+                                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">Done</Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="text-indigo-600 border-indigo-200 bg-indigo-50">Pending</Badge>
+                                        )}
+                                    </div>
+                                    
+                                    <Progress value={task.percentage} className={cn("h-2 bg-slate-100 dark:bg-slate-800", task.isMet ? "bg-emerald-100" : "")} />
+                                    
+                                    {/* MOTIVATIONAL MESSAGE */}
+                                    <div className="mt-2 text-xs flex justify-end">
+                                        {task.isMet ? (
+                                            <span className="text-emerald-600 font-bold flex items-center gap-1.5">
+                                                <Trophy className="h-3.5 w-3.5" /> 
+                                                Yes! You did it! Eligible.
+                                            </span>
+                                        ) : (
+                                            <span className="text-indigo-600 font-bold flex items-center gap-1.5 animate-pulse">
+                                                <Rocket className="h-3.5 w-3.5" /> 
+                                                Let's do it! Why are you waiting?
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    )}
                 </div>
             </div>
         )}
+
       </CardContent>
+
+      <Separator className="bg-indigo-100 dark:bg-indigo-900" />
+
+      <CardFooter className="pt-6 pb-6 bg-indigo-50/50 dark:bg-indigo-950/30 flex justify-center">
+        <Button 
+            size="lg" 
+            onClick={handleClaim} 
+            disabled={!canClaim || isClaiming}
+            className={cn(
+                "w-full font-bold text-lg h-14 shadow-xl transition-all duration-300 transform hover:-translate-y-1 active:scale-95",
+                canClaim 
+                    ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white border-none" 
+                    : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed hover:none"
+            )}
+        >
+            {isClaiming ? (
+                <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" /> Unwrapping...
+                </div>
+            ) : canClaim ? (
+                <div className="flex items-center gap-2">
+                    <Gift className="h-6 w-6 animate-bounce" /> REVEAL COUPON
+                </div>
+            ) : (
+                <div className="flex items-center gap-2">
+                    <Lock className="h-5 w-5" /> LOCKED
+                </div>
+            )}
+        </Button>
+      </CardFooter>
+      
+      <style jsx>{`
+        @keyframes gradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animate-gradient {
+          animation: gradient 3s ease infinite;
+        }
+      `}</style>
     </Card>
   );
 }
