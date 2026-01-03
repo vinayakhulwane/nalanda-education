@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -6,382 +7,137 @@
       "type": "object",
       "description": "Represents a user of the Nalanda platform.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user entity, matches Firebase Auth UID."
-        },
-        "email": {
-          "type": "string",
-          "description": "User's email address.",
-          "format": "email"
-        },
-        "name": {
-          "type": "string",
-          "description": "User's full display name."
-        },
-        "avatar": {
-          "type": "string",
-          "description": "URL to the user's profile picture."
-        },
-        "role": {
-          "type": "string",
-          "description": "User's role within the system (e.g., Admin, Teacher, Student).",
-          "enum": [
-            "student",
-            "teacher",
-            "admin"
-          ]
-        },
-        "coins": {
-          "type": "number",
-          "description": "The number of coins the user has."
-        },
-        "gold": {
-          "type": "number",
-          "description": "The amount of gold the user has."
-        },
-        "diamonds": {
-          "type": "number",
-          "description": "The amount of diamonds the user has."
-        },
-        "aiCredits": {
-          "type": "number",
-          "description": "The number of AI credits the user has for specific features."
-        },
-        "enrollments": {
-          "type": "array",
-          "description": "An array of subject IDs that the user is enrolled in.",
-          "items": {
-            "type": "string"
-          }
-        }
+        "id": { "type": "string", "description": "Unique identifier for the user entity, matches Firebase Auth UID." },
+        "email": { "type": "string", "description": "User's email address.", "format": "email" },
+        "name": { "type": "string", "description": "User's full display name." },
+        "avatar": { "type": "string", "description": "URL to the user's profile picture." },
+        "role": { "type": "string", "description": "User's role within the system.", "enum": ["student", "teacher", "admin"] },
+        "coins": { "type": "number", "description": "The number of coins the user has." },
+        "gold": { "type": "number", "description": "The amount of gold the user has." },
+        "diamonds": { "type": "number", "description": "The amount of diamonds the user has." },
+        "aiCredits": { "type": "number", "description": "The number of AI credits the user has." },
+        "enrollments": { "type": "array", "description": "An array of subject IDs that the user is enrolled in.", "items": { "type": "string" } }
       },
-      "required": [
-        "id",
-        "email",
-        "name",
-        "role"
-      ]
+      "required": ["id", "email", "name", "role"]
     },
     "Class": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Class",
-      "type": "object",
-      "description": "Represents an academic class level in the platform.",
+      "title": "Class", "type": "object", "description": "Represents an academic class level.",
       "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the class (e.g., 'Class 10')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A short description of the class."
-        }
+        "name": { "type": "string", "description": "The name of the class (e.g., 'Class 10')." },
+        "description": { "type": "string", "description": "A short description of the class." }
       },
-      "required": [
-        "name"
-      ]
+      "required": ["name"]
     },
     "Subject": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Subject",
-      "type": "object",
-      "description": "Represents an academic subject within a class.",
+      "title": "Subject", "type": "object", "description": "Represents an academic subject.",
       "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the subject (e.g., 'Mathematics')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A short description of the subject."
-        },
-        "classId": {
-          "type": "string",
-          "description": "The ID of the class this subject belongs to."
-        }
+        "name": { "type": "string", "description": "The name of the subject (e.g., 'Mathematics')." },
+        "description": { "type": "string", "description": "A short description of the subject." },
+        "classId": { "type": "string", "description": "The ID of the class this subject belongs to." }
       },
-      "required": [
-        "name",
-        "classId"
-      ]
+      "required": ["name", "classId"]
     },
     "Unit": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Unit",
-      "type": "object",
-      "description": "Represents a unit of study within a subject.",
+      "title": "Unit", "type": "object", "description": "Represents a unit of study within a subject.",
       "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the unit (e.g., 'Algebra')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A short description of the unit."
-        },
-        "subjectId": {
-          "type": "string",
-          "description": "The ID of the subject this unit belongs to."
-        }
+        "name": { "type": "string", "description": "The name of the unit." },
+        "description": { "type": "string", "description": "A short description of the unit." },
+        "subjectId": { "type": "string", "description": "The ID of the subject this unit belongs to." }
       },
       "required": ["name", "subjectId"]
     },
     "Category": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Category",
-      "type": "object",
-      "description": "Represents a specific category or topic within a unit.",
+      "title": "Category", "type": "object", "description": "Represents a specific category within a unit.",
       "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the category (e.g., 'Quadratic Equations')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A short description of the category."
-        },
-        "unitId": {
-          "type": "string",
-          "description": "The ID of the unit this category belongs to."
-        }
+        "name": { "type": "string", "description": "The name of the category." },
+        "description": { "type": "string", "description": "A short description of the category." },
+        "unitId": { "type": "string", "description": "The ID of the unit this category belongs to." }
       },
       "required": ["name", "unitId"]
     },
     "Question": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Question",
-      "type": "object",
-      "description": "Represents a numerical question in the system.",
+      "title": "Question", "type": "object", "description": "Represents a numerical question.",
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "mainQuestionText": {
-          "type": "string"
-        },
-        "classId": {
-          "type": "string"
-        },
-        "subjectId": {
-          "type": "string"
-        },
-        "unitId": {
-          "type": "string"
-        },
-        "categoryId": {
-          "type": "string"
-        },
-        "currencyType": {
-          "type": "string",
-          "enum": ["spark", "coin", "gold", "diamond"]
-        },
-        "status": {
-          "type": "string",
-          "enum": ["draft", "published"]
-        },
-        "authorId": {
-          "type": "string"
-        }
+        "name": { "type": "string" }, "mainQuestionText": { "type": "string" }, "classId": { "type": "string" },
+        "subjectId": { "type": "string" }, "unitId": { "type": "string" }, "categoryId": { "type": "string" },
+        "currencyType": { "type": "string", "enum": ["spark", "coin", "gold", "diamond"] },
+        "status": { "type": "string", "enum": ["draft", "published"] }, "authorId": { "type": "string" }
       },
-      "required": [
-        "name",
-        "mainQuestionText",
-        "classId",
-        "subjectId",
-        "unitId",
-        "categoryId",
-        "currencyType",
-        "status",
-        "authorId"
-      ]
+      "required": ["name", "mainQuestionText", "classId", "subjectId", "unitId", "categoryId", "currencyType", "status", "authorId"]
     },
-     "Worksheet": {
+    "Worksheet": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Worksheet",
-      "type": "object",
-      "description": "Represents a worksheet created by a teacher or admin.",
+      "title": "Worksheet", "type": "object", "description": "Represents a worksheet created by a teacher or admin.",
       "properties": {
-        "title": { "type": "string" },
-        "classId": { "type": "string" },
-        "subjectId": { "type": "string" },
-        "unitId": { "type": "string" },
-        "mode": { "type": "string", "enum": ["practice", "exam"] },
-        "worksheetType": { "type": "string", "enum": ["classroom", "sample"] },
-        "startTime": { "type": "string", "format": "date-time" },
-        "questions": { "type": "array", "items": { "type": "string" } },
-        "authorId": { "type": "string" },
-        "status": { "type": "string", "enum": ["draft", "published"] }
+        "title": { "type": "string" }, "classId": { "type": "string" }, "subjectId": { "type": "string" }, "unitId": { "type": "string" },
+        "mode": { "type": "string", "enum": ["practice", "exam"] }, "worksheetType": { "type": "string", "enum": ["classroom", "sample"] },
+        "startTime": { "type": "string", "format": "date-time" }, "questions": { "type": "array", "items": { "type": "string" } },
+        "authorId": { "type": "string" }, "status": { "type": "string", "enum": ["draft", "published"] }
       },
       "required": ["title", "classId", "subjectId", "mode", "worksheetType", "questions", "authorId", "status"]
     },
     "WorksheetAttempt": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Worksheet Attempt",
-      "description": "Stores a user's attempt at a worksheet.",
-      "type": "object",
+      "title": "Worksheet Attempt", "description": "Stores a user's attempt at a worksheet.", "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "worksheetId": { "type": "string" },
-        "answers": { "type": "object" },
-        "results": { "type": "object" },
-        "timeTaken": { "type": "number" },
-        "attemptedAt": { "type": "string", "format": "date-time" }
+        "userId": { "type": "string" }, "worksheetId": { "type": "string" }, "answers": { "type": "object" },
+        "results": { "type": "object" }, "timeTaken": { "type": "number" }, "attemptedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "worksheetId", "answers", "results", "timeTaken", "attemptedAt"]
     },
     "EconomySettings": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Economy Settings",
-      "type": "object",
-      "description": "Defines the global economy settings for the application.",
+      "title": "Economy Settings", "type": "object", "description": "Defines the global economy settings.",
       "properties": {
-        "coinsPerGold": {
-          "type": "number",
-          "description": "Number of coins required to exchange for 1 gold."
-        },
-        "goldPerDiamond": {
-          "type": "number",
-          "description": "Number of gold required to exchange for 1 diamond."
-        }
+        "coinsPerGold": { "type": "number" }, "goldPerDiamond": { "type": "number" }
       },
       "required": ["coinsPerGold", "goldPerDiamond"]
     },
     "Transaction": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Transaction",
-      "description": "Represents a currency transaction for a user.",
-      "type": "object",
+      "title": "Transaction", "description": "Represents a currency transaction for a user.", "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "type": { "type": "string", "enum": ["earned", "spent"] },
-        "description": { "type": "string" },
-        "amount": { "type": "number" },
-        "currency": { "type": "string", "enum": ["coin", "gold", "diamond"] },
+        "userId": { "type": "string" }, "type": { "type": "string", "enum": ["earned", "spent"] },
+        "description": { "type": "string" }, "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["coin", "gold", "diamond", "aiCredits"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "type", "description", "amount", "currency", "createdAt"]
+    },
+    "Coupon": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Coupon", "description": "Represents a promotional coupon.", "type": "object",
+      "properties": {
+        "name": { "type": "string" }, "rewardAmount": { "type": "number" },
+        "rewardCurrency": { "type": "string", "enum": ["coin", "gold", "diamond", "aiCredits"] },
+        "availableDate": { "type": "string", "format": "date-time" },
+        "conditions": { "type": "array", "items": { "type": "object" } }
+      },
+      "required": ["name", "rewardAmount", "rewardCurrency", "availableDate"]
     }
   },
   "auth": {
-    "providers": [
-      "google.com"
-    ],
-    "authorizedDomains": [
-      "localhost",
-      "firebaseapp.com",
-      "web.app",
-      "cloudworkstations.dev"
-    ]
+    "providers": ["google.com"],
+    "authorizedDomains": ["localhost", "firebaseapp.com", "web.app", "cloudworkstations.dev"]
   },
   "firestore": {
     "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profiles. Includes standard user information like email, name, and role.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/classes/{classId}",
-        "definition": {
-          "entityName": "Class",
-          "schema": {
-            "$ref": "#/backend/entities/Class"
-          },
-          "description": "Stores the academic classes available on the platform."
-        }
-      },
-       {
-        "path": "/subjects/{subjectId}",
-        "definition": {
-          "entityName": "Subject",
-          "schema": {
-            "$ref": "#/backend/entities/Subject"
-          },
-          "description": "Stores the academic subjects for all classes."
-        }
-      },
-      {
-        "path": "/units/{unitId}",
-        "definition": {
-          "entityName": "Unit",
-          "schema": {
-            "$ref": "#/backend/entities/Unit"
-          },
-          "description": "Stores the units for all subjects."
-        }
-      },
-      {
-        "path": "/categories/{categoryId}",
-        "definition": {
-          "entityName": "Category",
-          "schema": {
-            "$ref": "#/backend/entities/Category"
-          },
-          "description": "Stores the categories for all units."
-        }
-      },
-      {
-        "path": "/questions/{questionId}",
-        "definition": {
-          "entityName": "Question",
-          "schema": {
-            "$ref": "#/backend/entities/Question"
-          },
-          "description": "Stores all numerical questions created by teachers/admins."
-        }
-      },
-      {
-        "path": "/worksheets/{worksheetId}",
-        "definition": {
-          "entityName": "Worksheet",
-          "schema": {
-            "$ref": "#/backend/entities/Worksheet"
-          },
-          "description": "Stores worksheets created by teachers and admins."
-        }
-      },
-      {
-        "path": "/attempts/{attemptId}",
-        "definition": {
-          "entityName": "WorksheetAttempt",
-          "schema": {
-            "$ref": "#/backend/entities/WorksheetAttempt"
-          },
-          "description": "Stores user attempts for worksheets."
-        }
-      },
-      {
-        "path": "/settings/economy",
-        "definition": {
-          "entityName": "EconomySettings",
-          "schema": {
-            "$ref": "#/backend/entities/EconomySettings"
-          },
-          "description": "A single document to store global economy settings."
-        }
-      },
-      {
-        "path": "/transactions/{transactionId}",
-        "definition": {
-          "entityName": "Transaction",
-          "schema": {
-            "$ref": "#/backend/entities/Transaction"
-          },
-          "description": "Stores all currency transactions for all users."
-        }
-      }
+      { "path": "/users/{userId}", "definition": { "entityName": "User", "schema": { "$ref": "#/backend/entities/User" }, "description": "Stores user profiles." } },
+      { "path": "/classes/{classId}", "definition": { "entityName": "Class", "schema": { "$ref": "#/backend/entities/Class" }, "description": "Stores academic classes." } },
+      { "path": "/subjects/{subjectId}", "definition": { "entityName": "Subject", "schema": { "$ref": "#/backend/entities/Subject" }, "description": "Stores academic subjects." } },
+      { "path": "/units/{unitId}", "definition": { "entityName": "Unit", "schema": { "$ref": "#/backend/entities/Unit" }, "description": "Stores units for subjects." } },
+      { "path": "/categories/{categoryId}", "definition": { "entityName": "Category", "schema": { "$ref": "#/backend/entities/Category" }, "description": "Stores categories for units." } },
+      { "path": "/questions/{questionId}", "definition": { "entityName": "Question", "schema": { "$ref": "#/backend/entities/Question" }, "description": "Stores all numerical questions." } },
+      { "path": "/worksheets/{worksheetId}", "definition": { "entityName": "Worksheet", "schema": { "$ref": "#/backend/entities/Worksheet" }, "description": "Stores created worksheets." } },
+      { "path": "/attempts/{attemptId}", "definition": { "entityName": "WorksheetAttempt", "schema": { "$ref": "#/backend/entities/WorksheetAttempt" }, "description": "Stores user attempts for worksheets." } },
+      { "path": "/settings/economy", "definition": { "entityName": "EconomySettings", "schema": { "$ref": "#/backend/entities/EconomySettings" }, "description": "A single document for global economy settings." } },
+      { "path": "/transactions/{transactionId}", "definition": { "entityName": "Transaction", "schema": { "$ref": "#/backend/entities/Transaction" }, "description": "Stores all currency transactions." } },
+      { "path": "/coupons/{couponId}", "definition": { "entityName": "Coupon", "schema": { "$ref": "#/backend/entities/Coupon" }, "description": "Stores promotional coupons." } }
     ]
   }
 }

@@ -9,7 +9,7 @@ export type GradingMode = 'system' | 'ai';
 
 export type QuestionStatus = 'draft' | 'published' | 'archived';
 
-export type AnswerType = 'numerical' | 'text' | 'mcq'; // Added MCQ for Step 1 logic
+export type AnswerType = 'numerical' | 'text' | 'mcq';
 
 // ==========================================
 // 2. RUBRIC STRUCTURE (For AI Grading)
@@ -26,7 +26,7 @@ export type AIFeedbackPattern = 'givenRequiredMapping' | 'conceptualMisconceptio
 // ==========================================
 export interface NumericalAnswer {
   correctValue: number;
-  toleranceValue: number; // Mandatory for numerical
+  toleranceValue: number; 
   baseUnit: string;
 }
 
@@ -37,7 +37,7 @@ export interface McqOption {
 
 export interface McqAnswer {
   options: McqOption[];
-  correctOptions: string[]; // UUIDs
+  correctOptions: string[]; 
   isMultiCorrect: boolean;
   shuffleOptions: boolean;
 }
@@ -47,17 +47,16 @@ export interface SubQuestion {
   questionText: string;
   marks: number;
   answerType: AnswerType;
-  // One of these must be populated based on answerType
   numericalAnswer?: NumericalAnswer;
   mcqAnswer?: McqAnswer; 
-  textAnswerKeywords?: string[]; // For text matching
+  textAnswerKeywords?: string[]; 
 }
 
 export interface SolutionStep {
   id: string;
   title: string;
-  description: string; // "Step Description"
-  stepQuestion: string; // "Step Question"
+  description: string; 
+  stepQuestion: string; 
   subQuestions: SubQuestion[];
 }
 
@@ -65,31 +64,56 @@ export interface SolutionStep {
 // 4. THE MASTER QUESTION OBJECT
 // ==========================================
 export interface Question {
-  // Metadata (Step 1)
   id: string;
-  name: string; // Internal Name
-  mainQuestionText: string; // Problem Statement
+  name: string; 
+  mainQuestionText: string; 
   authorId: string;
   classId: string;
   subjectId: string;
   unitId: string;
   categoryId: string;
   currencyType: CurrencyType;
-  
-  // The Solution Engine (Step 2)
   solutionSteps: SolutionStep[];
-
-  // Grading Logic (Step 4)
   gradingMode: GradingMode;
-  aiRubric?: AIRubric; // Required if gradingMode === 'ai'
-  aiFeedbackPatterns: AIFeedbackPattern[]; // e.g., ['calculation_error', 'conceptual_misconception']
-
-  // System State (Step 3 & 5)
+  aiRubric?: AIRubric; 
+  aiFeedbackPatterns: AIFeedbackPattern[]; 
   status: QuestionStatus;
   createdAt: { seconds: number; nanoseconds: number };
   updatedAt: { seconds: number; nanoseconds: number };
   publishedAt?: { seconds: number; nanoseconds: number };
 }
+
+// ==========================================
+// 5. COUPON & ECONOMY
+// ==========================================
+export interface CouponCondition {
+    type: 'minClassroomAssignments' | 'minPracticeAssignments' | 'minGoldQuestions' | 'minAcademicHealth';
+    value: number;
+}
+
+export interface Coupon {
+    id: string;
+    name: string;
+    rewardAmount: number;
+    rewardCurrency: CurrencyType;
+    availableDate: any; // Firestore Timestamp
+    conditions: CouponCondition[];
+    createdAt?: any;
+    updatedAt?: any;
+}
+
+export interface EconomySettings {
+  coinToGold: number;
+  goldToDiamond: number;
+  costPerMark: number;
+  aiGradingCostMultiplier?: number;
+  solutionCost?: number; 
+  solutionCurrency?: CurrencyType;
+  rewardPractice: number;
+  rewardClassroom: number;
+  rewardSpark: number;
+}
+
 
 // --- Other existing types ---
 
@@ -109,7 +133,7 @@ export interface User {
   enrollments?: string[];
   completedWorksheets?: string[];
   unlockedTabs?: string[];
-  unlockedSolutions?: string[];
+  unlockedSolutions?: Record<string, string>;
   lastCouponClaimedAt?: any; // Firestore Timestamp
   hasClaimedWelcomeCoupon?: boolean;
 }
@@ -174,9 +198,7 @@ export interface Teacher extends User {
   classes: string[];
 }
 
-
 export type QuestionFilter = 'unit' | 'category' | 'status' | 'currency';
-
 
 export interface Worksheet {
     id: string;
@@ -186,20 +208,21 @@ export interface Worksheet {
     unitId?: string;
     mode: 'practice' | 'exam';
     worksheetType: 'classroom' | 'sample' | 'practice';
-    startTime?: Date; // For exam mode
-    questions: string[]; // Array of question IDs
+    startTime?: Date; 
+    questions: string[]; 
     authorId: string;
     status: 'draft' | 'published';
-    createdAt: any; // Firestore ServerTimestamp
-    updatedAt: any; // Firestore ServerTimestamp
+    createdAt: any; 
+    updatedAt: any; 
 }
 
 export type AnswerState = { [subQuestionId: string]: { answer: any } };
 export type ResultState = {
   [subQuestionId: string]: {
     isCorrect: boolean;
-    score?: number;       // ✅ Added: Optional score for AI grading
-    feedback?: string;    // ✅ Added: Optional text feedback from AI
+    score?: number;       
+    feedback?: string;    
+    aiBreakdown?: Record<string, number>;
   }
 };
 
@@ -211,41 +234,9 @@ export interface WorksheetAttempt {
     answers: AnswerState;
     results: ResultState;
     timeTaken: number;
-    attemptedAt: any; // Firestore ServerTimestamp
+    attemptedAt: any; 
     rewardsClaimed?: boolean;
-    
-    // ✅ NEW: Track purchased solutions (QuestionID -> Solution Text)
     unlockedSolutions?: Record<string, string>; 
-}
-
-export interface CouponCondition {
-    type: 'minClassroomAssignments' | 'minPracticeAssignments' | 'minGoldQuestions' | 'minAcademicHealth';
-    value: number;
-    description: string;
-}
-
-export interface EconomySettings {
-  // Exchange Rates
-  coinToGold: number;
-  goldToDiamond: number;
-
-  // Creation Costs
-  costPerMark: number;
-  aiGradingCostMultiplier?: number;
-  solutionCost?: number; 
-  solutionCurrency?: CurrencyType;
-
-  // Reward Multipliers
-  rewardPractice: number;
-  rewardClassroom: number;
-  rewardSpark: number;
-  
-  // Surprise Coupon Settings
-  welcomeAiCredits?: number;
-  surpriseRewardAmount?: number;
-  surpriseRewardCurrency?: CurrencyType;
-  nextCouponAvailableDate?: any; // Firestore Timestamp
-  couponConditions?: CouponCondition[];
 }
 
 export interface Transaction {
@@ -255,7 +246,7 @@ export interface Transaction {
   description: string;
   amount: number;
   currency: CurrencyType;
-  createdAt: any; // Firestore ServerTimestamp
+  createdAt: any;
 }
 
 export interface WalletTransaction {
