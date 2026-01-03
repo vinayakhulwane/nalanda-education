@@ -41,9 +41,8 @@ export default function UserManagementPage() {
                 description="Manage users, track progress, and handle enrollments."
             />
             <Tabs defaultValue="users">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="users">All Users</TabsTrigger>
-                    <TabsTrigger value="permissions">Permissions & Roles</TabsTrigger>
                     <TabsTrigger value="matrix">Permission Matrix</TabsTrigger>
                     <TabsTrigger value="progress">Student Progress</TabsTrigger>
                     <TabsTrigger value="enrollment">Enrollment</TabsTrigger>
@@ -51,10 +50,6 @@ export default function UserManagementPage() {
 
                 <TabsContent value="users">
                     <UserList />
-                </TabsContent>
-
-                <TabsContent value="permissions">
-                    <RoleManagement />
                 </TabsContent>
                 
                 <TabsContent value="matrix">

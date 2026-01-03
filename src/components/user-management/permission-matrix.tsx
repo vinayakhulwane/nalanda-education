@@ -9,61 +9,61 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Lock, Save } from "lucide-react";
+import { Loader2, Lock, Save, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-// These keys MUST match the keys we check in Firestore Rules later
+// Define the permissions structure
 const PERMISSION_KEYS = [
-    { key: 'worksheet_create', label: 'Create Worksheets' },
-    { key: 'worksheet_read',   label: 'Read Worksheets (Global)' },
-    { key: 'worksheet_delete', label: 'Delete Worksheets' },
-    { key: 'transaction_view', label: 'See Transaction History' },
-    { key: 'transaction_create', label: 'Create Transactions (Rewards)' },
-    { key: 'question_create',  label: 'Create Questions' },
+    { key: 'worksheet_create', label: 'Create Worksheets', default: ['admin', 'teacher'] },
+    { key: 'worksheet_read',   label: 'Read/View Worksheets', default: ['admin', 'teacher', 'student'] }, // ✅ Student enabled by default
+    { key: 'worksheet_delete', label: 'Delete Worksheets', default: ['admin'] },
+    { key: 'transaction_view', label: 'See Transaction History', default: ['admin', 'student'] }, // ✅ Student enabled by default
+    { key: 'transaction_create', label: 'Create Transactions (Rewards)', default: ['admin', 'teacher'] },
+    { key: 'question_create',  label: 'Create Questions', default: ['admin', 'teacher'] },
 ];
 
-type PermissionState = Record<string, string[]>; // e.g. { 'worksheet_create': ['admin', 'teacher'] }
+type PermissionState = Record<string, string[]>;
 
 export function PermissionMatrix() {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    
-    // Default: Admin has everything, others have nothing until loaded
     const [permissions, setPermissions] = useState<PermissionState>({});
 
     useEffect(() => {
-        const loadPermissions = async () => {
-            if (!firestore) return;
-            try {
-                const docRef = doc(firestore, 'settings', 'permissions');
-                const snap = await getDoc(docRef);
-                if (snap.exists()) {
-                    setPermissions(snap.data() as PermissionState);
-                } else {
-                    // Initialize default if document doesn't exist
-                    const defaults: PermissionState = {};
-                    PERMISSION_KEYS.forEach(p => defaults[p.key] = ['admin']);
-                    setPermissions(defaults);
-                }
-            } catch (e) {
-                console.error("Failed to load permissions", e);
-            } finally {
-                setLoading(false);
-            }
-        };
         loadPermissions();
     }, [firestore]);
 
+    const loadPermissions = async () => {
+        if (!firestore) return;
+        setLoading(true);
+        try {
+            const docRef = doc(firestore, 'settings', 'permissions');
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+                setPermissions(snap.data() as PermissionState);
+            } else {
+                // If doc doesn't exist, use defaults in UI but don't save yet
+                const defaults: PermissionState = {};
+                PERMISSION_KEYS.forEach(p => defaults[p.key] = p.default);
+                setPermissions(defaults);
+            }
+        } catch (e) {
+            console.error("Failed to load permissions", e);
+            toast({ variant: "destructive", title: "Connection Error", description: "Could not load permission settings." });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleToggle = (permKey: string, role: string) => {
         setPermissions(prev => {
-            const currentRoles = prev[permKey] || ['admin'];
+            const currentRoles = prev[permKey] || [];
             const newRoles = currentRoles.includes(role)
-                ? currentRoles.filter(r => r !== role) // Remove
-                : [...currentRoles, role]; // Add
-            
+                ? currentRoles.filter(r => r !== role)
+                : [...currentRoles, role];
             return { ...prev, [permKey]: newRoles };
         });
     };
@@ -73,13 +73,31 @@ export function PermissionMatrix() {
         setSaving(true);
         try {
             const docRef = doc(firestore, 'settings', 'permissions');
-            await setDoc(docRef, permissions);
-            toast({ title: "Permissions Updated", description: "Database rules will now reflect these changes." });
+            // Ensure Admin is ALWAYS in every permission to prevent lockout
+            const safePermissions = { ...permissions };
+            PERMISSION_KEYS.forEach(p => {
+                const current = safePermissions[p.key] || [];
+                if (!current.includes('admin')) {
+                    safePermissions[p.key] = [...current, 'admin'];
+                }
+            });
+
+            await setDoc(docRef, safePermissions);
+            setPermissions(safePermissions);
+            toast({ title: "Permissions Saved", description: "Database rules updated successfully." });
         } catch (e) {
-            toast({ variant: "destructive", title: "Error", description: "Could not save permissions." });
+            console.error(e);
+            toast({ variant: "destructive", title: "Save Failed", description: "Check your internet connection." });
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleReset = () => {
+        const defaults: PermissionState = {};
+        PERMISSION_KEYS.forEach(p => defaults[p.key] = p.default);
+        setPermissions(defaults);
+        toast({ title: "Defaults Loaded", description: "Click Save to apply these defaults." });
     };
 
     if (loading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>;
@@ -91,13 +109,19 @@ export function PermissionMatrix() {
                     <div className="flex items-center gap-2">
                         <Lock className="h-5 w-5" /> Global Permission Matrix
                     </div>
-                    <Button onClick={handleSave} disabled={saving}>
-                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Save Changes
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={handleReset}>
+                            <RotateCcw className="mr-2 h-4 w-4" /> Reset Defaults
+                        </Button>
+                        <Button onClick={handleSave} disabled={saving}>
+                            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Save Changes
+                        </Button>
+                    </div>
                 </CardTitle>
                 <CardDescription>
-                    Toggle checkboxes to control what each role can do. Admin always has full access.
+                    Control exactly what Students and Teachers can do. 
+                    <br/><span className="text-red-500 font-bold">Note:</span> Unchecking a box here instantly blocks that action in the app.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -115,14 +139,14 @@ export function PermissionMatrix() {
                             <TableRow key={perm.key}>
                                 <TableCell className="font-medium">{perm.label}</TableCell>
                                 
-                                {/* ADMIN COLUMN (Always True/Disabled) */}
+                                {/* ADMIN (Locked) */}
                                 <TableCell className="text-center bg-slate-50 dark:bg-slate-900">
                                     <div className="flex justify-center">
                                         <Checkbox checked={true} disabled />
                                     </div>
                                 </TableCell>
 
-                                {/* TEACHER COLUMN */}
+                                {/* TEACHER */}
                                 <TableCell className="text-center">
                                     <div className="flex justify-center">
                                         <Checkbox 
@@ -132,7 +156,7 @@ export function PermissionMatrix() {
                                     </div>
                                 </TableCell>
 
-                                {/* STUDENT COLUMN */}
+                                {/* STUDENT */}
                                 <TableCell className="text-center">
                                     <div className="flex justify-center">
                                         <Checkbox 
