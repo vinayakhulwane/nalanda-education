@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -20,22 +21,34 @@ import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { v4 as uuidv4 } from 'uuid';
+import { Switch } from '@/components/ui/switch';
 
 // Reusable Coupon Form Component
 function CouponForm({ coupon, setCoupon, availableYears, availableMonths, availableDays }: any) {
+  const [isScheduled, setIsScheduled] = useState(!!coupon.availableDate);
   const [day, setDay] = useState(coupon.availableDate ? new Date(coupon.availableDate).getDate().toString() : '');
   const [month, setMonth] = useState(coupon.availableDate ? (new Date(coupon.availableDate).getMonth() + 1).toString() : '');
   const [year, setYear] = useState(coupon.availableDate ? new Date(coupon.availableDate).getFullYear().toString() : '');
   const [time, setTime] = useState(coupon.availableDate ? format(new Date(coupon.availableDate), 'HH:mm') : '09:00');
 
   useEffect(() => {
+    if (!isScheduled) {
+        setCoupon({ ...coupon, availableDate: null });
+        return;
+    }
+    
     if (year && month && day) {
       const newDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       const [hours, minutes] = time.split(':').map(Number);
       newDate.setHours(hours, minutes, 0, 0);
       setCoupon({ ...coupon, availableDate: newDate });
+    } else {
+        // If scheduling is on but date is incomplete, ensure it's not null
+        if (!coupon.availableDate) {
+            setCoupon({...coupon, availableDate: new Date() });
+        }
     }
-  }, [year, month, day, time]);
+  }, [year, month, day, time, isScheduled]);
 
   const handleYearChange = (newYear: string) => { setYear(newYear); setMonth(''); setDay(''); };
   const handleMonthChange = (newMonth: string) => { setMonth(newMonth); setDay(''); };
@@ -85,14 +98,22 @@ function CouponForm({ coupon, setCoupon, availableYears, availableMonths, availa
       </div>
 
       <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
-        <h3 className="font-semibold text-sm">Scheduling</h3>
-        <div className="flex flex-wrap gap-2">
-          <Select onValueChange={handleYearChange} value={year}><SelectTrigger className="w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger><SelectContent>{availableYears.map((y: number) => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent></Select>
-          <Select onValueChange={handleMonthChange} value={month} disabled={!year}><SelectTrigger className="w-[150px]"><SelectValue placeholder="Month" /></SelectTrigger><SelectContent>{availableMonths.map((m: any) => <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>)}</SelectContent></Select>
-          <Select onValueChange={setDay} value={day} disabled={!month}><SelectTrigger className="w-[100px]"><SelectValue placeholder="Day" /></SelectTrigger><SelectContent>{availableDays.map((d: number) => <SelectItem key={d} value={d.toString()}>{d}</SelectItem>)}</SelectContent></Select>
-          <Input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-auto" />
+        <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-sm">Scheduling</h3>
+            <div className="flex items-center gap-2">
+                <Label htmlFor="scheduling-switch" className="text-xs text-muted-foreground">Set a Date</Label>
+                <Switch id="scheduling-switch" checked={isScheduled} onCheckedChange={setIsScheduled}/>
+            </div>
         </div>
-        <p className="text-xs text-muted-foreground">Set the exact date and time the coupon becomes available.</p>
+        {isScheduled && (
+            <div className="flex flex-wrap gap-2 animate-in fade-in">
+              <Select onValueChange={handleYearChange} value={year}><SelectTrigger className="w-[120px]"><SelectValue placeholder="Year" /></SelectTrigger><SelectContent>{availableYears.map((y: number) => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent></Select>
+              <Select onValueChange={handleMonthChange} value={month} disabled={!year}><SelectTrigger className="w-[150px]"><SelectValue placeholder="Month" /></SelectTrigger><SelectContent>{availableMonths.map((m: any) => <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>)}</SelectContent></Select>
+              <Select onValueChange={setDay} value={day} disabled={!month}><SelectTrigger className="w-[100px]"><SelectValue placeholder="Day" /></SelectTrigger><SelectContent>{availableDays.map((d: number) => <SelectItem key={d} value={d.toString()}>{d}</SelectItem>)}</SelectContent></Select>
+              <Input type="time" value={time} onChange={e => setTime(e.target.value)} className="w-auto" />
+            </div>
+        )}
+        <p className="text-xs text-muted-foreground">{isScheduled ? 'Set the exact date and time the coupon becomes available.' : 'This coupon will be available immediately if conditions are met.'}</p>
       </div>
 
       <div className="p-4 border rounded-lg bg-muted/20 space-y-4">
@@ -181,14 +202,14 @@ export default function EconomySettingsPage() {
   };
   
   const openCreateDialog = () => {
-    setEditingCoupon({ id: uuidv4(), name: '', rewardAmount: 100, rewardCurrency: 'coin', availableDate: new Date(), conditions: [] });
+    setEditingCoupon({ id: uuidv4(), name: '', rewardAmount: 100, rewardCurrency: 'coin', conditions: [], availableDate: null });
     setCouponDialogOpen(true);
   };
 
   const openEditDialog = (coupon: Coupon) => {
     const couponData = {
       ...coupon,
-      availableDate: coupon.availableDate?.toDate ? coupon.availableDate.toDate() : new Date(),
+      availableDate: coupon.availableDate?.toDate ? coupon.availableDate.toDate() : null,
     };
     setEditingCoupon(couponData);
     setCouponDialogOpen(true);
@@ -312,3 +333,4 @@ export default function EconomySettingsPage() {
     </div>
   );
 }
+

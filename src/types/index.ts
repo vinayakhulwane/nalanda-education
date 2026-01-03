@@ -1,4 +1,5 @@
 
+
 'use client';
 // ==========================================
 // 1. CORE ENUMS & CONSTANTS
@@ -96,7 +97,7 @@ export interface Coupon {
     name: string;
     rewardAmount: number;
     rewardCurrency: CurrencyType;
-    availableDate: any; // Firestore Timestamp
+    availableDate?: any; // Firestore Timestamp, now optional
     conditions: CouponCondition[];
     createdAt?: any;
     updatedAt?: any;

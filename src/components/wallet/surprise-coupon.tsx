@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -43,7 +44,9 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
   const [isClaimed, setIsClaimed] = useState(false);
   
   const lastClaimedMillis = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
-  const nextAvailableMillis = coupon.availableDate.toDate().getTime();
+  
+  // If availableDate is null, coupon is available from the dawn of time.
+  const nextAvailableMillis = coupon.availableDate ? coupon.availableDate.toDate().getTime() : 0;
   
   const isTimeReady = Date.now() >= nextAvailableMillis;
   const hasNotClaimedThisCycle = lastClaimedMillis < nextAvailableMillis;
@@ -132,7 +135,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
             {!isTimeReady ? "Unlocks In" : "Time Requirement"}
           </div>
           <div className="text-center mt-1">
-            {!isTimeReady ? <CountdownTimer targetDate={coupon.availableDate.toDate()} /> : <p className="text-sm font-semibold text-emerald-800">Timer Complete!</p>}
+            {!isTimeReady && coupon.availableDate ? <CountdownTimer targetDate={coupon.availableDate.toDate()} /> : <p className="text-sm font-semibold text-emerald-800">Available Now!</p>}
           </div>
         </div>
         {taskProgress.length > 0 && (
@@ -171,7 +174,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
 
     const couponsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
-        return query(collection(firestore, 'coupons'), where('availableDate', '>', new Date(0)), orderBy('availableDate', 'asc'));
+        return query(collection(firestore, 'coupons'), orderBy('availableDate', 'asc'));
     }, [firestore]);
     const { data: coupons, isLoading: couponsLoading } = useCollection<Coupon>(couponsQuery);
     
