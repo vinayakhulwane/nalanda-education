@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { EnrollmentList } from "@/components/user-management/enrollment-list";
 import { StudentProgressList } from "@/components/user-management/student-progress-list";
 import { UserList } from "@/components/user-management/user-list";
+import { RoleManagement } from "@/components/user-management/role-management"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from "@/firebase";
 import { useRouter } from "next/navigation";
@@ -39,14 +40,19 @@ export default function UserManagementPage() {
                 description="Manage users, track progress, and handle enrollments."
             />
             <Tabs defaultValue="users">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="users">Users</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="users">All Users</TabsTrigger>
+                    <TabsTrigger value="permissions">Permissions & Roles</TabsTrigger>
                     <TabsTrigger value="progress">Student Progress</TabsTrigger>
                     <TabsTrigger value="enrollment">Enrollment</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="users">
                     <UserList />
+                </TabsContent>
+
+                <TabsContent value="permissions">
+                    <RoleManagement />
                 </TabsContent>
 
                 <TabsContent value="progress">
