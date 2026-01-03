@@ -66,7 +66,6 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
 
   const lastClaimedMillis = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
   
-  // Reference Time for Claim Cycle
   const referenceTimeMillis = coupon.availableDate 
       ? coupon.availableDate.toDate().getTime() 
       : ((coupon as any).createdAt ? (coupon as any).createdAt.toMillis() : 0);
@@ -75,14 +74,15 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
   const isAlreadyClaimed = lastClaimedMillis >= referenceTimeMillis;
   const hasNotClaimedThisCycle = !isAlreadyClaimed;
 
-  // --- TASK PROGRESS LOGIC ---
+  // --- DEBUGGING ENABLED: TASK PROGRESS LOGIC ---
   const { conditionsMet, taskProgress } = useMemo(() => {
     if (!coupon.conditions || coupon.conditions.length === 0) {
       return { conditionsMet: true, taskProgress: [] };
     }
 
-    // Use all recent attempts (Time filter removed as requested)
+    console.groupCollapsed(`[DEBUG] Checking Coupon: ${coupon.name}`);
     const validAttempts = recentAttempts; 
+    console.log(`Checking ${validAttempts.length} attempts...`);
 
     let allMet = true;
     
@@ -90,7 +90,6 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       let current = 0;
       let label = "";
 
-      // 1. Practice Assignments
       if (condition.type === 'minPracticeAssignments') {
          label = "Complete Practice Exercises";
          current = validAttempts.filter(a => {
@@ -101,10 +100,11 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
                                  || (a as any).worksheetType?.toLowerCase() === 'practice';
              const isSelfCreated = w?.authorId === userProfile.id;
 
-             return isTypePractice || isSelfCreated;
+             const match = isTypePractice || isSelfCreated;
+             if (match) console.log(`  -> Found Practice Attempt: ${a.id}`);
+             return match;
          }).length;
 
-      // 2. Classroom Assignments
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
          current = validAttempts.filter(a => {
@@ -117,19 +117,33 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
              return isTypeClassroom && isNotSelfCreated;
          }).length;
 
-      // 3. Gold Questions (Fixed Type Error)
       } else if (condition.type === 'minGoldQuestions') {
          label = "Solve Gold Questions";
+         console.log("  --- Checking Gold ---");
+         
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
              
-             // Cast to 'any' to avoid TS error on 'rewardCurrency'
-             const givesGold = (w as any)?.rewardCurrency === 'gold' || (w as any)?.currency === 'gold';
-             const earnedGold = (a as any)?.earnedCurrency === 'gold' || (a as any)?.rewardCurrency === 'gold';
+             // Cast to 'any' to avoid TS error
+             // We check BOTH the worksheet config AND the earned currency on the attempt
+             const wsCurrency = (w as any)?.rewardCurrency || (w as any)?.currency;
+             const attCurrency = (a as any)?.earnedCurrency || (a as any)?.rewardCurrency;
 
-             return givesGold || earnedGold;
+             const givesGold = wsCurrency === 'gold';
+             const earnedGold = attCurrency === 'gold';
+             const isMatch = givesGold || earnedGold;
+
+             if (isMatch) {
+                 console.log(`  ✅ MATCH! Attempt ${a.id} | WS Currency: ${wsCurrency} | Earned: ${attCurrency}`);
+             } else {
+                 // Log failures so you can see what they ARE (e.g. 'coin')
+                 // console.log(`  ❌ Fail. Attempt ${a.id} | WS Currency: ${wsCurrency} | Earned: ${attCurrency}`);
+             }
+
+             return isMatch;
          }).length;
-
+         
+         console.log(`  >>> Total Gold Found: ${current}`);
       } else {
          label = "Special Mission";
       }
@@ -145,7 +159,8 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
           percentage: Math.min(100, (current / condition.value) * 100) 
       };
     });
-
+    
+    console.groupEnd();
     return { conditionsMet: allMet, taskProgress: progress };
   }, [coupon.conditions, recentAttempts, worksheets, userProfile.id]);
 
@@ -381,7 +396,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
               } else if (cond.type === 'minPracticeAssignments') {
                  count = validAttempts.filter(a => check((worksheets || []).find(w => w.id === a.worksheetId), a, 'practice')).length;
               
-              // ✅ FIX: Added Gold Logic to Sorter + Fixed Type Error
+              // ✅ Added Gold Logic to Sorter
               } else if (cond.type === 'minGoldQuestions') {
                  count = validAttempts.filter(a => {
                      const w = (worksheets || []).find(sheet => sheet.id === a.worksheetId);
