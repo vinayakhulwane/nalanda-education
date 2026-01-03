@@ -13,9 +13,8 @@ import { doc, writeBatch, collection, increment, serverTimestamp, query, where, 
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { format, subDays, startOfDay, isSameDay } from 'date-fns';
+import { format, subDays } from 'date-fns';
 
-// Define Transaction Interface Locally
 interface Transaction {
   id: string;
   userId: string;
@@ -38,61 +37,103 @@ interface CouponCardProps {
   recentTransactions?: Transaction[];
 }
 
-// --- HELPER: ACADEMIC HEALTH ALGORITHM (With Debugging) ---
-function calculateAcademicHealth(attempts: WorksheetAttempt[]): number {
-  if (!attempts || attempts.length === 0) return 0;
+// --- HELPER: ROBUST SCORE EXTRACTION (WITH LOGS) ---
+const getAttemptTotals = (a: WorksheetAttempt) => {
+    // 1. Safe Access to Fields (Handle number or string)
+    const rawScore = (a as any).score ?? (a as any).obtainedMarks ?? (a as any).marks;
+    const rawTotal = (a as any).totalMarks ?? (a as any).maxScore ?? (a as any).totalPoints;
 
-  // 1. Group attempts by Date (YYYY-MM-DD)
-  const dailyStats: Record<string, { totalPct: number; count: number }> = {};
+    const savedScore = Number(rawScore);
+    const savedTotal = Number(rawTotal);
+
+    // 2. Validate
+    if (!isNaN(savedScore) && !isNaN(savedTotal) && savedTotal > 0) {
+        // Sanity Check: If score > total, assume score is a percentage
+        if (savedScore > savedTotal) {
+            return { score: (savedScore / 100) * savedTotal, total: savedTotal };
+        }
+        return { score: savedScore, total: savedTotal };
+    }
+    
+    return null; 
+};
+
+// --- HELPER: ACADEMIC HEALTH ALGORITHM (X-RAY VERSION) ---
+function calculateAcademicHealth(attempts: WorksheetAttempt[]): number {
+  console.groupCollapsed("🩺 [Health X-Ray] Starting Calculation");
+
+  if (!attempts || attempts.length === 0) {
+      console.log("No attempts found. Returning baseline 80.");
+      console.groupEnd();
+      return 80; 
+  }
+
+  // 1. Group attempts by Date
+  const dailyStats: Record<string, { total: number; obtained: number; count: number }> = {};
 
   attempts.forEach((a) => {
     if (!a.attemptedAt) return;
-    // Handle Timestamp or Date object
-    const dateObj = (a.attemptedAt as any).toDate ? (a.attemptedAt as any).toDate() : new Date((a.attemptedAt as any));
+    
+    // Robust Date Parsing
+    let dateObj;
+    try {
+        dateObj = (a.attemptedAt as any).toDate ? (a.attemptedAt as any).toDate() : new Date((a.attemptedAt as any));
+    } catch (e) { return; }
+    
     const dateKey = format(dateObj, 'yyyy-MM-dd');
 
-    const score = (a as any).score || (a as any).obtainedMarks || 0;
-    // Check multiple fields for max score to be safe
-    const max = (a as any).maxScore || (a as any).totalMarks || (a as any).totalPoints || 100; 
+    const data = getAttemptTotals(a);
     
-    // Safety: Ensure max is not 0 to avoid Infinity
-    const safeMax = max === 0 ? 100 : max;
-    const pct = (score / safeMax) * 100;
+    // LOG INVALID ATTEMPTS (This is likely where your issue is)
+    if (!data) {
+       // Uncomment to see which specific IDs are failing
+       // console.warn(`⚠️ Attempt ${a.id} ignored. Missing score/total.`);
+       return; 
+    }
+
+    const { score, total } = data;
 
     if (!dailyStats[dateKey]) {
-      dailyStats[dateKey] = { totalPct: 0, count: 0 };
+      dailyStats[dateKey] = { total: 0, obtained: 0, count: 0 };
     }
-    dailyStats[dateKey].totalPct += pct;
-    dailyStats[dateKey].count += 1;
+    dailyStats[dateKey].total += total;
+    dailyStats[dateKey].obtained += score;
+    dailyStats[dateKey].count++;
   });
 
   // 2. Rolling Calculation (14 Days)
-  // We use a baseline of 50, but if the user has NO history in the window, it might decay.
-  let currentHealth = 50; 
+  let currentHealth = 80; 
   const today = new Date();
 
-  // DEBUG: Track the calculation
-  // console.log("--- Health Calculation Start (Baseline: 50) ---");
+  console.log("--- Day by Day Breakdown ---");
 
-  // Iterate from 13 days ago -> Today
   for (let i = 13; i >= 0; i--) {
     const targetDate = subDays(today, i);
     const dateKey = format(targetDate, 'yyyy-MM-dd');
-    const dayData = dailyStats[dateKey];
+    const dayStats = dailyStats[dateKey];
 
-    if (dayData) {
-      // Active Day: Weighted Avg
-      const dayAvg = dayData.totalPct / dayData.count;
+    const prevHealth = currentHealth;
+
+    if (dayStats && dayStats.total > 0) {
+      // ACTIVE DAY
+      const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
       currentHealth = (currentHealth * 0.6) + (dayAvg * 0.4);
-      // console.log(`Day -${i} (${dateKey}): Active. Avg: ${dayAvg.toFixed(1)}%. New Health: ${currentHealth.toFixed(1)}%`);
+      
+      console.log(`✅ [${dateKey}] ACTIVE | Avg Score: ${dayAvg.toFixed(1)}% | Health: ${prevHealth.toFixed(1)}% -> ${currentHealth.toFixed(1)}%`);
     } else {
-      // Inactive Day: Decay
-      currentHealth = currentHealth * 0.95;
-      // console.log(`Day -${i} (${dateKey}): Inactive. Decay to: ${currentHealth.toFixed(1)}%`);
+      // INACTIVE DAY
+      currentHealth = Math.max(0, currentHealth * 0.95);
+      
+      // Log inactive days to see if the date matching is failing
+      console.log(`💤 [${dateKey}] Inactive | Health: ${prevHealth.toFixed(1)}% -> ${currentHealth.toFixed(1)}%`);
     }
   }
 
-  return Math.round(currentHealth);
+  const finalResult = Math.round(currentHealth);
+  console.log(`🏁 FINAL HEALTH: ${finalResult}%`);
+  console.groupEnd();
+
+  return finalResult;
 }
 
 // --- HELPER: HH:MM:SS TIMER ---
@@ -152,25 +193,19 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
 
     const couponCreationTime = (coupon as any).createdAt?.toMillis?.() || 0;
     
-    // 1. Attempts Filter (All history for Health)
     const validAttempts = recentAttempts; 
 
-    // 2. Transactions Filter (Strictly AFTER coupon creation)
     const validTransactions = recentTransactions.filter(t => {
         const time = (t.createdAt as any)?.toMillis?.() || 0;
         return time >= couponCreationTime;
     });
 
-    // 3. ✅ CALCULATE ACADEMIC HEALTH
-    // We calculate it ONCE here so all conditions use the same value
-    const academicHealth = calculateAcademicHealth(recentAttempts);
-
-    // DEBUG LOGS SPECIFIC TO HEALTH
+    // 3. ✅ CALCULATE ACADEMIC HEALTH (With X-Ray)
+    // Only run this calc if there is actually a health condition to check (saves console spam)
     const hasHealthCondition = coupon.conditions.some(c => c.type === 'minAcademicHealth');
+    let academicHealth = 0;
     if (hasHealthCondition) {
-        console.groupCollapsed(`[DEBUG] Health Check for: ${coupon.name}`);
-        console.log(`Loaded Attempts for Calc: ${recentAttempts.length}`);
-        console.log(`Calculated Health: ${academicHealth}%`);
+        academicHealth = calculateAcademicHealth(recentAttempts);
     }
 
     let allMet = true;
@@ -204,11 +239,8 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
          }).length;
 
       } else if (condition.type === 'minAcademicHealth') {
-         // ✅ FIX: Use the calculated percentage
          label = `Maintain Academic Health > ${condition.value}%`;
          current = academicHealth;
-         console.log(`  -> Condition: ${condition.value}% | Actual: ${current}% | Pass: ${current >= condition.value}`);
-      
       } else {
          label = "Special Mission";
       }
@@ -216,10 +248,8 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
       const isMet = current >= condition.value;
       if (!isMet) allMet = false;
 
-      // Progress Bar Logic
       let barPercent = 0;
       if (condition.type === 'minAcademicHealth') {
-          // Visual cap at 100%
           barPercent = Math.min(100, (current / condition.value) * 100);
       } else {
           barPercent = Math.min(100, (current / condition.value) * 100);
@@ -234,8 +264,6 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
           suffix: condition.type === 'minAcademicHealth' ? '%' : '' 
       };
     });
-    
-    if (hasHealthCondition) console.groupEnd();
     
     return { conditionsMet: allMet, taskProgress: progress };
   }, [coupon.conditions, recentAttempts, worksheets, recentTransactions, userProfile.id, coupon]);
@@ -433,7 +461,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
       where('userId', '==', userProfile.id),
       where('attemptedAt', '>', oneMonthAgo),
       orderBy('attemptedAt', 'desc'), 
-      limit(300) // ✅ INCREASED FROM 50
+      limit(300) 
     );
   }, [firestore, userProfile.id]);
   const { data: recentAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
@@ -494,7 +522,12 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
         let tasksDone = true;
         
         // Calculate health for sorting
-        const academicHealth = calculateAcademicHealth(recentAttempts || []);
+        // Note: For simple sorting, we rely on the main render calculation logic if possible, 
+        // but since we need it here inside the sort, we call the helper again safely.
+        let academicHealth = 0;
+        if(recentAttempts) {
+             academicHealth = calculateAcademicHealth(recentAttempts);
+        }
 
         if (c.conditions && c.conditions.length > 0) {
            const validAttempts = recentAttempts || [];

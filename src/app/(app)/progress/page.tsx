@@ -1,581 +1,420 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import type { User, Coupon, Worksheet, WorksheetAttempt } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Gift, Loader2, Lock, CheckCircle2, Rocket, Ticket, Star, Trophy, Sparkles, Clock, Activity } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy, limit, getDocs } from 'firebase/firestore';
-import confetti from 'canvas-confetti';
-import { useToast } from '@/hooks/use-toast';
+import { collection, query, where, documentId, orderBy } from 'firebase/firestore';
+import type { Subject, WorksheetAttempt, Unit, Category, Worksheet } from '@/types';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from '@/components/page-header';
+import { Loader2, BookOpen, ChevronLeft, Flame, TrendingUp, AlertTriangle, Compass, Trophy, ArrowDownRight, Layers, Tag } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { format, subDays, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { format, subDays, startOfDay, isSameDay } from 'date-fns';
+import { StudentAttemptHistory } from '@/components/user-management/student-attempt-history';
 
-// Define Transaction Interface Locally
-interface Transaction {
+type PerformanceMetric = {
   id: string;
-  userId: string;
-  type: 'earned' | 'spent' | 'bought';
-  currency: string;
-  amount: number;
-  createdAt: any;
-  description?: string;
-}
+  name: string;
+  type: 'unit' | 'category';
+  parentName?: string; 
+  totalMarks: number;
+  obtainedMarks: number;
+  percentage: number;
+  attemptCount: number;
+};
 
-interface SurpriseCouponProps {
-  userProfile: User;
-}
-
-interface CouponCardProps {
-  coupon: Coupon;
-  userProfile: User;
-  recentAttempts?: WorksheetAttempt[];
-  worksheets?: Worksheet[];
-  recentTransactions?: Transaction[];
-}
-
-// --- HELPER: ROBUST SCORE EXTRACTION ---
-const getAttemptTotals = (a: WorksheetAttempt) => {
-    // Cast to 'any' to access legacy/dynamic fields
-    const savedScore = (a as any).score || (a as any).obtainedMarks;
-    const savedTotal = (a as any).totalMarks || (a as any).maxScore || (a as any).totalPoints;
+// ✅ HELPER: Robustly calculate score & total
+const getAttemptTotals = (a: WorksheetAttempt, worksheet: Worksheet | undefined, allQuestions: Map<string, any>) => {
+    // 1. Try to use saved summary stats (if valid)
+    // Cast to 'any' to bypass TS error for legacy fields
+    const savedScore = (a as any).score;
+    const savedTotal = (a as any).totalMarks;
 
     if (typeof savedScore === 'number' && typeof savedTotal === 'number' && savedTotal > 0) {
+        // Sanity Check: If score > total, it's bad data (percentage stored as score)
         if (savedScore > savedTotal) {
-            return { score: (savedScore / 100) * savedTotal, total: savedTotal };
+             return { score: (savedScore / 100) * savedTotal, total: savedTotal };
         }
         return { score: savedScore, total: savedTotal };
     }
-    return null;
+
+    // 2. Re-calculate from scratch (The reliable way)
+    let calcScore = 0;
+    let calcTotal = 0;
+    const results = a.results || {};
+
+    if (worksheet) {
+        worksheet.questions.forEach(qId => {
+            const question = allQuestions.get(qId);
+            if (question) {
+                // Calculate Max Marks for Question
+                const qMax = question.solutionSteps?.reduce((acc: number, s: any) => acc + s.subQuestions.reduce((ss: number, sub: any) => ss + (sub.marks || 0), 0), 0) || 0;
+                calcTotal += qMax;
+
+                // Calculate Earned Score
+                let qEarned = 0;
+                question.solutionSteps?.forEach((step: any) => {
+                    step.subQuestions.forEach((sub: any) => {
+                        const res = results[sub.id];
+                        if (res) {
+                            if (typeof res.score === 'number') qEarned += res.score;
+                            else if (res.isCorrect) qEarned += (sub.marks || 0);
+                        }
+                    });
+                });
+
+                // 🛡️ SANITIZER: If individual question score > max, fix it
+                if (qEarned > qMax && qMax > 0) {
+                    qEarned = (qEarned / 100) * qMax;
+                }
+                calcScore += qEarned;
+            }
+        });
+    }
+
+    // Only return if we found valid data
+    if (calcTotal > 0) return { score: calcScore, total: calcTotal };
+    
+    return null; // Signal that this attempt is invalid/empty
 };
 
-// --- HELPER: ACADEMIC HEALTH ALGORITHM (WITH X-RAY DEBUGGING) ---
-function calculateAcademicHealth(attempts: WorksheetAttempt[]): number {
-  if (!attempts || attempts.length === 0) {
-      console.log("[Health X-Ray] No attempts found. Returning 80 baseline.");
-      return 80; 
-  }
-
-  // 1. Group attempts by Date
-  const dailyStats: Record<string, { total: number; obtained: number; attempts: number }> = {};
-
-  attempts.forEach((a) => {
-    if (!a.attemptedAt) return;
-    
-    // Robust Date Parsing
-    let dateObj;
-    try {
-        dateObj = (a.attemptedAt as any).toDate ? (a.attemptedAt as any).toDate() : new Date((a.attemptedAt as any));
-    } catch (e) {
-        return; // Skip invalid dates
-    }
-    const dateKey = format(dateObj, 'yyyy-MM-dd');
-
-    const data = getAttemptTotals(a);
-    if (!data) return; 
-
-    const { score, total } = data;
-
-    if (!dailyStats[dateKey]) {
-      dailyStats[dateKey] = { total: 0, obtained: 0, attempts: 0 };
-    }
-    dailyStats[dateKey].total += total;
-    dailyStats[dateKey].obtained += score;
-    dailyStats[dateKey].attempts += 1;
-  });
-
-  // 2. Rolling Calculation (14 Days) with LOGGING
-  let currentHealth = 80; 
-  const today = new Date();
-
-  console.groupCollapsed("🩺 [Health X-Ray] Daily Calculation Report");
-  console.log(`Starting Health: ${currentHealth}%`);
-
-  for (let i = 13; i >= 0; i--) {
-    const targetDate = subDays(today, i);
-    const dateKey = format(targetDate, 'yyyy-MM-dd');
-    const dayStats = dailyStats[dateKey];
-
-    if (dayStats && dayStats.total > 0) {
-      // ACTIVE DAY
-      const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
-      const oldHealth = currentHealth;
-      currentHealth = (currentHealth * 0.6) + (dayAvg * 0.4);
-      
-      console.log(`✅ Day -${i} (${dateKey}): ACTIVE`);
-      console.log(`   - Attempts: ${dayStats.attempts}`);
-      console.log(`   - Day Score: ${dayAvg.toFixed(1)}% (${dayStats.obtained}/${dayStats.total})`);
-      console.log(`   - Health: ${oldHealth.toFixed(1)}% -> ${currentHealth.toFixed(1)}%`);
-    } else {
-      // INACTIVE DAY
-      const oldHealth = currentHealth;
-      currentHealth = Math.max(0, currentHealth * 0.95);
-      
-      // Only log inactive days if health is dropping significantly to keep log clean
-      // console.log(`💤 Day -${i} (${dateKey}): Inactive. Decay ${oldHealth.toFixed(1)}% -> ${currentHealth.toFixed(1)}%`);
-    }
-  }
-
-  const finalResult = Math.round(currentHealth);
-  console.log(`🏁 FINAL RESULT: ${finalResult}%`);
-  console.groupEnd();
-
-  return finalResult;
-}
-
-// --- HELPER: HH:MM:SS TIMER ---
-function CountdownTimer({ targetDate }: { targetDate: Date }) {
-  const [timeLeft, setTimeLeft] = useState<string>("--:--:--");
-
-  useEffect(() => {
-    const updateTimer = () => {
-      const now = new Date().getTime();
-      const distance = targetDate.getTime() - now;
-
-      if (distance < 0) {
-        setTimeLeft("00:00:00");
-        return;
-      }
-
-      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-      setTimeLeft(
-        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-      );
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [targetDate]);
-
-  return <span className="font-mono text-amber-600 dark:text-amber-400 font-bold tracking-widest text-lg">{timeLeft}</span>;
-}
-
-// --- SUB-COMPONENT: COUPON CARD ---
-function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [], recentTransactions = [] }: CouponCardProps) {
+export default function ProgressPage() {
+  // ✅ FIXED: Added isUserProfileLoading back to destructuring
+  const { user, userProfile, isUserProfileLoading } = useUser();
   const firestore = useFirestore();
-  const { user } = useUser();
-  const { toast } = useToast();
-  const [isClaiming, setIsClaiming] = useState(false);
-  const [justClaimed, setJustClaimed] = useState(false);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
 
-  const lastClaimedMillis = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
-  
-  const referenceTimeMillis = coupon.availableDate 
-      ? coupon.availableDate.toDate().getTime() 
-      : ((coupon as any).createdAt ? (coupon as any).createdAt.toMillis() : 0);
+  // --- 1. DATA FETCHING ---
 
-  const isTimeReady = !coupon.availableDate || Date.now() >= referenceTimeMillis;
-  const isAlreadyClaimed = lastClaimedMillis >= referenceTimeMillis;
-  const hasNotClaimedThisCycle = !isAlreadyClaimed;
+  const enrolledSubjectsQuery = useMemoFirebase(() => {
+    if (!firestore || !userProfile?.enrollments || userProfile.enrollments.length === 0) return null;
+    return query(collection(firestore, 'subjects'), where(documentId(), 'in', userProfile.enrollments.slice(0, 30)));
+  }, [firestore, userProfile?.enrollments]);
+  const { data: subjects, isLoading: subjectsLoading } = useCollection<Subject>(enrolledSubjectsQuery);
 
-  // --- TASK PROGRESS LOGIC ---
-  const { conditionsMet, taskProgress } = useMemo(() => {
-    if (!coupon.conditions || coupon.conditions.length === 0) {
-      return { conditionsMet: true, taskProgress: [] };
-    }
+  const attemptsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'worksheet_attempts'), where('userId', '==', user.uid), orderBy('attemptedAt', 'asc'));
+  }, [user, firestore]);
+  const { data: attempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(attemptsQuery);
 
-    const couponCreationTime = (coupon as any).createdAt?.toMillis?.() || 0;
-    
-    // 1. Attempts Filter (All history for Health)
-    const validAttempts = recentAttempts; 
+  const { data: units } = useCollection<Unit>(useMemoFirebase(() => firestore ? collection(firestore, 'units') : null, [firestore]));
+  const { data: categories } = useCollection<Category>(useMemoFirebase(() => firestore ? collection(firestore, 'categories') : null, [firestore]));
+  const { data: allWorksheets } = useCollection<Worksheet>(useMemoFirebase(() => firestore ? collection(firestore, 'worksheets') : null, [firestore]));
+  const { data: allQuestions } = useCollection<any>(useMemoFirebase(() => firestore ? collection(firestore, 'questions') : null, [firestore]));
 
-    // 2. Transactions Filter (Strictly AFTER coupon creation)
-    const validTransactions = recentTransactions.filter(t => {
-        const time = (t.createdAt as any)?.toMillis?.() || 0;
-        return time >= couponCreationTime;
+  // --- 2. DATA PROCESSING ---
+
+  const lookups = useMemo(() => {
+    if (!units || !categories || !allWorksheets || !allQuestions) return null;
+    return {
+        unitMap: new Map(units.map(u => [u.id, u])),
+        categoryMap: new Map(categories.map(c => [c.id, c])),
+        worksheetMap: new Map(allWorksheets.map(w => [w.id, w])),
+        questionMap: new Map(allQuestions.map(q => [q.id, q])),
+    };
+  }, [units, categories, allWorksheets, allQuestions]);
+
+  const subjectStats = useMemo(() => {
+    if (!subjects || !attempts || !lookups) return {};
+    const stats: Record<string, { total: number, obtained: number, count: number, health: number }> = {};
+    subjects.forEach(s => stats[s.id] = { total: 0, obtained: 0, count: 0, health: 80 });
+
+    const attemptsBySubjectByDate: Record<string, Map<string, { total: number; obtained: number }>> = {};
+
+    attempts.forEach(a => {
+        const w = lookups.worksheetMap.get(a.worksheetId);
+        if (w && stats[w.subjectId]) {
+            const data = getAttemptTotals(a, w, lookups.questionMap);
+            
+            if (data) {
+                const { score, total } = data;
+                stats[w.subjectId].obtained += score;
+                stats[w.subjectId].total += total;
+                stats[w.subjectId].count++;
+
+                // Health Data
+                if (!attemptsBySubjectByDate[w.subjectId]) attemptsBySubjectByDate[w.subjectId] = new Map();
+                if(a.attemptedAt) {
+                     const dateKey = format(a.attemptedAt.toDate(), 'yyyy-MM-dd');
+                     if (!attemptsBySubjectByDate[w.subjectId].has(dateKey)) {
+                         attemptsBySubjectByDate[w.subjectId].set(dateKey, { total: 0, obtained: 0 });
+                     }
+                     const dayData = attemptsBySubjectByDate[w.subjectId].get(dateKey)!;
+                     dayData.total += total;
+                     dayData.obtained += score;
+                }
+            }
+        }
     });
 
-    // 3. ✅ CALCULATE ACADEMIC HEALTH
-    const academicHealth = calculateAcademicHealth(recentAttempts);
+    Object.keys(stats).forEach(subjectId => {
+        const attemptsByDate = attemptsBySubjectByDate[subjectId];
+        if (!attemptsByDate) return;
 
-    let allMet = true;
-    
-    const progress = coupon.conditions.map(condition => {
-      let current = 0;
-      let label = "";
-
-      if (condition.type === 'minPracticeAssignments') {
-         label = "Complete Practice Exercises";
-         current = validAttempts.filter(a => {
-             const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice';
-             const isSelfCreated = w?.authorId === userProfile.id;
-             return isTypePractice || isSelfCreated;
-         }).length;
-
-      } else if (condition.type === 'minClassroomAssignments') {
-         label = "Complete Classroom Assignments";
-         current = validAttempts.filter(a => {
-             const w = worksheets.find(sheet => sheet.id === a.worksheetId);
-             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom' || (a as any).worksheetType?.toLowerCase() === 'classroom';
-             const isNotSelfCreated = w?.authorId !== userProfile.id;
-             return isTypeClassroom && isNotSelfCreated;
-         }).length;
-
-      } else if (condition.type === 'minGoldQuestions') {
-         label = "Solve Gold Questions";
-         current = validTransactions.filter(t => {
-             return t.currency?.toLowerCase() === 'gold' && t.type === 'earned';
-         }).length;
-
-      } else if (condition.type === 'minAcademicHealth') {
-         label = `Maintain Academic Health > ${condition.value}%`;
-         current = academicHealth;
-      
-      } else {
-         label = "Special Mission";
-      }
-
-      const isMet = current >= condition.value;
-      if (!isMet) allMet = false;
-
-      // Progress Bar Logic
-      let barPercent = 0;
-      if (condition.type === 'minAcademicHealth') {
-          barPercent = Math.min(100, (current / condition.value) * 100);
-      } else {
-          barPercent = Math.min(100, (current / condition.value) * 100);
-      }
-
-      return { 
-          label, 
-          current, 
-          required: condition.value, 
-          isMet, 
-          percentage: barPercent,
-          suffix: condition.type === 'minAcademicHealth' ? '%' : '' 
-      };
+        let healthScore = 80;
+        for (let i = 13; i >= 0; i--) {
+            const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
+            const dayStats = attemptsByDate.get(dateKey);
+            if (dayStats && dayStats.total > 0) {
+                // Calculation: Weighted Average
+                const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
+                healthScore = (healthScore * 0.6) + (dayAvg * 0.4);
+            } else {
+                // Decay on inactive days
+                healthScore = Math.max(0, healthScore * 0.95);
+            }
+        }
+        stats[subjectId].health = Math.round(healthScore);
     });
+
+    return stats;
+  }, [subjects, attempts, lookups]);
+
+  // --- DETAILED ANALYTICS ---
+  const analytics = useMemo(() => {
+    if (!attempts || !lookups || !selectedSubjectId) return null;
+    const { unitMap, categoryMap, worksheetMap, questionMap } = lookups;
+
+    const activeUnits = Array.from(unitMap.values()).filter(u => u.subjectId === selectedSubjectId);
+    const activeUnitIds = new Set(activeUnits.map(u => u.id));
     
-    return { conditionsMet: allMet, taskProgress: progress };
-  }, [coupon.conditions, recentAttempts, worksheets, recentTransactions, userProfile.id, coupon]);
+    // Initialize Metrics
+    const metricsMap = new Map<string, PerformanceMetric>();
+    activeUnits.forEach(u => metricsMap.set(`unit_${u.id}`, { id: u.id, name: u.name, type: 'unit', totalMarks: 0, obtainedMarks: 0, percentage: 0, attemptCount: 0 }));
+    
+    const attemptsByDate = new Map<string, { total: number, obtained: number }>();
+    
+    // Process every attempt
+    attempts.forEach(attempt => {
+        const worksheet = worksheetMap.get(attempt.worksheetId);
+        if (!worksheet || worksheet.subjectId !== selectedSubjectId) return;
 
-  const canClaim = isTimeReady && hasNotClaimedThisCycle && conditionsMet && !justClaimed;
+        const data = getAttemptTotals(attempt, worksheet, questionMap);
+        if (!data) return; // Skip invalid attempts to prevent bad data (500%)
 
-  let statusMessage = "Complete tasks to unlock.";
-  if (canClaim) statusMessage = "Your reward is unlocked!";
-  else if (!isTimeReady) statusMessage = "Coming soon! Opens in...";
-  else if (isAlreadyClaimed) statusMessage = "You have collected this reward.";
-  else if (!conditionsMet) statusMessage = "Complete missions to unlock.";
+        const { score, total } = data;
 
-  const handleClaim = async () => {
-    if (!firestore || !user) return;
-    setIsClaiming(true);
+        // 1. Health Graph Data
+        if (attempt.attemptedAt) {
+             const dateKey = format(attempt.attemptedAt.toDate(), 'yyyy-MM-dd');
+             if (!attemptsByDate.has(dateKey)) attemptsByDate.set(dateKey, { total: 0, obtained: 0 });
+             const d = attemptsByDate.get(dateKey)!;
+             d.total += total; d.obtained += score;
+        }
 
-    try {
-      const batch = writeBatch(firestore);
-      const userRef = doc(firestore, 'users', user.uid);
-      const transactionRef = doc(collection(firestore, 'transactions'));
+        // 2. Detailed Insights (Attribute Score to Unit/Category)
+        // We distribute the total worksheet score proportional to questions
+        worksheet.questions.forEach(qId => {
+            const question = questionMap.get(qId);
+            if (!question) return;
 
-      const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds', aiCredits: 'aiCredits' };
-      const field = fieldMap[coupon.rewardCurrency];
+            let qMax = 0;
+            let qScore = 0;
 
-      if(field) {
-        batch.update(userRef, {
-          [field]: increment(coupon.rewardAmount),
-          lastCouponClaimedAt: serverTimestamp(),
+            // Calculate raw totals for this question
+            question.solutionSteps?.forEach((step: any) => {
+                step.subQuestions.forEach((sub: any) => {
+                    const m = sub.marks || 0;
+                    qMax += m;
+                    const res = attempt.results?.[sub.id];
+                    if (res) {
+                        if (typeof res.score === 'number') qScore += res.score;
+                        else if (res.isCorrect) qScore += m;
+                    }
+                });
+            });
+
+            // Sanitizer for specific question
+            if (qScore > qMax && qMax > 0) qScore = (qScore / 100) * qMax;
+
+            // Determine Target Unit (Question > Worksheet)
+            const targetUnitId = question.unitId || worksheet.unitId;
+
+            // Attribute to Unit
+            if (targetUnitId && activeUnitIds.has(targetUnitId)) {
+                const m = metricsMap.get(`unit_${targetUnitId}`);
+                if (m) {
+                    m.attemptCount++;
+                    m.totalMarks += qMax;
+                    m.obtainedMarks += qScore;
+                }
+            }
+
+            // Attribute to Category
+            if (question.categoryId) {
+                 const c = categoryMap.get(question.categoryId);
+                 if (c && c.unitId && activeUnitIds.has(c.unitId)) {
+                     const key = `category_${c.id}`;
+                     if (!metricsMap.has(key)) {
+                         metricsMap.set(key, { id: c.id, name: c.name, type: 'category', parentName: unitMap.get(c.unitId)?.name, totalMarks: 0, obtainedMarks: 0, percentage: 0, attemptCount: 0 });
+                     }
+                     const mCat = metricsMap.get(key)!;
+                     mCat.attemptCount++;
+                     mCat.totalMarks += qMax;
+                     mCat.obtainedMarks += qScore;
+                 }
+            }
         });
-      }
+    });
 
-      batch.set(transactionRef, {
-        userId: user.uid, type: 'earned', description: `Coupon: ${coupon.name}`,
-        amount: coupon.rewardAmount, currency: coupon.rewardCurrency,
-        createdAt: serverTimestamp(), adminId: 'system',
-      });
+    // Calculate Final Percentages
+    metricsMap.forEach(m => { 
+        if (m.totalMarks > 0) {
+            m.percentage = Math.min(100, (m.obtainedMarks / m.totalMarks) * 100); 
+        }
+    });
 
-      await batch.commit();
-      confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });
-      toast({ title: 'Reward Claimed!', description: `You received ${coupon.rewardAmount} ${coupon.rewardCurrency}.` });
-      setJustClaimed(true); 
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message });
-    } finally {
-      setIsClaiming(false);
+    // Streak Logic
+    let currentStreak = 0;
+    const sortedDates = Array.from(attemptsByDate.keys()).sort();
+    if (sortedDates.length > 0) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+        const last = sortedDates[sortedDates.length - 1];
+        if (last === today || last === yesterday) {
+            currentStreak = 1;
+            for (let i = sortedDates.length - 2; i >= 0; i--) {
+                const diff = differenceInDays(new Date(sortedDates[i+1]), new Date(sortedDates[i]));
+                if (diff === 1) currentStreak++; else break;
+            }
+        }
     }
-  };
 
-  if (justClaimed || isAlreadyClaimed) {
+    const healthChartData = [];
+    let healthScore = 80; 
+    for (let i = 13; i >= 0; i--) {
+        const dateKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
+        const dayStats = attemptsByDate.get(dateKey);
+        if (dayStats && dayStats.total > 0) {
+            const dayAvg = Math.min(100, (dayStats.obtained / dayStats.total) * 100);
+            healthScore = (healthScore * 0.6) + (dayAvg * 0.4);
+        } else {
+            healthScore = Math.max(0, healthScore * 0.95);
+        }
+        healthChartData.push({ date: format(subDays(new Date(), i), 'MMM dd'), health: Math.round(healthScore) });
+    }
+
+    // Sort Buckets
+    const unitMetrics = { strengths: [] as PerformanceMetric[], weaknesses: [] as PerformanceMetric[], unexplored: [] as PerformanceMetric[] };
+    const catMetrics = { strengths: [] as PerformanceMetric[], weaknesses: [] as PerformanceMetric[], unexplored: [] as PerformanceMetric[] };
+    
+    metricsMap.forEach(m => {
+        const target = m.type === 'unit' ? unitMetrics : catMetrics;
+        if (m.attemptCount === 0) {
+            target.unexplored.push(m);
+        }
+        else if (m.percentage >= 75) {
+            target.strengths.push(m);
+        }
+        else if (m.percentage <= 50) {
+            target.weaknesses.push(m);
+        }
+    });
+    
+    const sortM = (list: PerformanceMetric[], asc = false) => list.sort((a, b) => asc ? a.percentage - b.percentage : b.percentage - a.percentage);
+    [unitMetrics, catMetrics].forEach(g => { sortM(g.strengths); sortM(g.weaknesses, true); });
+
+    return { 
+        streak: currentStreak, 
+        healthData: healthChartData, 
+        currentHealth: Math.round(healthScore), 
+        unitMetrics, 
+        catMetrics, 
+        activeAttemptsCount: attempts.filter(a => lookups.worksheetMap.get(a.worksheetId)?.subjectId === selectedSubjectId).length 
+    };
+  }, [attempts, lookups, selectedSubjectId]);
+
+
+  const isLoading = isUserProfileLoading || subjectsLoading || attemptsLoading || !lookups;
+
+  if (!selectedSubjectId) {
     return (
-      <Card className={cn(
-        "relative overflow-hidden border-none shadow-xl bg-gradient-to-br from-yellow-50 via-orange-50 to-yellow-100 dark:from-yellow-950/30 dark:to-orange-950/30",
-        justClaimed ? "animate-in fade-in zoom-in duration-500" : "opacity-80 grayscale-[0.3]"
-      )}>
-          <div className="absolute inset-0 bg-[url('/grid.svg')] bg-repeat opacity-10"></div>
-          <CardContent className="pt-8 pb-8 px-8 text-center relative z-10 space-y-6">
-              <div className="mx-auto bg-yellow-100 dark:bg-yellow-900/50 p-4 rounded-full w-fit shadow-inner ring-4 ring-yellow-200 dark:ring-yellow-800">
-                  <Trophy className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
-              </div>
-              <div className="space-y-2">
-                  <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">
-                      CONGRATULATIONS!
-                  </h2>
-                  <p className="text-lg font-medium text-slate-700 dark:text-slate-200">
-                      You earned <span className="font-bold text-yellow-600">{coupon.rewardAmount} {coupon.rewardCurrency}</span> from this coupon.
-                  </p>
-              </div>
-              {taskProgress.length > 0 && (
-                <div className="grid gap-2 text-left bg-white/40 dark:bg-black/20 p-4 rounded-xl">
-                   <span className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1 block">Completed Missions</span>
-                    {taskProgress.map((task, idx) => (
-                        <div key={idx} className="flex items-center gap-3 text-sm">
-                            <div className="bg-green-100 dark:bg-green-900/50 p-1 rounded-full">
-                                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+        <div>
+          <PageHeader title="My Progress" description="Here is an overview of your progress in each subject." />
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <>
+              {subjects && subjects.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {subjects.map((subject) => {
+                      const stats = subjectStats[subject.id];
+                      const health = stats?.health ?? 0;
+                      const healthColor = health > 75 ? "bg-green-500" : health > 50 ? "bg-yellow-500" : "bg-primary";
+                      return (
+                        <Card key={subject.id}>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" />{subject.name}</CardTitle>
+                            <CardDescription>{stats?.count || 0} Worksheets Completed</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                             <div className="space-y-3">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Academic Health</span>
+                                    <span className="font-bold">{health}%</span>
+                                </div>
+                                <Progress value={health} className={cn("h-2 [&>div]:transition-all [&>div]:duration-500")} indicatorClassName={healthColor} />
                             </div>
-                            <span className="font-semibold text-slate-700 dark:text-slate-300 line-through decoration-green-500/50">
-                                {task.label}
-                            </span>
-                        </div>
-                    ))}
+                          </CardContent>
+                          <CardFooter>
+                              <Button variant="secondary" className="w-full" onClick={() => setSelectedSubjectId(subject.id)}>View Details</Button>
+                          </CardFooter>
+                        </Card>
+                      );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-48 border-2 border-dashed rounded-lg">
+                    <p className="text-muted-foreground">You are not enrolled in any subjects yet.</p>
                 </div>
               )}
-          </CardContent>
-          <CardFooter className="justify-center pb-8 pt-0">
-             {justClaimed ? (
-                <Button variant="outline" className="border-yellow-300 bg-yellow-50 hover:bg-yellow-100 text-yellow-800" onClick={() => window.location.reload()}>
-                  <Sparkles className="mr-2 h-4 w-4" /> Awesome!
-                </Button>
-             ) : (
-                <Badge variant="outline" className="border-yellow-600 text-yellow-700 bg-yellow-50 px-4 py-1">
-                    Reward Collected
-                </Badge>
-             )}
-          </CardFooter>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="relative overflow-hidden border-2 border-dashed border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-white dark:from-slate-900 dark:to-slate-950 shadow-lg group hover:shadow-xl transition-all duration-300">
-      <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-black rounded-full border-r-2 border-indigo-200 dark:border-indigo-800" />
-      <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-black rounded-full border-l-2 border-indigo-200 dark:border-indigo-800" />
-      
-      <CardHeader className="pb-2 text-center relative z-10">
-        <div className="mx-auto bg-indigo-100 dark:bg-indigo-900/50 p-3 rounded-full w-fit mb-2">
-            <Ticket className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+            </>
+          )}
         </div>
-        <CardTitle className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-            {coupon.name}
-        </CardTitle>
-        <CardDescription className="text-base font-medium">
-            {statusMessage}
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-6 relative z-10 px-8">
-        {coupon.availableDate && (
-           <div className={cn("rounded-xl border p-4 transition-colors", !isTimeReady ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900" : "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900")}>
-             <div className={cn("text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2", !isTimeReady ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400")}>
-               {!isTimeReady ? <><Clock className="h-3 w-3" /> Coming Soon</> : "Time Requirement"}
-             </div>
-             <div className="text-center mt-1">
-               {!isTimeReady ? <CountdownTimer targetDate={coupon.availableDate.toDate()} /> : <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-400">Available Now!</p>}
-             </div>
-           </div>
-        )}
-
-        {taskProgress.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-                <Star className="h-4 w-4 text-indigo-500" />
-                <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">Mission Requirements</h4>
-            </div>
-            <div className="space-y-3">
-              {taskProgress.map((task, idx) => (
-                <div key={idx} className="bg-white dark:bg-slate-900/50 p-3 rounded-lg border shadow-sm">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className={cn("text-sm font-bold block", task.isMet ? "text-emerald-700 dark:text-emerald-400" : "text-slate-700 dark:text-slate-200")}>{task.label}</span>
-                    {task.isMet ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">Done</Badge> : <Badge variant="outline" className="text-indigo-600 border-indigo-200 bg-indigo-50">Pending</Badge>}
-                  </div>
-                  <Progress value={task.percentage} className={cn("h-2", task.isMet ? "bg-emerald-100" : "")} />
-                  <div className="mt-2 text-xs flex justify-end">
-                    {task.isMet ? 
-                        <span className="text-emerald-600 font-bold flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" /> Eligible</span> 
-                        : 
-                        <span className="text-indigo-600 font-bold flex items-center gap-1.5 animate-pulse">
-                            {task.suffix ? 
-                                <><Activity className="h-3.5 w-3.5" /> Current: {task.current}{task.suffix}</> 
-                                : <><Rocket className="h-3.5 w-3.5" /> {task.required - task.current} to go!</>
-                            }
-                        </span>
-                    }
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
-      
-      <Separator className="bg-indigo-100 dark:bg-indigo-900" />
-      
-      <CardFooter className="pt-6 pb-6 bg-indigo-50/50 dark:bg-indigo-950/30 flex justify-center">
-        <Button 
-            size="lg" 
-            onClick={handleClaim} 
-            disabled={!canClaim || isClaiming} 
-            className={cn("w-full font-bold text-lg h-14 shadow-xl transition-all", canClaim ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed")}
-        >
-          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Coming Soon</>}
-        </Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
-// --- MAIN COMPONENT ---
-export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
-  const firestore = useFirestore();
-
-  // 1. Fetch Coupons
-  const couponsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'coupons'), orderBy('availableDate', 'asc'));
-  }, [firestore]);
-  const { data: coupons, isLoading: couponsLoading } = useCollection<Coupon>(couponsQuery);
-
-  // 2. Fetch Attempts - INCREASED LIMIT TO 300 TO FIX 14-DAY CALCULATION
-  const recentAttemptsQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile.id) return null;
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    return query(
-      collection(firestore, 'worksheet_attempts'),
-      where('userId', '==', userProfile.id),
-      where('attemptedAt', '>', oneMonthAgo),
-      orderBy('attemptedAt', 'desc'), 
-      limit(300) 
-    );
-  }, [firestore, userProfile.id]);
-  const { data: recentAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
-
-  // 3. FETCH TRANSACTIONS (For Gold Mission)
-  const transactionsQuery = useMemoFirebase(() => {
-    if (!firestore || !userProfile.id) return null;
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    return query(
-      collection(firestore, 'transactions'),
-      where('userId', '==', userProfile.id),
-      where('createdAt', '>', oneMonthAgo),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
-  }, [firestore, userProfile.id]);
-  const { data: recentTransactions, isLoading: transactionsLoading } = useCollection<Transaction>(transactionsQuery);
-
-  // 4. Robust Worksheet Fetching
-  const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
-  
-  useEffect(() => {
-    const fetchWorksheets = async () => {
-        if (!firestore || !recentAttempts || recentAttempts.length === 0) return;
-        const allIds = [...new Set(recentAttempts.map(a => a.worksheetId))];
-        const chunks = [];
-        for (let i = 0; i < allIds.length; i += 30) chunks.push(allIds.slice(i, i + 30));
-
-        try {
-            const results: Worksheet[] = [];
-            for (const chunk of chunks) {
-                if (chunk.length === 0) continue;
-                const q = query(collection(firestore, 'worksheets'), where(documentId(), 'in', chunk));
-                const snap = await getDocs(q);
-                snap.forEach(doc => results.push({ id: doc.id, ...doc.data() } as Worksheet));
-            }
-            setWorksheets(results);
-        } catch (e) {
-            console.error(e);
-        }
-    };
-    fetchWorksheets();
-  }, [firestore, recentAttempts]);
-
-  // --- SORTING LOGIC ---
-  const sortedCoupons = useMemo(() => {
-    if (!coupons) return [];
-
-    const getRank = (c: Coupon) => {
-        const lastClaimed = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
-        const refTime = c.availableDate ? c.availableDate.toDate().getTime() : ((c as any).createdAt?.toMillis?.() || 0);
-        
-        if (lastClaimed >= refTime) return 3;
-
-        const isTimeReady = !c.availableDate || Date.now() >= refTime;
-        
-        let tasksDone = true;
-        
-        // Calculate health for sorting
-        const academicHealth = calculateAcademicHealth(recentAttempts || []);
-
-        if (c.conditions && c.conditions.length > 0) {
-           const validAttempts = recentAttempts || [];
-           const validTransactions = recentTransactions || [];
-           
-           for (const cond of c.conditions) {
-              const check = (w: Worksheet | undefined, a: WorksheetAttempt, t: string) => {
-                  const typeMatch = w?.worksheetType?.toLowerCase() === t.toLowerCase() || (a as any).worksheetType?.toLowerCase() === t.toLowerCase();
-                  if (t === 'practice') return typeMatch || w?.authorId === userProfile.id;
-                  if (t === 'classroom') return typeMatch && w?.authorId !== userProfile.id;
-                  return false;
-              };
-
-              let count = 0;
-              if (cond.type === 'minClassroomAssignments') {
-                 count = validAttempts.filter(a => check((worksheets || []).find(w => w.id === a.worksheetId), a, 'classroom')).length;
-              } else if (cond.type === 'minPracticeAssignments') {
-                 count = validAttempts.filter(a => check((worksheets || []).find(w => w.id === a.worksheetId), a, 'practice')).length;
-              } else if (cond.type === 'minGoldQuestions') {
-                 count = validTransactions.filter(t => t.currency?.toLowerCase() === 'gold' && t.type === 'earned').length;
-              } else if (cond.type === 'minAcademicHealth') {
-                 if (academicHealth < cond.value) { tasksDone = false; break; }
-                 continue; 
-              }
-
-              if (count < cond.value) { tasksDone = false; break; }
-           }
-        }
-
-        if (isTimeReady && tasksDone) return 1;
-        return 2;
-    };
-
-    return [...coupons].sort((a, b) => getRank(a) - getRank(b));
-  }, [coupons, userProfile, recentAttempts, worksheets, recentTransactions]);
-
-  const isLoading = couponsLoading || attemptsLoading || transactionsLoading;
-
-  if(isLoading) {
-    return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+      );
   }
 
-  if(!sortedCoupons || sortedCoupons.length === 0) {
-    return (
-      <Card className="text-center p-8 border-dashed">
-        <CardHeader><CardTitle>No Coupons Available</CardTitle></CardHeader>
-        <CardContent><p className="text-muted-foreground">Check back later for new rewards and promotions!</p></CardContent>
-      </Card>
-    )
-  }
+  if (!analytics || !userProfile) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  const selectedSubjectName = subjects?.find(s => s.id === selectedSubjectId)?.name || 'Subject';
+
+  const InsightGrid = ({ data }: { data: typeof analytics.unitMetrics }) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
+        <Card className="border-l-4 border-l-green-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><TrendingUp className="h-5 w-5 text-green-600" /> Strengths</CardTitle><CardDescription>Score &ge; 75%</CardDescription></CardHeader><CardContent>{data.strengths.length > 0 ? (<div className="space-y-4">{data.strengths.slice(0, 5).map(s => (<div key={s.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{s.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{s.type}</span>{s.type === 'category' && s.parentName && (<><span>•</span><span className="truncate">{s.parentName}</span></>)}</div></div><Badge className="bg-green-100 text-green-700 border-none">{Math.round(s.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">Keep practicing to find your strengths!</div>}</CardContent></Card>
+        <Card className="border-l-4 border-l-red-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><AlertTriangle className="h-5 w-5 text-red-600" /> Weaknesses</CardTitle><CardDescription>Score &le; 50%</CardDescription></CardHeader><CardContent>{data.weaknesses.length > 0 ? (<div className="space-y-4">{data.weaknesses.slice(0, 5).map(w => (<div key={w.id} className="flex justify-between items-start"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium">{w.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider">{w.type}</span>{w.type === 'category' && w.parentName && (<><span>•</span><span className="truncate">{w.parentName}</span></>)}</div></div><Badge className="bg-red-100 text-red-700 border-none">{Math.round(w.percentage)}%</Badge></div>))}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">No major weaknesses found!</div>}</CardContent></Card>
+        <Card className="border-l-4 border-l-slate-500 shadow-sm"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Compass className="h-5 w-5 text-slate-600" /> Unexplored</CardTitle><CardDescription>Not yet attempted</CardDescription></CardHeader><CardContent>{data.unexplored.length > 0 ? (<div className="space-y-4">{data.unexplored.slice(0, 5).map(u => (<div key={u.id} className="flex justify-between items-center"><div className="flex flex-col truncate w-2/3"><span className="text-sm font-medium text-muted-foreground">{u.name}</span><div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><span className="uppercase font-bold tracking-wider opacity-70">{u.type}</span>{u.type === 'category' && u.parentName && (<><span>•</span><span className="truncate opacity-70">{u.parentName}</span></>)}</div></div><ArrowDownRight className="h-4 w-4 text-muted-foreground opacity-50" /></div>))}{data.unexplored.length > 5 && <p className="text-xs text-center text-muted-foreground pt-2">+{data.unexplored.length - 5} more</p>}</div>) : <div className="text-sm text-muted-foreground py-4 text-center">All topics explored!</div>}</CardContent></Card>
+    </div>
+  );
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      {sortedCoupons.map(coupon => (
-        <CouponCard 
-            key={coupon.id} 
-            coupon={coupon} 
-            userProfile={userProfile} 
-            recentAttempts={recentAttempts ?? []} 
-            worksheets={worksheets ?? []}
-            recentTransactions={recentTransactions ?? []}
-        />
-      ))}
+    <div className="p-6 max-w-7xl mx-auto space-y-8">
+      <div className="flex flex-col gap-4">
+        <Button variant="ghost" className="w-fit -ml-2 text-muted-foreground" onClick={() => setSelectedSubjectId(null)}><ChevronLeft className="mr-2 h-4 w-4" /> Back to Subjects</Button>
+        <div><h1 className="text-3xl font-bold tracking-tight">{selectedSubjectName} Progress</h1><p className="text-muted-foreground">Detailed insights for {selectedSubjectName}</p></div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-gradient-to-br from-orange-50 to-white border-orange-200"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Flame className="h-4 w-4 text-orange-500" /> Streak</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold text-orange-600 flex items-baseline gap-2">{analytics.streak} <span className="text-lg font-normal text-muted-foreground">days</span></div><p className="text-xs text-muted-foreground mt-2">Active days.</p></CardContent></Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-blue-500" /> Health</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold text-blue-600 flex items-baseline gap-2">{analytics.currentHealth}%</div><Progress value={analytics.currentHealth} className="h-2 mt-3 [&>div]:bg-blue-600" /><p className="text-xs text-muted-foreground mt-2">Health score.</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Trophy className="h-4 w-4 text-yellow-500" /> Worksheets</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold text-foreground">{analytics.activeAttemptsCount}</div><p className="text-xs text-muted-foreground mt-2">Completed.</p></CardContent></Card>
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle>Health Trend</CardTitle><CardDescription>14-day history.</CardDescription></CardHeader>
+        <CardContent className="h-[300px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={analytics.healthData}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tick={{fontSize: 12}} tickLine={false} axisLine={false} minTickGap={30} /><YAxis domain={[0, 100]} tick={{fontSize: 12}} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}%`} /><Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} /><Line type="monotone" dataKey="health" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, fill: "#2563eb", strokeWidth: 0 }} activeDot={{ r: 6 }} /></LineChart></ResponsiveContainer></CardContent>
+      </Card>
+
+      <Tabs defaultValue="unit" className="w-full">
+        <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-semibold">Detailed Insights</h2><TabsList><TabsTrigger value="unit" className="flex items-center gap-2"><Layers className="h-4 w-4"/> By Unit</TabsTrigger><TabsTrigger value="category" className="flex items-center gap-2"><Tag className="h-4 w-4"/> By Category</TabsTrigger></TabsList></div>
+        <TabsContent value="unit"><InsightGrid data={analytics.unitMetrics} /></TabsContent>
+        <TabsContent value="category"><InsightGrid data={analytics.catMetrics} /></TabsContent>
+      </Tabs>
+
+      <StudentAttemptHistory student={userProfile} />
     </div>
-  )
+  );
 }
