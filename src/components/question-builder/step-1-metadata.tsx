@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useEffect, useState, Dispatch, SetStateAction } from 'react';
-import { useSearchParams } from 'next/navigation'; 
+import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Question, Class, Subject, Unit, Category, CurrencyType } from "@/types";
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { RichTextEditor } from '../rich-text-editor';
-import { Upload } from 'lucide-react';
+import { Upload, Sparkles, Loader2, AlertCircle } from 'lucide-react'; // Added AlertCircle
 
 interface Step1Props {
   question: Question;
@@ -20,10 +21,11 @@ interface Step1Props {
 
 export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1Props) {
   const firestore = useFirestore();
-  const searchParams = useSearchParams(); 
+  const searchParams = useSearchParams();
   
-  // Force Refresh State
   const [formVersion, setFormVersion] = useState(0);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // --- AUTO-SELECT FROM URL ---
   useEffect(() => {
@@ -40,6 +42,77 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
     }
   }, [searchParams, setQuestion, question.classId]);
 
+  // --- HELPER: MAP JSON TO QUESTION STATE ---
+  const mapJsonToState = (json: any) => {
+     const mappedQuestion: Question = {
+        id: question.id,
+        status: 'draft',
+        
+        // --- CONTENT (Take from AI/File) ---
+        name: json.name || '',
+        mainQuestionText: json.mainQuestionText || '',
+        authorId: json.authorId || '',
+        
+        // --- METADATA (STRICTLY KEEP CURRENT USER SELECTION) ---
+        // We ignore the incoming JSON for these fields as requested
+        classId: question.classId,
+        subjectId: question.subjectId,
+        unitId: question.unitId,
+        categoryId: question.categoryId,
+        
+        // --- SETTINGS (Take from AI/File, fallback to defaults) ---
+        currencyType: json.currencyType || 'spark',
+        gradingMode: json.gradingMode || 'system',
+        aiFeedbackPatterns: json.aiFeedbackPatterns || [],
+        
+        // --- STEPS (Take from AI/File) ---
+        solutionSteps: Array.isArray(json.solutionSteps) ? json.solutionSteps : [],
+        aiRubric: json.aiRubric || undefined,
+        
+        createdAt: { seconds: 0, nanoseconds: 0 },
+        updatedAt: { seconds: 0, nanoseconds: 0 }
+    };
+
+    setQuestion(mappedQuestion);
+    setFormVersion(v => v + 1);
+  }
+
+  // --- AI GENERATOR FUNCTION (FIXED ERROR HANDLING) ---
+  const handleAiGenerate = async () => {
+    if (!aiPrompt.trim()) {
+        alert("Please enter a problem description first.");
+        return;
+    }
+
+    setIsGenerating(true);
+    try {
+        const response = await fetch('/api/generate-question', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: aiPrompt })
+        });
+
+        // ✅ READ THE ACTUAL ERROR MESSAGE FROM SERVER
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || "Generation failed on server.");
+        }
+
+        // Use shared mapper logic
+        mapJsonToState(data);
+        
+        // alert(`AI Generation Successful!\n\nCreated: ${data.name}`);
+        setAiPrompt(''); 
+    } catch (error: any) {
+        console.error("AI Error:", error);
+        // Show the actual error message to help debug
+        alert(`Error: ${error.message}`);
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
   // --- JSON FILE READER ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -50,49 +123,12 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
       try {
         const content = event.target?.result as string;
         const json = JSON.parse(content);
-
-        // Explicitly Map Data
-        const mappedQuestion: Question = {
-            id: question.id, 
-            status: 'draft',
-            
-            // --- CONTENT (Import this) ---
-            name: json.name || '', 
-            mainQuestionText: json.mainQuestionText || '',
-            authorId: json.authorId || '',
-            
-            // --- METADATA (KEEP EXISTING SELECTION) ---
-            // We ignore the JSON file here and keep what is currently selected in the UI
-            classId: question.classId,
-            subjectId: question.subjectId,
-            unitId: question.unitId,
-            categoryId: question.categoryId,
-
-            // --- SETTINGS (Import this) ---
-            currencyType: json.currencyType || 'spark',
-            gradingMode: json.gradingMode || 'system',
-            aiFeedbackPatterns: json.aiFeedbackPatterns || [],
-
-            // --- STEPS (Import this) ---
-            solutionSteps: Array.isArray(json.solutionSteps) ? json.solutionSteps : [],
-            aiRubric: json.aiRubric || undefined, // Also import rubric if present
-
-            createdAt: { seconds: 0, nanoseconds: 0 },
-            updatedAt: { seconds: 0, nanoseconds: 0 }
-        };
-
-        setQuestion(mappedQuestion);
-
-        // Increment version to force-refresh text inputs (Name/Editor)
-        setFormVersion(v => v + 1);
-        
-        alert(`Import Successful!\n\nName: ${mappedQuestion.name}\nSteps Found: ${mappedQuestion.solutionSteps.length}\n\n(Metadata preserved)`);
-        
-        e.target.value = ''; 
-
+        mapJsonToState(json); 
+        alert(`Import Successful!\n\nName: ${json.name}`);
+        e.target.value = '';
       } catch (error) {
         console.error("Import Error:", error);
-        alert("Failed to parse JSON. Please check the file format.");
+        alert("Failed to parse JSON.");
       }
     };
     reader.readAsText(file);
@@ -115,8 +151,8 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
 
   const allCategoriesQuery = useMemoFirebase(() => {
       if (!firestore) return null;
-      return collection(firestore, 'categories'); 
-  }, [firestore]);
+      return collection(firestore, 'categories');
+   }, [firestore]);
   const { data: allCategories } = useCollection<Category>(allCategoriesQuery);
 
   const categoriesForUnit = React.useMemo(() => {
@@ -131,7 +167,7 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
       question.classId && 
       question.subjectId && 
       question.unitId && 
-      question.categoryId &&
+      question.categoryId && 
       question.currencyType
   );
 
@@ -154,6 +190,37 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
   return (
     <div className="space-y-6">
       
+      {/* AI GENERATOR SECTION */}
+      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-5 w-5 text-indigo-600" />
+            <h3 className="font-semibold text-slate-800">AI Quick Generator</h3>
+        </div>
+        <div className="flex gap-2 items-start">
+            <Textarea 
+                placeholder="Describe your problem here... (e.g., 'A car travels 100km at 50km/h...')" 
+                className="bg-white min-h-[80px]"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+            />
+            <Button 
+                onClick={handleAiGenerate} 
+                disabled={isGenerating || !aiPrompt.trim()}
+                className="h-[80px] w-32 bg-indigo-600 hover:bg-indigo-700"
+            >
+                {isGenerating ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating</>
+                ) : (
+                    "Generate"
+                )}
+            </Button>
+        </div>
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            This will preserve your current Class/Subject selection.
+        </p>
+      </div>
+
       <div className="flex justify-between items-center border-b pb-4">
         <div>
           <h2 className="text-xl font-bold">Metadata</h2>
@@ -165,21 +232,21 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
                 <div><Upload className="mr-2 h-4 w-4" /> Import JSON</div>
             </Button>
           </Label>
-          <Input 
-            id="json-upload" 
-            type="file" 
-            accept=".json" 
-            className="hidden" 
-            onChange={handleFileUpload} 
+          <Input
+            id="json-upload"
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleFileUpload}
           />
         </div>
       </div>
 
       <div className="space-y-2">
         <Label>Question Name <span className="text-red-500">*</span></Label>
-        <Input 
-          key={`name-${formVersion}`} 
-          value={question.name || ''} 
+        <Input
+          key={`name-${formVersion}`}
+          value={question.name || ''}
           onChange={(e) => onFieldChange('name', e.target.value)}
           placeholder="Internal reference name (e.g., 'Newton 2nd Law Basic')"
         />
@@ -195,7 +262,6 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* DROPDOWNS: NO KEY NEEDED NOW as data is not being reset by import */}
         <div className="space-y-2">
           <Label>Class</Label>
           <Select 
@@ -247,9 +313,9 @@ export function Step1Metadata({ question, setQuestion, onValidityChange }: Step1
       <div className="space-y-2">
         <Label>Currency Reward Type</Label>
         <Select 
-            key={`curr-${formVersion}`}
-            value={question.currencyType || 'spark'} 
-            onValueChange={(val: CurrencyType) => onFieldChange('currencyType', val)}
+           key={`curr-${formVersion}`}
+           value={question.currencyType || 'spark'} 
+           onValueChange={(val: CurrencyType) => onFieldChange('currencyType', val)}
         >
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>

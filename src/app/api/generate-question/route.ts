@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Ensure Node runtime
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// Reuse your robust JSON extractor
+// --- LIST OF MODELS TO TRY IN ORDER ---
+// We try the newest 2.0 first. If 404, we fallback to specific 1.5 versions.
+const MODELS = [
+  "gemini-2.0-flash-exp",   // Newest, smartest, fast
+  "gemini-1.5-flash",       // Standard alias
+  "gemini-1.5-flash-001",   // Specific stable version (often fixes 404s)
+  "gemini-1.5-pro",         // Slower but reliable fallback
+];
+
+// Helper: Extract JSON from markdown
 function extractJSON(text: string): string {
   try {
     JSON.parse(text);
@@ -23,7 +30,6 @@ function extractJSON(text: string): string {
   }
 }
 
-// The Prompt Definitions
 const SYSTEM_INSTRUCTION = `
 **Role:** You are a specialized JSON Data Generator for a React Learning Management System. 
 **Output:** RAW JSON ONLY. No markdown. No explanations.
@@ -140,21 +146,50 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    // Configure Model (Using Flash for speed/cost, same as your grading)
-    const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        generationConfig: { 
-            responseMimeType: "application/json",
-            temperature: 0.2 // Low temp for consistent structure
-        } 
-    });
+    // --- ROBUST MODEL LOOP ---
+    // Try models one by one until success
+    let lastError = null;
+    let textResponse = null;
 
-    const result = await model.generateContent([
-        SYSTEM_INSTRUCTION, 
-        `Input Problem: ${prompt}`
-    ]);
+    for (const modelName of MODELS) {
+      try {
+        console.log(`Attempting generation with model: ${modelName}`);
+        
+        const model = genAI.getGenerativeModel({ 
+            model: modelName,
+            generationConfig: { 
+                responseMimeType: "application/json",
+                temperature: 0.2 
+            } 
+        });
 
-    const textResponse = result.response.text();
+        const result = await model.generateContent([
+            SYSTEM_INSTRUCTION, 
+            `Input Problem: ${prompt}`
+        ]);
+
+        textResponse = result.response.text();
+        
+        // If we get here, it worked! Break the loop.
+        if (textResponse) break;
+
+      } catch (error: any) {
+        console.warn(`Model ${modelName} failed:`, error.message);
+        lastError = error;
+        // Continue to next model...
+      }
+    }
+
+    // If all models failed
+    if (!textResponse) {
+      console.error("All models failed. Last error:", lastError);
+      return NextResponse.json({ 
+        error: "AI Service Unavailable. All models failed.", 
+        details: lastError?.message 
+      }, { status: 503 });
+    }
+
+    // Process Success
     const cleanJson = extractJSON(textResponse);
 
     try {
