@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -9,15 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Gift, Loader2, Lock, CheckCircle2, Rocket, Ticket, Star, Trophy, Sparkles, Clock } from 'lucide-react';
+import { Gift, Loader2, Lock, CheckCircle2, Rocket, Ticket, Star, Trophy, Sparkles, Clock, Activity } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy, limit, getDocs } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { subDays } from 'date-fns';
+import { format, subDays, startOfDay, isSameDay } from 'date-fns';
 
-// Define Transaction Interface Locally (to ensure safety)
+// Define Transaction Interface Locally
 interface Transaction {
   id: string;
   userId: string;
@@ -37,7 +35,64 @@ interface CouponCardProps {
   userProfile: User;
   recentAttempts?: WorksheetAttempt[];
   worksheets?: Worksheet[];
-  recentTransactions?: Transaction[]; 
+  recentTransactions?: Transaction[];
+}
+
+// --- HELPER: ACADEMIC HEALTH ALGORITHM (With Debugging) ---
+function calculateAcademicHealth(attempts: WorksheetAttempt[]): number {
+  if (!attempts || attempts.length === 0) return 0;
+
+  // 1. Group attempts by Date (YYYY-MM-DD)
+  const dailyStats: Record<string, { totalPct: number; count: number }> = {};
+
+  attempts.forEach((a) => {
+    if (!a.attemptedAt) return;
+    // Handle Timestamp or Date object
+    const dateObj = (a.attemptedAt as any).toDate ? (a.attemptedAt as any).toDate() : new Date((a.attemptedAt as any));
+    const dateKey = format(dateObj, 'yyyy-MM-dd');
+
+    const score = (a as any).score || (a as any).obtainedMarks || 0;
+    // Check multiple fields for max score to be safe
+    const max = (a as any).maxScore || (a as any).totalMarks || (a as any).totalPoints || 100; 
+    
+    // Safety: Ensure max is not 0 to avoid Infinity
+    const safeMax = max === 0 ? 100 : max;
+    const pct = (score / safeMax) * 100;
+
+    if (!dailyStats[dateKey]) {
+      dailyStats[dateKey] = { totalPct: 0, count: 0 };
+    }
+    dailyStats[dateKey].totalPct += pct;
+    dailyStats[dateKey].count += 1;
+  });
+
+  // 2. Rolling Calculation (14 Days)
+  // We use a baseline of 50, but if the user has NO history in the window, it might decay.
+  let currentHealth = 50; 
+  const today = new Date();
+
+  // DEBUG: Track the calculation
+  // console.log("--- Health Calculation Start (Baseline: 50) ---");
+
+  // Iterate from 13 days ago -> Today
+  for (let i = 13; i >= 0; i--) {
+    const targetDate = subDays(today, i);
+    const dateKey = format(targetDate, 'yyyy-MM-dd');
+    const dayData = dailyStats[dateKey];
+
+    if (dayData) {
+      // Active Day: Weighted Avg
+      const dayAvg = dayData.totalPct / dayData.count;
+      currentHealth = (currentHealth * 0.6) + (dayAvg * 0.4);
+      // console.log(`Day -${i} (${dateKey}): Active. Avg: ${dayAvg.toFixed(1)}%. New Health: ${currentHealth.toFixed(1)}%`);
+    } else {
+      // Inactive Day: Decay
+      currentHealth = currentHealth * 0.95;
+      // console.log(`Day -${i} (${dateKey}): Inactive. Decay to: ${currentHealth.toFixed(1)}%`);
+    }
+  }
+
+  return Math.round(currentHealth);
 }
 
 // --- HELPER: HH:MM:SS TIMER ---
@@ -97,43 +152,26 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
 
     const couponCreationTime = (coupon as any).createdAt?.toMillis?.() || 0;
     
-    // 1. Filter Attempts by Time (For Practice/Classroom)
-    const validAttempts = recentAttempts.filter(a => {
-        const t = (a.attemptedAt as any)?.toMillis?.() || 0;
-        return t >= couponCreationTime;
-    });
+    // 1. Attempts Filter (All history for Health)
+    const validAttempts = recentAttempts; 
 
-    // 2. Filter Transactions by Time (For Gold Mission)
+    // 2. Transactions Filter (Strictly AFTER coupon creation)
     const validTransactions = recentTransactions.filter(t => {
         const time = (t.createdAt as any)?.toMillis?.() || 0;
         return time >= couponCreationTime;
     });
-    
-    // 3. Calculate Overall Academic Health
-    let totalScore = 0;
-    let totalPossible = 0;
-    validAttempts.forEach(attempt => {
-        const worksheet = worksheets.find(w => w.id === attempt.worksheetId);
-        if (worksheet) {
-            worksheet.questions.forEach(qId => {
-                const question = (worksheets as any).find((q: any) => q.id === qId);
-                if (question) {
-                    const marks = question.solutionSteps?.reduce((sum: number, s: any) => sum + s.subQuestions.reduce((subSum: number, sub: any) => subSum + (sub.marks || 0), 0), 0) || 0;
-                    totalPossible += marks;
 
-                    const results = attempt.results || {};
-                    question.solutionSteps?.forEach((step: any) => {
-                        step.subQuestions.forEach((sub: any) => {
-                            if (results[sub.id]?.isCorrect) {
-                                totalScore += sub.marks || 0;
-                            }
-                        });
-                    });
-                }
-            });
-        }
-    });
-    const academicHealth = totalPossible > 0 ? (totalScore / totalPossible) * 100 : 0;
+    // 3. ✅ CALCULATE ACADEMIC HEALTH
+    // We calculate it ONCE here so all conditions use the same value
+    const academicHealth = calculateAcademicHealth(recentAttempts);
+
+    // DEBUG LOGS SPECIFIC TO HEALTH
+    const hasHealthCondition = coupon.conditions.some(c => c.type === 'minAcademicHealth');
+    if (hasHealthCondition) {
+        console.groupCollapsed(`[DEBUG] Health Check for: ${coupon.name}`);
+        console.log(`Loaded Attempts for Calc: ${recentAttempts.length}`);
+        console.log(`Calculated Health: ${academicHealth}%`);
+    }
 
     let allMet = true;
     
@@ -142,29 +180,34 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
       let label = "";
 
       if (condition.type === 'minPracticeAssignments') {
-         label = "Complete Assignments in My Practice Zone";
+         label = "Complete Practice Exercises";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
+             const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice';
              const isSelfCreated = w?.authorId === userProfile.id;
-             return isSelfCreated;
+             return isTypePractice || isSelfCreated;
          }).length;
+
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
+             const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom' || (a as any).worksheetType?.toLowerCase() === 'classroom';
              const isNotSelfCreated = w?.authorId !== userProfile.id;
-             return isNotSelfCreated;
+             return isTypeClassroom && isNotSelfCreated;
          }).length;
+
       } else if (condition.type === 'minGoldQuestions') {
          label = "Solve Gold Questions";
          current = validTransactions.filter(t => {
-             const isGold = t.currency?.toLowerCase() === 'gold';
-             const isEarned = t.type === 'earned';
-             return isGold && isEarned;
+             return t.currency?.toLowerCase() === 'gold' && t.type === 'earned';
          }).length;
+
       } else if (condition.type === 'minAcademicHealth') {
-          label = `Raise your Academic Health above ${condition.value}%`;
-          current = academicHealth;
+         // ✅ FIX: Use the calculated percentage
+         label = `Maintain Academic Health > ${condition.value}%`;
+         current = academicHealth;
+         console.log(`  -> Condition: ${condition.value}% | Actual: ${current}% | Pass: ${current >= condition.value}`);
       
       } else {
          label = "Special Mission";
@@ -173,14 +216,26 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
       const isMet = current >= condition.value;
       if (!isMet) allMet = false;
 
+      // Progress Bar Logic
+      let barPercent = 0;
+      if (condition.type === 'minAcademicHealth') {
+          // Visual cap at 100%
+          barPercent = Math.min(100, (current / condition.value) * 100);
+      } else {
+          barPercent = Math.min(100, (current / condition.value) * 100);
+      }
+
       return { 
           label, 
           current, 
           required: condition.value, 
           isMet, 
-          percentage: Math.min(100, (current / condition.value) * 100) 
+          percentage: barPercent,
+          suffix: condition.type === 'minAcademicHealth' ? '%' : '' 
       };
     });
+    
+    if (hasHealthCondition) console.groupEnd();
     
     return { conditionsMet: allMet, taskProgress: progress };
   }, [coupon.conditions, recentAttempts, worksheets, recentTransactions, userProfile.id, coupon]);
@@ -241,7 +296,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
                   <Trophy className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="space-y-2">
-                  <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">
+                  <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 dark:from-yellow-400 dark:to-orange-400">
                       CONGRATULATIONS!
                   </h2>
                   <p className="text-lg font-medium text-slate-700 dark:text-slate-200">
@@ -326,7 +381,12 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
                     {task.isMet ? 
                         <span className="text-emerald-600 font-bold flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" /> Eligible</span> 
                         : 
-                        <span className="text-indigo-600 font-bold flex items-center gap-1.5 animate-pulse"><Rocket className="h-3.5 w-3.5" /> {task.required - task.current} to go!</span>
+                        <span className="text-indigo-600 font-bold flex items-center gap-1.5 animate-pulse">
+                            {task.suffix ? 
+                                <><Activity className="h-3.5 w-3.5" /> Current: {task.current}{task.suffix}</> 
+                                : <><Rocket className="h-3.5 w-3.5" /> {task.required - task.current} to go!</>
+                            }
+                        </span>
                     }
                   </div>
                 </div>
@@ -345,7 +405,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
             disabled={!canClaim || isClaiming} 
             className={cn("w-full font-bold text-lg h-14 shadow-xl transition-all", canClaim ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed")}
         >
-          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Locked</>}
+          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Coming Soon</>}
         </Button>
       </CardFooter>
     </Card>
@@ -363,7 +423,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
   }, [firestore]);
   const { data: coupons, isLoading: couponsLoading } = useCollection<Coupon>(couponsQuery);
 
-  // 2. Fetch Attempts
+  // 2. Fetch Attempts - INCREASED LIMIT TO 300 TO FIX 14-DAY CALCULATION
   const recentAttemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
     const oneMonthAgo = new Date();
@@ -373,15 +433,16 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
       where('userId', '==', userProfile.id),
       where('attemptedAt', '>', oneMonthAgo),
       orderBy('attemptedAt', 'desc'), 
-      limit(50) 
+      limit(300) // ✅ INCREASED FROM 50
     );
   }, [firestore, userProfile.id]);
   const { data: recentAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
 
-  // 3. ✅ FETCH TRANSACTIONS (For Gold Mission)
+  // 3. FETCH TRANSACTIONS (For Gold Mission)
   const transactionsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
-    const oneMonthAgo = subDays(new Date(), 30); // Use date-fns for safety
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
     return query(
       collection(firestore, 'transactions'),
       where('userId', '==', userProfile.id),
@@ -431,6 +492,10 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
         const isTimeReady = !c.availableDate || Date.now() >= refTime;
         
         let tasksDone = true;
+        
+        // Calculate health for sorting
+        const academicHealth = calculateAcademicHealth(recentAttempts || []);
+
         if (c.conditions && c.conditions.length > 0) {
            const validAttempts = recentAttempts || [];
            const validTransactions = recentTransactions || [];
@@ -450,7 +515,11 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
                  count = validAttempts.filter(a => check((worksheets || []).find(w => w.id === a.worksheetId), a, 'practice')).length;
               } else if (cond.type === 'minGoldQuestions') {
                  count = validTransactions.filter(t => t.currency?.toLowerCase() === 'gold' && t.type === 'earned').length;
+              } else if (cond.type === 'minAcademicHealth') {
+                 if (academicHealth < cond.value) { tasksDone = false; break; }
+                 continue; 
               }
+
               if (count < cond.value) { tasksDone = false; break; }
            }
         }
@@ -486,7 +555,7 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
             userProfile={userProfile} 
             recentAttempts={recentAttempts ?? []} 
             worksheets={worksheets ?? []}
-            recentTransactions={recentTransactions ?? []} // Pass transactions
+            recentTransactions={recentTransactions ?? []}
         />
       ))}
     </div>
