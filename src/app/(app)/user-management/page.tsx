@@ -20,10 +20,9 @@ export default function UserManagementPage() {
         }
     }, [userProfile, isUserProfileLoading, router]);
 
-
     if (isUserProfileLoading || !userProfile) {
         return (
-             <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
+            <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
         )
@@ -39,18 +38,21 @@ export default function UserManagementPage() {
                 title="User Management"
                 description="Manage users, track progress, and handle enrollments."
             />
-            <Tabs defaultValue="permissions">
+            <Tabs defaultValue="users">
                 <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="permissions">Permissions & Roles</TabsTrigger>
+                    <TabsTrigger value="users">Users</TabsTrigger>
                     <TabsTrigger value="progress">Student Progress</TabsTrigger>
                     <TabsTrigger value="enrollment">Enrollment</TabsTrigger>
                 </TabsList>
-                <TabsContent value="permissions">
+
+                <TabsContent value="users">
                     <UserList />
                 </TabsContent>
+
                 <TabsContent value="progress">
                     <StudentProgressList />
                 </TabsContent>
+
                 <TabsContent value="enrollment">
                     <EnrollmentList />
                 </TabsContent>
