@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { User, Coupon, Worksheet, WorksheetAttempt } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Gift, Loader2, Lock, CheckCircle2, Rocket, Ticket, Star, Trophy } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { doc, writeBatch, collection, increment, serverTimestamp, query, where } from 'firebase/firestore';
+import { doc, writeBatch, collection, increment, serverTimestamp, query, where, documentId, orderBy } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
