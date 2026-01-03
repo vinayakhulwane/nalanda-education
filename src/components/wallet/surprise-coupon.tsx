@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -145,6 +146,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
              const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' || (a as any).worksheetType?.toLowerCase() === 'practice';
+             // A practice worksheet is one created by the user themselves
              const isSelfCreated = w?.authorId === userProfile.id;
              return isTypePractice || isSelfCreated;
          }).length;
@@ -167,7 +169,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [],
          }).length;
       
       } else if (condition.type === 'minAcademicHealth') {
-          label = `Raise your Academic Health above ${condition.value}%`;
+          label = `Bring Academic Health above ${condition.value}%`;
           current = academicHealth;
       
       } else {
