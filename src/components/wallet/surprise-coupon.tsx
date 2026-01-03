@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -67,7 +66,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
 
   const lastClaimedMillis = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
   
-  // Reference Time for Claim Cycle (availableDate or CreatedAt)
+  // Reference Time for Claim Cycle
   const referenceTimeMillis = coupon.availableDate 
       ? coupon.availableDate.toDate().getTime() 
       : ((coupon as any).createdAt ? (coupon as any).createdAt.toMillis() : 0);
@@ -82,12 +81,8 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       return { conditionsMet: true, taskProgress: [] };
     }
 
-    const validAttempts = recentAttempts.filter(a => {
-        const attemptTime = (a.attemptedAt as any)?.toMillis?.();
-        if (!attemptTime) return false;
-        // This attempt must be newer than the last time the user claimed a coupon of this type
-        return attemptTime > lastClaimedMillis;
-    });
+    // Use all recent attempts (Time filter removed as requested)
+    const validAttempts = recentAttempts; 
 
     let allMet = true;
     
@@ -95,32 +90,46 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
       let current = 0;
       let label = "";
 
+      // 1. Practice Assignments
       if (condition.type === 'minPracticeAssignments') {
-         label = "Complete Assignment in my practice zone";
+         label = "Complete Practice Exercises";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
+             
+             // Check if Practice (Explicit type OR Self-Created)
              const isTypePractice = w?.worksheetType?.toLowerCase() === 'practice' 
                                  || (a as any).worksheetType?.toLowerCase() === 'practice';
              const isSelfCreated = w?.authorId === userProfile.id;
+
              return isTypePractice || isSelfCreated;
          }).length;
+
+      // 2. Classroom Assignments
       } else if (condition.type === 'minClassroomAssignments') {
          label = "Complete Classroom Assignments";
          current = validAttempts.filter(a => {
              const w = worksheets.find(sheet => sheet.id === a.worksheetId);
+             
              const isTypeClassroom = w?.worksheetType?.toLowerCase() === 'classroom'
                                   || (a as any).worksheetType?.toLowerCase() === 'classroom';
              const isNotSelfCreated = w?.authorId !== userProfile.id;
+
              return isTypeClassroom && isNotSelfCreated;
          }).length;
+
+      // 3. Gold Questions (Fixed Type Error)
       } else if (condition.type === 'minGoldQuestions') {
-          label = "Solve Gold Question";
-          // This logic would need to be implemented if questions were fetched
-          current = 0; // Placeholder
-      } else if (condition.type === 'minAcademicHealth') {
-          label = "Raise your Academic health";
-          // This logic would need to be implemented if health was calculated
-          current = 0; // Placeholder
+         label = "Solve Gold Questions";
+         current = validAttempts.filter(a => {
+             const w = worksheets.find(sheet => sheet.id === a.worksheetId);
+             
+             // Cast to 'any' to avoid TS error on 'rewardCurrency'
+             const givesGold = (w as any)?.rewardCurrency === 'gold' || (w as any)?.currency === 'gold';
+             const earnedGold = (a as any)?.earnedCurrency === 'gold' || (a as any)?.rewardCurrency === 'gold';
+
+             return givesGold || earnedGold;
+         }).length;
+
       } else {
          label = "Special Mission";
       }
@@ -138,7 +147,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
     });
 
     return { conditionsMet: allMet, taskProgress: progress };
-  }, [coupon.conditions, recentAttempts, worksheets, userProfile.id, lastClaimedMillis]);
+  }, [coupon.conditions, recentAttempts, worksheets, userProfile.id]);
 
   const canClaim = isTimeReady && hasNotClaimedThisCycle && conditionsMet && !justClaimed;
 
@@ -303,7 +312,7 @@ function CouponCard({ coupon, userProfile, recentAttempts = [], worksheets = [] 
             disabled={!canClaim || isClaiming} 
             className={cn("w-full font-bold text-lg h-14 shadow-xl transition-all", canClaim ? "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-[length:200%_auto] animate-gradient text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed")}
         >
-          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Locked</>}
+          {isClaiming ? <Loader2 className="h-5 w-5 animate-spin" /> : canClaim ? <><Gift className="h-6 w-6 mr-2 animate-bounce" /> Claim Reward</> : <><Lock className="h-5 w-5 mr-2" /> Coming Soon</>}
         </Button>
       </CardFooter>
     </Card>
@@ -322,27 +331,24 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
 
   const recentAttemptsQuery = useMemoFirebase(() => {
     if (!firestore || !userProfile.id) return null;
-    // Get attempts from the last month for performance
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    
     return query(
       collection(firestore, 'worksheet_attempts'),
       where('userId', '==', userProfile.id),
-      orderBy('attemptedAt', 'desc'), 
       where('attemptedAt', '>', oneMonthAgo),
-      limit(50) // Limit to a reasonable number of recent attempts
+      orderBy('attemptedAt', 'desc'), 
+      limit(50) 
     );
   }, [firestore, userProfile.id]);
   const { data: recentAttempts, isLoading: attemptsLoading } = useCollection<WorksheetAttempt>(recentAttemptsQuery);
 
-  // Use a Safe List for Worksheets
   const worksheetIds = useMemo(() => recentAttempts ? [...new Set(recentAttempts.map(a => a.worksheetId))] : [], [recentAttempts]);
   
   const worksheetsQuery = useMemoFirebase(() => {
     if (!firestore || worksheetIds.length === 0) return null;
     return query(collection(firestore, 'worksheets'), where(documentId(), 'in', worksheetIds.slice(0, 30)));
-  }, [firestore, worksheetIds.join(',')]); // Join to create stable dependency
+  }, [firestore, worksheetIds.join(',')]);
   
   const { data: worksheets, isLoading: worksheetsLoading } = useCollection<Worksheet>(worksheetsQuery);
 
@@ -354,18 +360,13 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
         const lastClaimed = (userProfile.lastCouponClaimedAt as any)?.toMillis?.() || 0;
         const refTime = c.availableDate ? c.availableDate.toDate().getTime() : ((c as any).createdAt?.toMillis?.() || 0);
         
-        // Lowest rank: already claimed this cycle
         if (lastClaimed >= refTime) return 3;
 
         const isTimeReady = !c.availableDate || Date.now() >= refTime;
         
         let tasksDone = true;
         if (c.conditions && c.conditions.length > 0) {
-           const validAttempts = (recentAttempts || []).filter(a => {
-               const attemptTime = (a.attemptedAt as any)?.toMillis?.();
-               return attemptTime ? attemptTime > lastClaimed : false;
-           });
-
+           const validAttempts = recentAttempts || [];
            for (const cond of c.conditions) {
               const check = (w: Worksheet | undefined, a: WorksheetAttempt, t: string) => {
                   const typeMatch = w?.worksheetType?.toLowerCase() === t.toLowerCase() || (a as any).worksheetType?.toLowerCase() === t.toLowerCase();
@@ -379,15 +380,21 @@ export function SurpriseCoupon({ userProfile }: SurpriseCouponProps) {
                  count = validAttempts.filter(a => check((worksheets || []).find(w => w.id === a.worksheetId), a, 'classroom')).length;
               } else if (cond.type === 'minPracticeAssignments') {
                  count = validAttempts.filter(a => check((worksheets || []).find(w => w.id === a.worksheetId), a, 'practice')).length;
+              
+              // ✅ FIX: Added Gold Logic to Sorter + Fixed Type Error
+              } else if (cond.type === 'minGoldQuestions') {
+                 count = validAttempts.filter(a => {
+                     const w = (worksheets || []).find(sheet => sheet.id === a.worksheetId);
+                     const givesGold = (w as any)?.rewardCurrency === 'gold' || (w as any)?.currency === 'gold';
+                     const earnedGold = (a as any)?.earnedCurrency === 'gold' || (a as any)?.rewardCurrency === 'gold';
+                     return givesGold || earnedGold;
+                 }).length;
               }
               if (count < cond.value) { tasksDone = false; break; }
            }
         }
 
-        // Highest rank: ready and all tasks done
         if (isTimeReady && tasksDone) return 1;
-
-        // Middle rank: pending
         return 2;
     };
 
