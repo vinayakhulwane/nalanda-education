@@ -39,7 +39,7 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
     aiCredits: BrainCircuit,
 };
 
-// ✅ MOVED TO TOP: Defined here so it's accessible everywhere
+// Defined at top level to avoid ReferenceError
 const allCurrencyTypes: CurrencyType[] = ['spark', 'coin', 'gold', 'diamond'];
 
 // New styles map for the premium card look
@@ -149,7 +149,7 @@ export function WorksheetRandomBuilder({
   }, [availableCategories, filterSearch.category]);
 
   const filteredCurrenciesList = useMemo(() => {
-    // ✅ Now accessible because it's defined at the top
+    // Now accessible because it's defined at the top
     return allCurrencyTypes.filter(c => c.toLowerCase().includes(filterSearch.currency.toLowerCase()));
   }, [filterSearch.currency]);
 

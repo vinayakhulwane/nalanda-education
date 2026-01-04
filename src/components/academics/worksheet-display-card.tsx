@@ -13,31 +13,31 @@ interface WorksheetDisplayCardProps {
     worksheet: Worksheet;
     isPractice?: boolean;
     // This will now be an array of all attempts for this specific worksheet
-    attempts?: WorksheetAttempt[]; 
+    attempts?: WorksheetAttempt[];
     view?: 'card' | 'list';
     from?: string;
     studentId?: string;
 }
 
-export function WorksheetDisplayCard({ 
-    worksheet, 
-    isPractice = false, 
+export function WorksheetDisplayCard({
+    worksheet,
+    isPractice = false,
     attempts = [],
     view = 'card',
     from,
     studentId,
 }: WorksheetDisplayCardProps) {
     const router = useRouter();
-    
+
     const latestAttempt = attempts.length > 0 ? attempts[0] : undefined;
     const isCompletedOrAttempted = attempts.length > 0;
     const questionCount = worksheet.questions?.length || 0;
-    
-    const totalMarks = questionCount * 10; 
+
+    const totalMarks = questionCount * 10;
     const estimatedTime = Math.ceil(totalMarks * 0.5);
 
     const handleStart = () => {
-        router.push(`/solve/${worksheet.id}`); 
+        router.push(`/solve/${worksheet.id}`);
     };
 
     const handleReview = () => {
@@ -51,69 +51,90 @@ export function WorksheetDisplayCard({
         router.push(finalUrl);
     };
 
+    // --- MOBILE / LIST VIEW ---
     if (view === 'list') {
         const actionHandler = isCompletedOrAttempted ? handleReview : handleStart;
-        
+        const rewardXP = questionCount * 5;
+
         return (
-             <div className="group flex flex-col gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border hover:border-primary/20 transition-all shadow-sm hover:shadow-md cursor-pointer" onClick={actionHandler}>
-                <div className="flex items-center gap-4">
+            <div 
+                className={cn(
+                    "group flex flex-col gap-3 p-4 bg-white dark:bg-slate-900 rounded-2xl border transition-all shadow-sm active:scale-[0.98]",
+                    isPractice ? "border-pink-100 dark:border-pink-900/20" : "border-slate-200 dark:border-slate-800"
+                )} 
+                onClick={actionHandler}
+            >
+                {/* Header Section */}
+                <div className="flex items-start gap-4">
                     <div className={cn(
-                      "h-12 w-12 rounded-lg flex items-center justify-center shrink-0",
-                      isPractice ? "bg-pink-100 dark:bg-pink-900/30" : "bg-primary/10"
+                        "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+                        isPractice 
+                            ? "bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400" 
+                            : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
                     )}>
-                        <BookOpen className={cn("h-6 w-6", isPractice ? "text-pink-600 dark:text-pink-400" : "text-primary")} />
+                        <BookOpen className="h-6 w-6" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate">{worksheet.title}</h4>
-                        <p className="text-sm text-muted-foreground capitalize">
-                          {isPractice ? 'Practice Test' : 'Classroom Assignment'}
+                    <div className="flex-1 min-w-0 pt-0.5">
+                        <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate leading-tight">
+                            {worksheet.title}
+                        </h4>
+                        <p className="text-xs text-muted-foreground capitalize mt-1">
+                            {isPractice ? 'Practice Test' : 'Classroom Assignment'}
                         </p>
                     </div>
                 </div>
 
                 <hr className="border-slate-100 dark:border-slate-800" />
 
-                <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                        <FileQuestion className="h-4 w-4" />
-                        <span className="font-medium">{questionCount} Qs</span>
+                {/* Stats Row */}
+                <div className="flex items-center gap-4 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
+                        <FileQuestion className="h-3.5 w-3.5" />
+                        <span>{questionCount} Qs</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        <span className="font-medium">~{estimatedTime} min</span>
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>~{estimatedTime} min</span>
                     </div>
                 </div>
-                
-                <div className="flex items-center justify-between">
-                    {isCompletedOrAttempted ? (
-                        <div className="flex items-center gap-2 font-semibold text-sm text-blue-600 dark:text-blue-400">
-                             <Repeat className="h-4 w-4" />
-                             Attempted {attempts.length} time(s)
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2 font-semibold text-sm text-slate-500">
-                            <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
-                            Not Started
-                        </div>
-                    )}
-                    
-                    <Button
-                        size="sm"
+
+                {/* Footer Action Row */}
+                <div className="flex items-center justify-between pt-1">
+                    {/* Left Side: Reward or Attempt Status */}
+                    <div className="flex items-center">
+                        {isCompletedOrAttempted ? (
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
+                                <Repeat className="h-3.5 w-3.5" />
+                                <span>Tried {attempts.length}x</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-500 animate-pulse">
+                                <Sparkles className="h-3.5 w-3.5 fill-amber-600 dark:fill-amber-500" />
+                                <span>Win {rewardXP} XP</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right Side: Action Button */}
+                    <Button 
+                        size="sm" 
                         className={cn(
-                          "font-semibold",
-                          isPractice ? "bg-pink-600 hover:bg-pink-700 text-white" : ""
+                            "h-9 px-4 rounded-full font-bold text-xs shadow-sm transition-all",
+                            isPractice 
+                                ? "bg-pink-600 hover:bg-pink-700 text-white" 
+                                : "bg-primary hover:bg-primary/90 text-primary-foreground"
                         )}
                         onClick={(e) => { e.stopPropagation(); actionHandler(); }}
                     >
-                        {isCompletedOrAttempted ? 'View Latest' : 'Start Solving'}
-                        <ArrowRight className="ml-1.5 h-4 w-4"/>
+                        {isCompletedOrAttempted ? 'Review' : 'Start Solving'}
+                        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                     </Button>
                 </div>
             </div>
         );
     }
 
-    // --- CARD VIEW (Standard for Desktop) ---
+    // --- CARD VIEW (Standard for Desktop - UNCHANGED) ---
     return (
         <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white dark:bg-slate-900 flex flex-col h-full">
             <div className={cn(
@@ -175,7 +196,7 @@ export function WorksheetDisplayCard({
                         isCompletedOrAttempted 
                             ? "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-white" 
                             : isPractice 
-                                ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-purple-500/20"
+                                ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-purple-500/20" 
                                 : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-500/20"
                     )}
                     onClick={isCompletedOrAttempted ? handleReview : handleStart}
