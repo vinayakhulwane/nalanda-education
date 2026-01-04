@@ -36,7 +36,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <SidebarInset>
             <AppHeader />
-            <main className="p-4 lg:p-6 !pt-0">
+            <main>
                 {children}
             </main>
         </SidebarInset>
