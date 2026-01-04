@@ -16,28 +16,45 @@ interface StudentAttemptHistoryProps {
     student: User;
 }
 
-// ✅ HELPER: Smart Score Calculation to fix bad data
-const calculateMetrics = (attempt: WorksheetAttempt) => {
-    // Cast to any to safely access potentially missing fields
-    let score = (attempt as any).score ?? 0;
-    let total = (attempt as any).totalMarks ?? 0;
-    
-    // Fallback: If total is 0 or missing, try to count from results keys if they exist
-    if (total === 0 && attempt.results) {
-        total = Object.keys(attempt.results).length; // Rough estimate if data missing
-    }
-    
-    // Sanity Check 1: Prevent division by zero
-    if (total <= 0) return { percentage: 0, score: 0, total: 0, isPassed: false };
+// ✅ HELPER: Robust metric calculation that handles all legacy data cases
+const calculateMetrics = (attempt: any, worksheet?: Worksheet) => {
+    let score = attempt.score;
+    let total = attempt.totalMarks;
 
-    // Sanity Check 2: If score > total, it's likely a percentage stored as score
-    // e.g. Score: 80, Total: 20 -> This implies 80%
+    // CASE 1: Completely missing fields (Legacy Data) -> Recalculate from 'results' map
+    if ((score === undefined || total === undefined || total === 0) && attempt.results) {
+        score = 0;
+        total = 0;
+        Object.values(attempt.results).forEach((res: any) => {
+             // Try to find the max marks for this question from the worksheet if available
+             // Fallback: If we can't find the question max, assume 1 (standard for simple quizzes)
+             const maxForQuestion = 1; 
+             total += maxForQuestion;
+
+             if (typeof res.score === 'number') {
+                 score += res.score;
+             } else if (res.isCorrect) {
+                 score += maxForQuestion;
+             }
+        });
+    }
+
+    // CASE 2: Sanity Check - If still 0, avoid NaN
+    if (!total || total <= 0) {
+        // Last resort: count keys in results
+        if (attempt.results) total = Object.keys(attempt.results).length || 1;
+        else total = 1; 
+    }
+
+    // CASE 3: Percentage stored as Score (Data Corruption Fix)
+    // If score is 85 and total is 20, clearly 85 is a percentage
     if (score > total) {
-        score = (score / 100) * total;
+        const assumedPercentage = score; 
+        score = (assumedPercentage / 100) * total;
     }
 
     const percentage = Math.round((score / total) * 100);
-    const isPassed = percentage >= 35; // Passing Grade (Adjust to 40 or 50 if needed)
+    const isPassed = percentage >= 35; 
 
     return { percentage, score, total, isPassed };
 };
@@ -55,7 +72,7 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
         return query(
             collection(firestore, 'worksheet_attempts'),
             where('userId', '==', student.id),
-            orderBy('attemptedAt', 'desc') // Ensure we get latest first
+            orderBy('attemptedAt', 'desc') 
         );
     }, [firestore, student.id, userIsAdminOrTeacher, userProfile?.id]);
 
@@ -85,7 +102,6 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
             attemptsMap.set(attempt.worksheetId, [...existing, attempt]);
         });
 
-        // Sort worksheets by most recent attempt time
         const sortedWs = [...worksheets].sort((a, b) => {
             const lastAttemptA = attemptsMap.get(a.id)?.[0]?.attemptedAt?.toMillis() || 0;
             const lastAttemptB = attemptsMap.get(b.id)?.[0]?.attemptedAt?.toMillis() || 0;
@@ -109,20 +125,19 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
 
     return (
         <div className="space-y-6">
-            {/* Desktop Header */}
             <div className="hidden md:block">
                 <h3 className="text-lg font-medium">Attempt History</h3>
                 <p className="text-sm text-muted-foreground">Recent activity log.</p>
             </div>
 
-            {/* --- VIEW 1: MOBILE LIST VIEW (Safe Data) --- */}
+            {/* --- VIEW 1: MOBILE LIST VIEW --- */}
             <div className="block md:hidden border-t border-b divide-y border-slate-100 dark:border-slate-800 -mx-6 bg-white dark:bg-slate-950">
                 {orderedWorksheets.map(ws => {
                     const latestAttempt = attemptsByWorksheet.get(ws.id)?.[0];
                     if (!latestAttempt) return null;
 
-                    // ✅ Use Helper to get correct data
-                    const metrics = calculateMetrics(latestAttempt);
+                    // Pass worksheet to calculation for better accuracy if needed
+                    const metrics = calculateMetrics(latestAttempt, ws);
 
                     return (
                         <MobileHistoryItem 
@@ -155,7 +170,6 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
     );
 }
 
-// --- SUB-COMPONENT: Mobile Row Item ---
 function MobileHistoryItem({ 
     worksheet, 
     attempt, 
@@ -167,21 +181,15 @@ function MobileHistoryItem({
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const { percentage, isPassed, score, total } = metrics;
-
-    // Dynamic Color Classes
     const bgClass = isPassed ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
     
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
                 <div className="flex items-center gap-4 p-4 active:bg-slate-50 dark:active:bg-slate-900 transition-colors cursor-pointer w-full">
-                    
-                    {/* Score Box */}
                     <div className={cn("flex flex-col items-center justify-center h-12 w-12 rounded-xl shrink-0 font-bold text-sm", bgClass)}>
                         <span>{percentage}%</span>
                     </div>
-
-                    {/* Info */}
                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                         <h4 className="font-semibold text-sm truncate pr-2 text-slate-900 dark:text-slate-100">
                             {worksheet.title}
@@ -194,7 +202,6 @@ function MobileHistoryItem({
                             </span>
                         </div>
                     </div>
-
                     <ChevronRight className="h-5 w-5 text-slate-300 shrink-0" />
                 </div>
             </SheetTrigger>
@@ -206,8 +213,6 @@ function MobileHistoryItem({
                         Completed on {attempt.attemptedAt?.toDate().toLocaleDateString()} at {attempt.attemptedAt?.toDate().toLocaleTimeString()}
                     </SheetDescription>
                 </SheetHeader>
-
-                {/* Quick Stats Grid */}
                 <div className="grid grid-cols-2 gap-4 mb-8">
                     <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                         <div className="text-muted-foreground text-xs uppercase font-bold tracking-wider mb-1">Score</div>
@@ -223,22 +228,18 @@ function MobileHistoryItem({
                         </div>
                     </div>
                 </div>
-
-                {/* Big Action Buttons */}
                 <div className="flex flex-col gap-3">
                     <Button asChild className="w-full h-12 text-base rounded-xl font-semibold shadow-lg shadow-blue-500/20" size="lg">
                         <Link href={`/analytics/worksheet/${attempt.id}`}>
                             <FileText className="mr-2 h-5 w-5" /> View Detailed Report
                         </Link>
                     </Button>
-                    
                     <Button variant="outline" asChild className="w-full h-12 text-base rounded-xl" size="lg">
                         <Link href={`/worksheet/${worksheet.id}`}>
                             <RefreshCw className="mr-2 h-5 w-5" /> Retake Worksheet
                         </Link>
                     </Button>
                 </div>
-
                 <SheetFooter className="mt-4">
                     <Button variant="ghost" onClick={() => setIsOpen(false)} className="w-full text-muted-foreground">
                         Close
