@@ -74,6 +74,7 @@ export function WorksheetDisplayCard({
                     )}>
                         <BookOpen className="h-6 w-6" />
                     </div>
+                    {/* ✅ FIX: Added min-w-0 to allow truncation to work properly */}
                     <div className="flex-1 min-w-0 pt-0.5">
                         <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate leading-tight">
                             {worksheet.title}
