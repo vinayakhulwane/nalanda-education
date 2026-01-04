@@ -388,48 +388,59 @@ export default function SubjectWorkspacePage() {
       {/* MAIN CONTENT AREA */}
       {!isUserBlocked && (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 py-8 w-full">
-          {/* Modern Tabs Navigation - Sticky Header */}
+          {/* Sticky Header */}
           <div className="container mx-auto px-4 md:px-6 max-w-7xl sticky top-0 z-30 -my-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all w-full">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full">
               
-              <TabsList className="items-center text-muted-foreground h-auto p-2 md:p-1 gap-2 bg-slate-100 dark:bg-slate-900 border rounded-xl shadow-sm w-full max-w-full overflow-x-auto flex flex-nowrap md:flex-wrap justify-start no-scrollbar snap-x snap-mandatory">
-    
-                {/* Default Tabs */}
+              {/* MOBILE VIEW: Dropdown */}
+              <div className="md:hidden w-full">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Section</label>
+                <Select value={activeTab} onValueChange={setActiveTab}>
+                  <SelectTrigger className="w-full h-12 text-base">
+                    <SelectValue placeholder="Select a section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="syllabus">Syllabus</SelectItem>
+                    <SelectItem value="worksheet">Worksheets</SelectItem>
+                    <SelectItem value="leaderboard">Leaderboard</SelectItem>
+                    {visibleCustomTabs?.map(tab => (
+                       <SelectItem key={tab.id} value={tab.id}>{tab.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* DESKTOP VIEW: Scrollable Pills */}
+              <TabsList className="hidden md:flex h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm w-full max-w-full overflow-x-auto justify-start no-scrollbar">
                 <TabsTrigger 
                   value="syllabus" 
-                  className="snap-start min-h-[44px] rounded-full md:rounded-lg border bg-white dark:bg-slate-800/50 px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
+                  className="rounded-lg border bg-transparent px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
                 >
                   <BookOpen className="mr-2 h-4 w-4" /> Syllabus
                 </TabsTrigger>
-
                 <TabsTrigger 
                   value="worksheet" 
-                  className="snap-start min-h-[44px] rounded-full md:rounded-lg border bg-white dark:bg-slate-800/50 px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
+                  className="rounded-lg border bg-transparent px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
                 >
                   <BookCopy className="mr-2 h-4 w-4" /> Worksheets
                 </TabsTrigger>
-
                 <TabsTrigger 
                   value="leaderboard" 
-                  className="snap-start min-h-[44px] rounded-full md:rounded-lg border bg-white dark:bg-slate-800/50 px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
+                  className="rounded-lg border bg-transparent px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
                 >
                   <Trophy className="mr-2 h-4 w-4" /> Leaderboard
                 </TabsTrigger>
-
-                {/* Dynamic Tabs */}
                 {visibleCustomTabs?.map(tab => {
                   const isLocked = !userIsEditor && !isTabUnlocked(tab);
                   return (
-                    <div key={tab.id} className="relative group flex items-center flex-shrink-0 snap-start">
+                    <div key={tab.id} className="relative group flex items-center flex-shrink-0">
                       <TabsTrigger
                         value={tab.id}
-                        className="min-h-[44px] rounded-full md:rounded-lg border bg-white dark:bg-slate-800/50 px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex items-center gap-2"
+                        className="rounded-lg border bg-transparent px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex items-center gap-2"
                       >
                         {tab.label}
                         {isLocked && <Lock className="h-3 w-3 opacity-70" />}
                       </TabsTrigger>
-                      
-                      {/* Tab Menu (Editor Only) */}
                       {userIsEditor && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -438,17 +449,13 @@ export default function SubjectWorkspacePage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start">
-                            <DropdownMenuItem onClick={() => openEditTabDialog(tab)}>
-                              <Edit className="mr-2 h-4 w-4" /> Edit Details
-                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditTabDialog(tab)}><Edit className="mr-2 h-4 w-4" /> Edit Details</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
                               {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-                              {tab.hidden ? 'Show to Students' : 'Hide from Students'}
+                              {tab.hidden ? 'Show' : 'Hide'}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive">
-                              <Trash className="mr-2 h-4 w-4" /> Delete Tab
-                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive"><Trash className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -457,7 +464,6 @@ export default function SubjectWorkspacePage() {
                 })}
               </TabsList>
               
-              {/* Add Tab Button */}
               {userIsEditor && (
                 <Button onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} className="gap-2 shadow-sm flex-shrink-0">
                   <Plus className="h-4 w-4" /> New Tab
@@ -537,7 +543,6 @@ export default function SubjectWorkspacePage() {
       )}
 
       {/* --- DIALOGS (Unchanged Logic, just styling tweaks) --- */}
-      {/* Add/Edit Tab Dialog */}
       <Dialog open={isAddTabDialogOpen || isEditTabDialogOpen} onOpenChange={(open) => !open && !isSaving && (setAddTabDialogOpen(false), setEditTabDialogOpen(false))}>
         <DialogContent>
           <DialogHeader>
@@ -573,7 +578,6 @@ export default function SubjectWorkspacePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Edit Tab Content Dialog */}
       <Dialog open={isEditTabContentDialogOpen} onOpenChange={(open) => !open && !isSaving && setEditTabContentDialogOpen(false)}>
         <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -592,7 +596,6 @@ export default function SubjectWorkspacePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Delete Tab Dialog */}
       <AlertDialog open={isDeleteTabDialogOpen} onOpenChange={(open) => !open && !isSaving && setDeleteTabDialogOpen(false)}>
         <AlertDialogContent>
           <AlertDialogHeader>
