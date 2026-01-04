@@ -656,7 +656,7 @@ export function WorksheetManualBuilder({
             </div>
             
             {/* Floating button for mobile */}
-            <div className="lg:hidden fixed bottom-6 right-6 z-50">
+            <div className="lg:hidden fixed bottom-24 right-6 z-50">
                  <Sheet>
                     <SheetTrigger asChild>
                        <Button 

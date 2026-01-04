@@ -4,7 +4,7 @@ import type { Question, CurrencyType, Unit, Category, EconomySettings } from '@/
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ShoppingCart, PlusCircle, Filter, Trash2, Bot, Coins, Gem, Crown, Sparkles, Wand2, PieChart, ArrowRight, Search, BrainCircuit } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Filter, Trash2, Bot, Coins, Gem, Crown, Sparkles, Wand2, PieChart, ArrowRight, Search, BrainCircuit, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
@@ -477,7 +477,7 @@ export function WorksheetRandomBuilder({
                 <PlusCircle className="h-5 w-5 text-primary" />
                 Quick Add by Type
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {allCurrencyTypes.map(currency => {
               const totalOfType = questionsByCurrency[currency] || 0;
               const selectedOfType = selectedQuestionsByCurrency[currency] || 0;
@@ -486,17 +486,15 @@ export function WorksheetRandomBuilder({
               const styles = currencyStyles[currency];
               
               return (
-                <div key={currency} className={cn("group relative flex flex-col p-5 rounded-xl border transition-all overflow-hidden", styles.bg, styles.border)}>
-                  <CurrencyIcon className={cn("absolute -top-4 -right-4 h-32 w-32 pointer-events-none -rotate-12", styles.iconBg)} />
+                <div key={currency} className={cn("group relative flex flex-col p-4 md:p-5 rounded-xl border transition-all overflow-hidden", styles.bg, styles.border)}>
+                  <CurrencyIcon className={cn("absolute -top-2 -right-4 md:-top-4 md:-right-4 h-24 w-24 md:h-32 md:w-32 pointer-events-none -rotate-12", styles.iconBg)} />
                   <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className={cn("p-2 rounded-lg", styles.bg, "bg-opacity-50 dark:bg-opacity-50 ring-1", styles.border)}>
-                                <CurrencyIcon className={cn("h-8 w-8", styles.text)}/>
+                    <div className="flex items-start justify-between mb-2 md:mb-4">
+                        <div className="flex flex-col">
+                             <div className={cn("p-2 rounded-lg w-fit", styles.bg, "bg-opacity-50 dark:bg-opacity-50 ring-1", styles.border)}>
+                                <CurrencyIcon className={cn("h-6 w-6 md:h-8 md:w-8", styles.text)}/>
                             </div>
-                            <div>
-                                <p className={cn("capitalize font-bold text-xl", styles.text)}>{currency}</p>
-                            </div>
+                            <p className={cn("capitalize font-bold text-lg md:text-xl mt-2", styles.text)}>{currency}</p>
                         </div>
                         <Badge variant="outline" className={cn("bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm", styles.text, styles.border)}>
                             {remaining} left
@@ -523,7 +521,7 @@ export function WorksheetRandomBuilder({
         {/* REVIEW SHEET (Floating Button) */}
         <Sheet>
             <SheetTrigger asChild>
-                <div className="fixed bottom-6 right-6 z-50">
+                <div className="fixed bottom-24 right-6 z-50">
                     <Button 
                         size="lg" 
                         className={cn("rounded-full h-16 w-16 shadow-2xl bg-gradient-to-r from-primary to-indigo-600 hover:scale-105 transition-transform", animateCart && "animate-pulse")}
@@ -544,11 +542,11 @@ export function WorksheetRandomBuilder({
                     </SheetDescription>
                     {userIsEditor && (
                       <div className="flex items-center space-x-2 pt-4 p-2 bg-white dark:bg-slate-950 rounded-lg border">
-                          <Label htmlFor="worksheet-type" className={cn("text-xs uppercase font-bold tracking-wider", worksheetType === 'sample' ? 'text-primary' : 'text-muted-foreground')}>
+                          <Label htmlFor="worksheet-type-random" className={cn("text-xs uppercase font-bold tracking-wider", worksheetType === 'sample' ? 'text-primary' : 'text-muted-foreground')}>
                               Sample
                           </Label>
-                          <Switch id="worksheet-type" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
-                          <Label htmlFor="worksheet-type" className={cn("text-xs uppercase font-bold tracking-wider", worksheetType === 'classroom' ? 'text-primary' : 'text-muted-foreground')}>
+                          <Switch id="worksheet-type-random" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} />
+                          <Label htmlFor="worksheet-type-random" className={cn("text-xs uppercase font-bold tracking-wider", worksheetType === 'classroom' ? 'text-primary' : 'text-muted-foreground')}>
                             Classroom
                           </Label>
                       </div>
