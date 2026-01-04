@@ -56,15 +56,31 @@ export function WorksheetList({ subjectId, isEnrolled, userIsEditor }: Worksheet
   return (
     <div className="mt-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
         {(visibleWorksheets && visibleWorksheets.length > 0) || showEnrollmentPrompt ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {visibleWorksheets.map(ws => (
-                    <WorksheetDisplayCard 
-                        key={ws.id} 
-                        worksheet={ws} 
-                        isPractice={false}
-                    />
-                ))}
-                 {showEnrollmentPrompt && <EnrollmentPromptCard />}
+            <div>
+                 {/* --- Mobile View: List --- */}
+                <div className="block md:hidden space-y-4">
+                    {visibleWorksheets.map(ws => (
+                        <WorksheetDisplayCard 
+                            key={ws.id} 
+                            worksheet={ws} 
+                            isPractice={false}
+                            view="list"
+                        />
+                    ))}
+                    {showEnrollmentPrompt && <EnrollmentPromptCard />}
+                </div>
+                {/* --- Desktop View: Grid --- */}
+                <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {visibleWorksheets.map(ws => (
+                        <WorksheetDisplayCard 
+                            key={ws.id} 
+                            worksheet={ws} 
+                            isPractice={false}
+                            view="card"
+                        />
+                    ))}
+                    {showEnrollmentPrompt && <EnrollmentPromptCard />}
+                </div>
             </div>
         ) : (
             <div className="flex flex-col h-64 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
