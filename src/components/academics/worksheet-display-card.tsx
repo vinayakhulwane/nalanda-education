@@ -3,7 +3,7 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, CalendarDays } from "lucide-react";
+import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, CalendarDays, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Worksheet, WorksheetAttempt } from "@/types";
 import { cn } from "@/lib/utils";
@@ -32,8 +32,9 @@ export function WorksheetDisplayCard({
     const isCompleted = completedAttempts.includes(worksheet.id) || !!attempt;
     const questionCount = worksheet.questions?.length || 0;
     
-    // Placeholder for total marks logic
+    // Total marks logic - use 10 marks per question as an estimate for time
     const totalMarks = questionCount * 10; 
+    const estimatedTime = Math.ceil(totalMarks * 0.5); // Estimate 30 seconds per mark
 
     const handleStart = () => {
         router.push(`/solve/${worksheet.id}`); 
@@ -49,42 +50,66 @@ export function WorksheetDisplayCard({
         router.push(finalUrl);
     };
 
-    // --- LIST VIEW (For History) ---
+    // --- LIST VIEW (For Mobile & History) ---
     if (view === 'list') {
+        const actionHandler = isCompleted ? handleReview : handleStart;
+        
         return (
-            <div className="group flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-xl border hover:border-primary/50 transition-all shadow-sm hover:shadow-md">
+             <div className="group flex flex-col gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border hover:border-primary/20 transition-all shadow-sm hover:shadow-md cursor-pointer" onClick={actionHandler}>
+                {/* Top Section: Icon & Title */}
                 <div className="flex items-center gap-4">
-                    <div className={cn(
-                        "h-12 w-12 rounded-full flex items-center justify-center",
-                        isCompleted ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-500"
-                    )}>
-                        {isCompleted ? <CheckCircle2 className="h-6 w-6" /> : <FileQuestion className="h-6 w-6" />}
+                    <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <BookOpen className="h-6 w-6 text-primary" />
                     </div>
-                    <div>
-                        <h4 className="font-bold text-lg">{worksheet.title}</h4>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                            <span className="flex items-center gap-1"><FileQuestion className="h-3 w-3" /> {questionCount} Qs</span>
-                            
-                            {/* Score display removed to fix TS Error. 
-                                To re-enable, we need to fetch Questions to calculate score 
-                                or add a 'score' field to the WorksheetAttempt type. 
-                            */}
-                            
-                            <span className="flex items-center gap-1 text-xs opacity-70">
-                                <CalendarDays className="h-3 w-3" />
-                                {attempt?.attemptedAt ? format(attempt.attemptedAt.toDate(), 'PP p') : 'Unknown Date'}
-                            </span>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate">{worksheet.title}</h4>
+                        <p className="text-sm text-muted-foreground capitalize">{worksheet.worksheetType} Assignment</p>
                     </div>
                 </div>
-                <Button variant="ghost" size="icon" onClick={handleReview} className="h-10 w-10 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-full">
-                    <PlayCircle className="h-6 w-6" />
-                </Button>
+
+                {/* Divider */}
+                <hr className="border-slate-100 dark:border-slate-800" />
+
+                {/* Middle Section: Stats */}
+                <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                        <FileQuestion className="h-4 w-4" />
+                        <span className="font-medium">{questionCount} Qs</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <span className="font-medium">~{estimatedTime} min</span>
+                    </div>
+                </div>
+
+                {/* Bottom Section: Status & Button */}
+                <div className="flex items-center justify-between">
+                    {isCompleted ? (
+                        <div className="flex items-center gap-2 font-semibold text-sm text-emerald-600 dark:text-emerald-400">
+                             <CheckCircle2 className="h-4 w-4" />
+                             Completed
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 font-semibold text-sm text-slate-500">
+                            <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                            Not Started
+                        </div>
+                    )}
+                    
+                    <Button
+                        size="sm"
+                        className="font-semibold"
+                        onClick={(e) => { e.stopPropagation(); actionHandler(); }}
+                    >
+                        {isCompleted ? 'View Results' : 'Start Solving'}
+                        <ArrowRight className="ml-1.5 h-4 w-4"/>
+                    </Button>
+                </div>
             </div>
         );
     }
 
-    // --- CARD VIEW (Standard) ---
+    // --- CARD VIEW (Standard for Desktop) ---
     return (
         <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white dark:bg-slate-900 flex flex-col h-full">
             {/* Type Badge & Header Color */}
