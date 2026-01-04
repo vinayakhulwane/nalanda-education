@@ -1,4 +1,4 @@
-import type {Metadata} from 'next';
+import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase';
@@ -22,6 +22,14 @@ export const metadata: Metadata = {
   description: 'The personalized platform for academic excellence.',
   manifest: '/manifest.json',
 };
+
+export const viewport: Viewport = {
+  maximumScale: 1,
+  userScalable: false,
+  width: 'device-width',
+  initialScale: 1,
+};
+
 
 export default function RootLayout({
   children,

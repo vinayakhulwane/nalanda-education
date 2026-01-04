@@ -224,7 +224,8 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
       case 'numerical':
         return (
           <Input
-            type="text"
+            type="number"
+            inputMode="decimal"
             value={valueToDisplay ?? ''}
             onChange={(e) => setCurrentAnswer(e.target.value)}
             disabled={isSubmitted}
