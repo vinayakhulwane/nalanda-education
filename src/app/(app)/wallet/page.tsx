@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import { CurrencySwap } from "@/components/wallet/currency-swap";
 import { TransactionHistory } from "@/components/wallet/transaction-history";
 import { SurpriseCoupon } from "@/components/wallet/surprise-coupon";
-import { cn } from "@/lib/utils"; // Ensure you have this utility or use standard class strings
+import { cn } from "@/lib/utils";
 
 export default function WalletPage() {
   const { userProfile, isUserProfileLoading } = useUser();
@@ -31,58 +31,59 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="container mx-auto py-4 px-4 md:py-6 md:px-8 space-y-6 md:space-y-8">
-      
-      <PageHeader
-        title="My Wallet"
-        description="View your balances, exchange currencies, and see your transaction history."
-      />
-
-      <WalletBalances userProfile={userProfile} />
-
-      <Tabs defaultValue="coupon" className="w-full">
+    // 1. Applied the same background wrapper as CoursesPage
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 pb-20">
         
-        {/* --- TABS LIST --- */}
-        <TabsList className={cn(
-            // Mobile: Horizontal Scroll (Sliding), Transparent Background, Spaced items
-            "flex w-full overflow-x-auto no-scrollbar gap-2 bg-transparent p-0 h-auto",
-            // Desktop: Grid Layout, Muted Background, Standard Padding
-            "md:grid md:grid-cols-3 md:gap-0 md:bg-muted/80 md:p-1 md:rounded-xl"
-        )}>
-          {['coupon', 'swap', 'history'].map((val) => (
-             <TabsTrigger 
-               key={val}
-               value={val} 
-               className={cn(
-                 // Base Styles
-                 "whitespace-nowrap transition-all duration-200",
-                 
-                 // Mobile Styles: Pill Shape, Border, Min-Width for touch
-                 "rounded-full border bg-background px-4 py-2.5 text-xs font-medium shadow-sm min-w-[130px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary",
-                 
-                 // Desktop Styles: Standard Segmented Control Look (Overrides Mobile)
-                 "md:rounded-md md:border-none md:bg-transparent md:px-3 md:py-1.5 md:text-sm md:shadow-none md:min-w-0 md:data-[state=active]:bg-background md:data-[state=active]:text-foreground md:data-[state=active]:shadow-sm"
-               )}
-             >
-               {val === 'coupon' && "Surprise Coupon"}
-               {val === 'swap' && "Currency Swap"}
-               {val === 'history' && "History"}
-             </TabsTrigger>
-          ))}
-        </TabsList>
+      {/* 2. Applied exact same Container classes: 'container mx-auto px-6 max-w-7xl' */}
+      <div className="container mx-auto px-6 max-w-7xl py-8 space-y-8">
+        
+        <PageHeader
+          title="My Wallet"
+          description="View your balances, exchange currencies, and see your transaction history."
+        />
 
-        <TabsContent value="coupon" className="mt-4 md:mt-6">
-          <SurpriseCoupon userProfile={userProfile} />
-        </TabsContent>
+        <WalletBalances userProfile={userProfile} />
 
-        <TabsContent value="swap" className="mt-4 md:mt-6">
-          <CurrencySwap userProfile={userProfile} />
-        </TabsContent>
+        <Tabs defaultValue="coupon" className="w-full">
+          
+          {/* Tabs List - Mobile Friendly Sliding */}
+          <TabsList className={cn(
+              "flex w-full overflow-x-auto no-scrollbar gap-2 bg-transparent p-0 h-auto",
+              "md:grid md:grid-cols-3 md:gap-0 md:bg-muted/80 md:p-1 md:rounded-xl"
+          )}>
+            {['coupon', 'swap', 'history'].map((val) => (
+               <TabsTrigger 
+                 key={val}
+                 value={val} 
+                 className={cn(
+                   "whitespace-nowrap transition-all duration-200",
+                   "rounded-full border bg-background px-4 py-2.5 text-xs font-medium shadow-sm min-w-[130px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary",
+                   "md:rounded-md md:border-none md:bg-transparent md:px-3 md:py-1.5 md:text-sm md:shadow-none md:min-w-0 md:data-[state=active]:bg-background md:data-[state=active]:text-foreground md:data-[state=active]:shadow-sm"
+                 )}
+               >
+                 {val === 'coupon' && "Surprise Coupon"}
+                 {val === 'swap' && "Currency Swap"}
+                 {val === 'history' && "History"}
+               </TabsTrigger>
+            ))}
+          </TabsList>
 
-        <TabsContent value="history" className="mt-4 md:mt-6">
-          <TransactionHistory />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="coupon" className="mt-6">
+            <SurpriseCoupon userProfile={userProfile} />
+          </TabsContent>
+
+          <TabsContent value="swap" className="mt-6">
+            <CurrencySwap userProfile={userProfile} />
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-6">
+            {/* Added w-full to ensure it respects container width */}
+            <div className="w-full overflow-hidden">
+                <TransactionHistory />
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
