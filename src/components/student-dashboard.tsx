@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { ActivityChart } from "./dashboard/activity-chart";
 
 import Link from "next/link";
+import { BrandLogo } from "./brand-logo";
 
 
 
@@ -330,7 +331,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
 
                  <div className="absolute bottom-0 left-0 p-8 opacity-5 transform -rotate-12 scale-125 pointer-events-none">
 
-                     <GraduationCap className="h-80 w-80 text-purple-400" />
+                     <BrandLogo variant='white' size={300} className="opacity-10" />
 
                  </div>
 
@@ -580,7 +581,6 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
                         </TabsContent>
 
                        
-
                         <TabsContent value="subjects" className="mt-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
 
                             {isAcademicsLoading ? (
