@@ -4,11 +4,11 @@ import { useMemo, useState } from 'react';
 import type { User, Worksheet, WorksheetAttempt } from '@/types';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where, orderBy, documentId } from 'firebase/firestore';
-import { Loader2, ChevronRight, CheckCircle2, AlertCircle, FileText, RefreshCw } from 'lucide-react';
+import { Loader2, ChevronRight, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
 import { WorksheetDisplayCard } from '../academics/worksheet-display-card';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import Link from 'next/link';
 
@@ -16,21 +16,16 @@ interface StudentAttemptHistoryProps {
     student: User;
 }
 
-// ✅ HELPER: Robust metric calculation that handles all legacy data cases
 const calculateMetrics = (attempt: any, worksheet?: Worksheet) => {
     let score = attempt.score;
     let total = attempt.totalMarks;
 
-    // CASE 1: Completely missing fields (Legacy Data) -> Recalculate from 'results' map
     if ((score === undefined || total === undefined || total === 0) && attempt.results) {
         score = 0;
         total = 0;
         Object.values(attempt.results).forEach((res: any) => {
-             // Try to find the max marks for this question from the worksheet if available
-             // Fallback: If we can't find the question max, assume 1 (standard for simple quizzes)
              const maxForQuestion = 1; 
              total += maxForQuestion;
-
              if (typeof res.score === 'number') {
                  score += res.score;
              } else if (res.isCorrect) {
@@ -39,15 +34,11 @@ const calculateMetrics = (attempt: any, worksheet?: Worksheet) => {
         });
     }
 
-    // CASE 2: Sanity Check - If still 0, avoid NaN
     if (!total || total <= 0) {
-        // Last resort: count keys in results
         if (attempt.results) total = Object.keys(attempt.results).length || 1;
         else total = 1; 
     }
 
-    // CASE 3: Percentage stored as Score (Data Corruption Fix)
-    // If score is 85 and total is 20, clearly 85 is a percentage
     if (score > total) {
         const assumedPercentage = score; 
         score = (assumedPercentage / 100) * total;
@@ -64,7 +55,6 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
     const { userProfile } = useUser();
     const userIsAdminOrTeacher = userProfile?.role === 'admin' || userProfile?.role === 'teacher';
 
-    // --- 1. DATA FETCHING ---
     const attemptsQuery = useMemoFirebase(() => {
         if (!firestore || !student.id || (!userIsAdminOrTeacher && student.id !== userProfile?.id)) {
             return null;
@@ -90,7 +80,6 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
 
     const { data: worksheets, isLoading: areWorksheetsLoading } = useCollection<Worksheet>(worksheetsQuery);
 
-    // --- 2. DATA MERGING ---
     const { attemptsByWorksheet, orderedWorksheets } = useMemo(() => {
         if (!attempts || !worksheets) return { attemptsByWorksheet: new Map(), orderedWorksheets: [] };
 
@@ -130,13 +119,12 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
                 <p className="text-sm text-muted-foreground">Recent activity log.</p>
             </div>
 
-            {/* --- VIEW 1: MOBILE LIST VIEW --- */}
+            {/* --- MOBILE LIST VIEW --- */}
             <div className="block md:hidden border-t border-b divide-y border-slate-100 dark:border-slate-800 -mx-6 bg-white dark:bg-slate-950">
                 {orderedWorksheets.map(ws => {
                     const latestAttempt = attemptsByWorksheet.get(ws.id)?.[0];
                     if (!latestAttempt) return null;
 
-                    // Pass worksheet to calculation for better accuracy if needed
                     const metrics = calculateMetrics(latestAttempt, ws);
 
                     return (
@@ -150,7 +138,7 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
                 })}
             </div>
 
-            {/* --- VIEW 2: DESKTOP CARD VIEW --- */}
+            {/* --- DESKTOP CARD VIEW --- */}
             <div className="hidden md:grid gap-4">
                 {orderedWorksheets.map(ws => {
                     const latestAttempt = attemptsByWorksheet.get(ws.id)?.[0];
@@ -206,13 +194,14 @@ function MobileHistoryItem({
                 </div>
             </SheetTrigger>
 
-            <SheetContent side="bottom" className="rounded-t-3xl px-6 pb-8">
+            <SheetContent side="bottom" className="rounded-t-3xl px-6 pb-10">
                 <SheetHeader className="text-left mb-6">
                     <SheetTitle className="text-xl">{worksheet.title}</SheetTitle>
                     <SheetDescription>
                         Completed on {attempt.attemptedAt?.toDate().toLocaleDateString()} at {attempt.attemptedAt?.toDate().toLocaleTimeString()}
                     </SheetDescription>
                 </SheetHeader>
+
                 <div className="grid grid-cols-2 gap-4 mb-8">
                     <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                         <div className="text-muted-foreground text-xs uppercase font-bold tracking-wider mb-1">Score</div>
@@ -228,23 +217,16 @@ function MobileHistoryItem({
                         </div>
                     </div>
                 </div>
+
                 <div className="flex flex-col gap-3">
+                    {/* ✅ FIX: Simplified button structure to match desktop functionality exactly */}
                     <Button asChild className="w-full h-12 text-base rounded-xl font-semibold shadow-lg shadow-blue-500/20" size="lg">
                         <Link href={`/analytics/worksheet/${attempt.id}`}>
                             <FileText className="mr-2 h-5 w-5" /> View Detailed Report
                         </Link>
                     </Button>
-                    <Button variant="outline" asChild className="w-full h-12 text-base rounded-xl" size="lg">
-                        <Link href={`/worksheet/${worksheet.id}`}>
-                            <RefreshCw className="mr-2 h-5 w-5" /> Retake Worksheet
-                        </Link>
-                    </Button>
                 </div>
-                <SheetFooter className="mt-4">
-                    <Button variant="ghost" onClick={() => setIsOpen(false)} className="w-full text-muted-foreground">
-                        Close
-                    </Button>
-                </SheetFooter>
+                {/* Close and Retake buttons removed as requested */}
             </SheetContent>
         </Sheet>
     );
