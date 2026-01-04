@@ -56,6 +56,7 @@ export default function SubjectWorkspacePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState("syllabus");
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -295,10 +296,6 @@ export default function SubjectWorkspacePage() {
   }
 
   return (
-    // Mobile-first structure applied:
-    // 1. Used overflow-x-hidden on the main container to prevent horizontal scrolling
-    // 2. Used the 'container' with 'px-4' padding for mobile, consistent with previous fixes
-    // 3. Kept desktop layouts via 'md:' prefixes to preserve desktop UI
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 w-full overflow-x-hidden">
       
       {/* HERO SECTION */}
@@ -389,31 +386,38 @@ export default function SubjectWorkspacePage() {
 
       {/* MAIN CONTENT AREA */}
       {!isUserBlocked && (
-        <Tabs defaultValue="syllabus" className="space-y-8 py-8 w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 py-8 w-full">
           {/* Modern Tabs Navigation - Sticky Header */}
           <div className="container mx-auto px-4 md:px-6 max-w-7xl sticky top-0 z-30 -my-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all w-full">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full">
               
-              {/* Tabs Scroll Container */}
+              {/* REFACTORED TABS LIST */}
               <div className="w-full overflow-hidden min-w-0">
-                <TabsList className="h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm w-full max-w-full overflow-x-auto flex flex-nowrap md:flex-wrap justify-start no-scrollbar">
-                  <TabsTrigger value="syllabus" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
+                {/* 
+                  Mobile: Scrollable Pills (flex-nowrap, overflow-x-auto, snap-x)
+                  Desktop: Wrapping Flexbox (md:flex-wrap)
+                */}
+                <TabsList className="h-auto p-2 md:p-1 gap-2 bg-slate-100 dark:bg-slate-900 border rounded-xl shadow-sm w-full max-w-full overflow-x-auto flex flex-nowrap md:flex-wrap justify-start no-scrollbar snap-x snap-mandatory">
+                  
+                  {/* Default Tabs */}
+                  <TabsTrigger value="syllabus" className="min-h-[44px] snap-start shrink-0 rounded-lg px-4 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
                     <BookOpen className="mr-2 h-4 w-4" /> Syllabus
                   </TabsTrigger>
-                  <TabsTrigger value="worksheet" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
+                  <TabsTrigger value="worksheet" className="min-h-[44px] snap-start shrink-0 rounded-lg px-4 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
                     <BookCopy className="mr-2 h-4 w-4" /> Worksheets
                   </TabsTrigger>
-                  <TabsTrigger value="leaderboard" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
+                  <TabsTrigger value="leaderboard" className="min-h-[44px] snap-start shrink-0 rounded-lg px-4 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
                     <Trophy className="mr-2 h-4 w-4" /> Leaderboard
                   </TabsTrigger>
+                  
                   {/* Dynamic Tabs */}
                   {visibleCustomTabs?.map(tab => {
                     const isLocked = !userIsEditor && !isTabUnlocked(tab);
                     return (
-                      <div key={tab.id} className="relative group flex items-center flex-shrink-0">
+                      <div key={tab.id} className="relative group flex items-center shrink-0 snap-start">
                         <TabsTrigger
                           value={tab.id}
-                          className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex items-center gap-2"
+                          className="min-h-[44px] rounded-lg px-4 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex items-center gap-2"
                         >
                           {tab.label}
                           {isLocked && <Lock className="h-3 w-3 text-muted-foreground opacity-70" />}
@@ -446,6 +450,7 @@ export default function SubjectWorkspacePage() {
                   })}
                 </TabsList>
               </div>
+
               {/* Add Tab Button */}
               {userIsEditor && (
                 <Button onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} className="gap-2 shadow-sm flex-shrink-0">
@@ -455,8 +460,8 @@ export default function SubjectWorkspacePage() {
             </div>
           </div>
 
+
           {/* --- TAB CONTENT AREAS --- */}
-          {/* Consistent px-4 mobile padding applied here */}
           <div className="container mx-auto max-w-7xl px-4 md:px-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm min-h-[500px]">
             <TabsContent value="syllabus" className="mt-0 animate-in fade-in duration-500">
               <div className="max-w-4xl mx-auto pt-6">
