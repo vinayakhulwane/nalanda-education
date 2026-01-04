@@ -3,7 +3,7 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, CalendarDays, BookOpen } from "lucide-react";
+import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, CalendarDays, BookOpen, Repeat } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Worksheet, WorksheetAttempt } from "@/types";
 import { cn } from "@/lib/utils";
@@ -12,8 +12,8 @@ import { format } from "date-fns";
 interface WorksheetDisplayCardProps {
     worksheet: Worksheet;
     isPractice?: boolean;
-    completedAttempts?: string[];
-    attempt?: WorksheetAttempt; // For history view
+    // This will now be an array of all attempts for this specific worksheet
+    attempts?: WorksheetAttempt[]; 
     view?: 'card' | 'list';
     from?: string;
     studentId?: string;
@@ -22,26 +22,27 @@ interface WorksheetDisplayCardProps {
 export function WorksheetDisplayCard({ 
     worksheet, 
     isPractice = false, 
-    completedAttempts = [], 
-    attempt,
+    attempts = [],
     view = 'card',
     from,
     studentId,
 }: WorksheetDisplayCardProps) {
     const router = useRouter();
-    const isCompleted = completedAttempts.includes(worksheet.id) || !!attempt;
+    
+    const latestAttempt = attempts.length > 0 ? attempts[0] : undefined;
+    const isCompletedOrAttempted = attempts.length > 0;
     const questionCount = worksheet.questions?.length || 0;
     
-    // Total marks logic - use 10 marks per question as an estimate for time
     const totalMarks = questionCount * 10; 
-    const estimatedTime = Math.ceil(totalMarks * 0.5); // Estimate 30 seconds per mark
+    const estimatedTime = Math.ceil(totalMarks * 0.5);
 
     const handleStart = () => {
         router.push(`/solve/${worksheet.id}`); 
     };
 
     const handleReview = () => {
-        const reviewUrl = `/worksheets/review/${attempt?.id}`;
+        if (!latestAttempt) return; // Should not happen if button is shown
+        const reviewUrl = `/worksheets/review/${latestAttempt.id}`;
         const queryParams = new URLSearchParams();
         if (from) queryParams.set('from', from);
         if (studentId) queryParams.set('studentId', studentId);
@@ -50,13 +51,11 @@ export function WorksheetDisplayCard({
         router.push(finalUrl);
     };
 
-    // --- LIST VIEW (For Mobile & History) ---
     if (view === 'list') {
-        const actionHandler = isCompleted ? handleReview : handleStart;
+        const actionHandler = isCompletedOrAttempted ? handleReview : handleStart;
         
         return (
              <div className="group flex flex-col gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border hover:border-primary/20 transition-all shadow-sm hover:shadow-md cursor-pointer" onClick={actionHandler}>
-                {/* Top Section: Icon & Title */}
                 <div className="flex items-center gap-4">
                     <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                         <BookOpen className="h-6 w-6 text-primary" />
@@ -67,10 +66,8 @@ export function WorksheetDisplayCard({
                     </div>
                 </div>
 
-                {/* Divider */}
                 <hr className="border-slate-100 dark:border-slate-800" />
 
-                {/* Middle Section: Stats */}
                 <div className="flex items-center gap-6 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                         <FileQuestion className="h-4 w-4" />
@@ -81,13 +78,12 @@ export function WorksheetDisplayCard({
                         <span className="font-medium">~{estimatedTime} min</span>
                     </div>
                 </div>
-
-                {/* Bottom Section: Status & Button */}
+                
                 <div className="flex items-center justify-between">
-                    {isCompleted ? (
-                        <div className="flex items-center gap-2 font-semibold text-sm text-emerald-600 dark:text-emerald-400">
-                             <CheckCircle2 className="h-4 w-4" />
-                             Completed
+                    {isCompletedOrAttempted ? (
+                        <div className="flex items-center gap-2 font-semibold text-sm text-blue-600 dark:text-blue-400">
+                             <Repeat className="h-4 w-4" />
+                             Attempted {attempts.length} time(s)
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 font-semibold text-sm text-slate-500">
@@ -101,7 +97,7 @@ export function WorksheetDisplayCard({
                         className="font-semibold"
                         onClick={(e) => { e.stopPropagation(); actionHandler(); }}
                     >
-                        {isCompleted ? 'View Results' : 'Start Solving'}
+                        {isCompletedOrAttempted ? 'View Latest' : 'Start Solving'}
                         <ArrowRight className="ml-1.5 h-4 w-4"/>
                     </Button>
                 </div>
@@ -112,7 +108,6 @@ export function WorksheetDisplayCard({
     // --- CARD VIEW (Standard for Desktop) ---
     return (
         <Card className="group relative overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white dark:bg-slate-900 flex flex-col h-full">
-            {/* Type Badge & Header Color */}
             <div className={cn(
                 "absolute top-0 inset-x-0 h-1.5",
                 isPractice ? "bg-gradient-to-r from-purple-400 to-pink-500" : "bg-gradient-to-r from-blue-400 to-indigo-500"
@@ -128,7 +123,7 @@ export function WorksheetDisplayCard({
                     )}>
                         {isPractice ? 'Practice Zone' : 'Classroom'}
                     </Badge>
-                    {isCompleted && (
+                    {isCompletedOrAttempted && (
                         <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded-full">
                             <CheckCircle2 className="h-3 w-3" /> Done
                         </div>
@@ -140,7 +135,6 @@ export function WorksheetDisplayCard({
             </CardHeader>
 
             <CardContent className="flex-1">
-                {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-2 mt-2">
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
                         <FileQuestion className="h-4 w-4 text-muted-foreground" />
@@ -158,8 +152,7 @@ export function WorksheetDisplayCard({
                     </div>
                 </div>
                 
-                {/* Reward hint */}
-                {!isCompleted && (
+                {!isCompletedOrAttempted && (
                     <div className="flex items-center gap-1.5 mt-4 text-xs font-medium text-amber-600 dark:text-amber-400">
                         <Sparkles className="h-3.5 w-3.5" />
                         <span>Earn {questionCount * 5} XP</span>
@@ -171,18 +164,19 @@ export function WorksheetDisplayCard({
                 <Button 
                     className={cn(
                         "w-full font-semibold shadow-lg transition-all group/btn",
-                        isCompleted 
+                        isCompletedOrAttempted 
                             ? "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-white" 
                             : isPractice 
                                 ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-purple-500/20"
                                 : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-500/20"
                     )}
-                    onClick={isCompleted ? handleReview : handleStart}
+                    onClick={isCompletedOrAttempted ? handleReview : handleStart}
                 >
-                    {isCompleted ? 'Review Results' : 'Start Assignment'}
-                    {!isCompleted && <PlayCircle className="ml-2 h-4 w-4 group-hover/btn:scale-110 transition-transform" />}
+                    {isCompletedOrAttempted ? 'Review Results' : 'Start Assignment'}
+                    {!isCompletedOrAttempted && <PlayCircle className="ml-2 h-4 w-4 group-hover/btn:scale-110 transition-transform" />}
                 </Button>
             </CardFooter>
         </Card>
     );
 }
+

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from "next/navigation";
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import type { Worksheet, WorksheetAttempt } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,8 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
     const [attempts, setAttempts] = useState<WorksheetAttempt[]>([]);
     const [areAttemptsLoading, setAttemptsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 8; // Reduced slightly for better grid fit
+    const itemsPerPage = 8;
 
-    // HIDE FROM ADMIN & TEACHER
     if (userProfile?.role === 'admin' || userProfile?.role === 'teacher') {
         return (
             <div className="p-8 text-center border-2 border-dashed rounded-xl">
@@ -53,16 +52,15 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                 return;
             }
             try {
-                // Limit to 30 for 'in' query constraint
                 const attemptsQuery = query(
                     collection(firestore, 'worksheet_attempts'), 
                     where('userId', '==', user.uid),
-                    where('worksheetId', 'in', targetIds.slice(0, 30)) 
+                    where('worksheetId', 'in', targetIds.slice(0, 30)),
+                    orderBy('attemptedAt', 'desc')
                 );
                 const attemptSnapshots = await getDocs(attemptsQuery);
                 const fetchedAttempts = attemptSnapshots.docs.map(d => ({ id: d.id, ...d.data() })) as WorksheetAttempt[];
                 setAttempts(fetchedAttempts);
-
             } catch (error) {
                 console.error("Error fetching attempts:", error);
             } finally {
@@ -74,31 +72,22 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
     }, [firestore, user?.uid, practiceWorksheets]);
 
 
-    const { notStarted, history, attemptsMap, totalPages, paginatedHistory } = useMemo(() => {
-        if (!practiceWorksheets) return { notStarted: [], history: [], attemptsMap: new Map(), totalPages: 1, paginatedHistory: [] };
+    const { notStarted, history, attemptsByWorksheet, totalPages, paginatedHistory } = useMemo(() => {
+        if (!practiceWorksheets) return { notStarted: [], history: [], attemptsByWorksheet: new Map(), totalPages: 1, paginatedHistory: [] };
         
-        const latestAttemptsMap = new Map<string, WorksheetAttempt>();
+        const attemptsMap = new Map<string, WorksheetAttempt[]>();
         attempts.forEach(attempt => {
-            const existing = latestAttemptsMap.get(attempt.worksheetId);
-            if (!existing || (attempt.attemptedAt && existing.attemptedAt && attempt.attemptedAt.toMillis() > existing.attemptedAt.toMillis())) {
-                latestAttemptsMap.set(attempt.worksheetId, attempt);
-            }
+            const existing = attemptsMap.get(attempt.worksheetId) || [];
+            attemptsMap.set(attempt.worksheetId, [...existing, attempt]);
         });
 
         const attemptedWorksheetIds = new Set(attempts.map(a => a.worksheetId));
-        const profileCompletedIds = new Set(userProfile?.completedWorksheets || []);
-
-        const isWorksheetTouched = (id: string) => attemptedWorksheetIds.has(id) || profileCompletedIds.has(id);
-
-        const historyList = practiceWorksheets.filter(ws => isWorksheetTouched(ws.id));
-        const todoList = practiceWorksheets.filter(ws => !isWorksheetTouched(ws.id));
-
-        // Sort history by attempt time (newest first)
+        const todoList = practiceWorksheets.filter(ws => !attemptedWorksheetIds.has(ws.id));
+        const historyList = practiceWorksheets.filter(ws => attemptedWorksheetIds.has(ws.id));
+        
         historyList.sort((a, b) => {
-            const attemptA = latestAttemptsMap.get(a.id);
-            const attemptB = latestAttemptsMap.get(b.id);
-            const timeA = attemptA?.attemptedAt?.toMillis() || 0;
-            const timeB = attemptB?.attemptedAt?.toMillis() || 0;
+            const timeA = attemptsMap.get(a.id)?.[0]?.attemptedAt?.toMillis() || 0;
+            const timeB = attemptsMap.get(b.id)?.[0]?.attemptedAt?.toMillis() || 0;
             return timeB - timeA;
         });
         
@@ -110,11 +99,11 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
         return { 
             history: historyList, 
             notStarted: todoList, 
-            attemptsMap: latestAttemptsMap,
+            attemptsByWorksheet: attemptsMap,
             totalPages: totalP,
             paginatedHistory: paginatedItems,
         };
-    }, [practiceWorksheets, attempts, currentPage, userProfile?.completedWorksheets, itemsPerPage]);
+    }, [practiceWorksheets, attempts, currentPage, itemsPerPage]);
     
 
     const isLoading = areWorksheetsLoading || areAttemptsLoading;
@@ -130,10 +119,8 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                     </TabsList>
                 </div>
                 
-                {/* TAB 1: SAVED & TO-DO */}
                 <TabsContent value="saved" className="mt-0">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {/* CREATE NEW CARD (Modernized) */}
                         <div 
                             className="group flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/20 hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-all cursor-pointer h-full min-h-[300px]"
                             onClick={() => router.push(createWorksheetUrl)}
@@ -160,7 +147,6 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                                     key={ws.id} 
                                     worksheet={ws} 
                                     isPractice={true}
-                                    completedAttempts={userProfile?.completedWorksheets || []}
                                     view="card"
                                 />
                             ))
@@ -168,7 +154,6 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                     </div>
                 </TabsContent>
 
-                {/* TAB 2: HISTORY */}
                 <TabsContent value="history" className="mt-0">
                     <div className="space-y-4">
                         {isLoading ? (
@@ -183,14 +168,12 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                                             key={ws.id} 
                                             worksheet={ws} 
                                             isPractice={true}
-                                            completedAttempts={userProfile?.completedWorksheets || []}
                                             view="list"
-                                            attempt={attemptsMap.get(ws.id)}
+                                            attempts={attemptsByWorksheet.get(ws.id) || []}
                                         />
                                     ))}
                                 </div>
                                 
-                                {/* Pagination */}
                                 {totalPages > 1 && (
                                     <div className="flex items-center justify-between pt-4 border-t">
                                         <span className="text-sm text-muted-foreground">
