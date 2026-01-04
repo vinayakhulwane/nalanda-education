@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo } from "react";
@@ -487,7 +488,7 @@ export default function SubjectWorkspacePage() {
             <TabsContent value="worksheet" className="mt-0 animate-in fade-in duration-500 pt-6">
               <Tabs defaultValue="assignments" className="w-full">
                 <div className="flex justify-center mb-8">
-                  <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-full overflow-x-auto max-w-full">
+                  <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 grid grid-cols-2 md:inline-flex md:w-auto rounded-full w-full">
                     <TabsTrigger value="assignments" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
                       <BookCopy className="mr-2 h-4 w-4" /> Assignments
                     </TabsTrigger>
