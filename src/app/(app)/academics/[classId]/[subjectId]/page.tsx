@@ -1,10 +1,12 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus, BookOpen, Trophy } from "lucide-react";
+import { ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus, BookOpen, Trophy, GraduationCap, ChevronRight, Zap } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -13,11 +15,12 @@ import { useUser, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { arrayRemove, arrayUnion, collection, doc, updateDoc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
 import type { Subject, CustomTab, CurrencyType } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { UnlockContentCard } from "@/components/academics/unlock-content-card";
@@ -295,16 +298,19 @@ export default function SubjectWorkspacePage() {
   }
 
   return (
-    <div className="w-full">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50 w-full overflow-x-hidden">
       
       {/* HERO SECTION */}
       <div className="bg-slate-900 text-white relative overflow-hidden w-full">
+        {/* Decorative elements */}
         <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
           <BrandLogo variant='white' size={300} className="opacity-10" />
         </div>
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 pointer-events-none" />
 
+        {/* Content Container - Consistent px-4 mobile padding */}
         <div className="container mx-auto px-4 md:px-6 py-8 md:py-12 relative z-10 max-w-7xl">
+          {/* Breadcrumb / Back */}
           <Button
             variant="ghost"
             onClick={() => router.push(`/academics/${classId}`)}
@@ -382,85 +388,96 @@ export default function SubjectWorkspacePage() {
 
       {/* MAIN CONTENT AREA */}
       {!isUserBlocked && (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          
-          <div className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-             <div className="container mx-auto px-4 md:px-6 max-w-7xl relative">
-                {/* THIS IS THE CONTAINER THAT ENABLES SCROLLING */}
-                <div className="w-full overflow-hidden">
-                    <div className="flex items-center gap-4 py-3 overflow-x-auto no-scrollbar">
-                        <TabsList className="h-auto p-0 bg-transparent">
-                          <TabsTrigger value="syllabus" className="px-4 py-2.5 rounded-md text-sm font-medium data-[state=active]:bg-foreground/5 data-[state=active]:text-foreground">
-                            <BookOpen className="mr-2 h-4 w-4" /> Syllabus
-                          </TabsTrigger>
-                          <TabsTrigger value="worksheet" className="px-4 py-2.5 rounded-md text-sm font-medium data-[state=active]:bg-foreground/5 data-[state=active]:text-foreground">
-                            <BookCopy className="mr-2 h-4 w-4" /> Worksheets
-                          </TabsTrigger>
-                          <TabsTrigger value="leaderboard" className="px-4 py-2.5 rounded-md text-sm font-medium data-[state=active]:bg-foreground/5 data-[state=active]:text-foreground">
-                            <Trophy className="mr-2 h-4 w-4" /> Leaderboard
-                          </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 py-8 w-full">
+          {/* Sticky Header */}
+          <div className="container mx-auto px-4 md:px-6 max-w-7xl sticky top-0 z-30 -my-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all w-full">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full">
+              
+              {/* MOBILE VIEW: Dropdown */}
+              <div className="md:hidden w-full">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Section</label>
+                <Select value={activeTab} onValueChange={setActiveTab}>
+                  <SelectTrigger className="w-full h-12 text-base">
+                    <SelectValue placeholder="Select a section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="syllabus">Syllabus</SelectItem>
+                    <SelectItem value="worksheet">Worksheets</SelectItem>
+                    <SelectItem value="leaderboard">Leaderboard</SelectItem>
+                    {visibleCustomTabs?.map(tab => (
+                       <SelectItem key={tab.id} value={tab.id}>{tab.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                          {visibleCustomTabs?.map(tab => {
-                            const isLocked = !userIsEditor && !isTabUnlocked(tab);
-                            return (
-                              <div key={tab.id} className="relative group flex items-center">
-                                <TabsTrigger
-                                  value={tab.id}
-                                  className="flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium data-[state=active]:bg-foreground/5 data-[state=active]:text-foreground"
-                                >
-                                  {tab.label}
-                                  {isLocked && <Lock className="h-3 w-3 opacity-70" />}
-                                </TabsTrigger>
-                                
-                                {userIsEditor && (
-                                  <div className="ml-1">
-                                     <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                                            <MoreVertical className="h-4 w-4" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent>
-                                            <DropdownMenuItem onClick={() => openEditTabDialog(tab)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
-                                                {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-                                                {tab.hidden ? 'Show to Students' : 'Hide from Students'}
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-red-600"><Trash className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                     </DropdownMenu>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </TabsList>
+              {/* DESKTOP VIEW: Scrollable Pills */}
+              <TabsList className="hidden md:flex h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm w-full max-w-full overflow-x-auto justify-start no-scrollbar">
+                <TabsTrigger 
+                  value="syllabus" 
+                  className="rounded-lg border bg-transparent px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
+                >
+                  <BookOpen className="mr-2 h-4 w-4" /> Syllabus
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="worksheet" 
+                  className="rounded-lg border bg-transparent px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
+                >
+                  <BookCopy className="mr-2 h-4 w-4" /> Worksheets
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="leaderboard" 
+                  className="rounded-lg border bg-transparent px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex-shrink-0"
+                >
+                  <Trophy className="mr-2 h-4 w-4" /> Leaderboard
+                </TabsTrigger>
+                {visibleCustomTabs?.map(tab => {
+                  const isLocked = !userIsEditor && !isTabUnlocked(tab);
+                  return (
+                    <div key={tab.id} className="relative group flex items-center flex-shrink-0">
+                      <TabsTrigger
+                        value={tab.id}
+                        className="rounded-lg border bg-transparent px-5 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground md:data-[state=active]:bg-white md:data-[state=active]:text-primary font-medium shadow-sm transition-all flex items-center gap-2"
+                      >
+                        {tab.label}
+                        {isLocked && <Lock className="h-3 w-3 opacity-70" />}
+                      </TabsTrigger>
+                      {userIsEditor && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 ml-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800">
+                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => openEditTabDialog(tab)}><Edit className="mr-2 h-4 w-4" /> Edit Details</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
+                              {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                              {tab.hidden ? 'Show' : 'Hide'}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive"><Trash className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
-                </div>
-
-                {userIsEditor && (
-                  <div className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 bg-background/95 pl-4">
-                      <Button onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} size="sm" className="gap-2 shadow-sm">
-                      <Plus className="h-4 w-4" /> New Tab
-                      </Button>
-                  </div>
-                )}
+                  )
+                })}
+              </TabsList>
+              
+              {userIsEditor && (
+                <Button onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} className="gap-2 shadow-sm flex-shrink-0">
+                  <Plus className="h-4 w-4" /> New Tab
+                </Button>
+              )}
             </div>
           </div>
-          
-           {userIsEditor && (
-             <div className="container px-4 mt-4 md:hidden">
-                 <Button variant="outline" onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} className="w-full gap-2 border-dashed h-12">
-                 <Plus className="h-4 w-4" /> Add New Section
-                 </Button>
-             </div>
-           )}
+
 
           {/* --- TAB CONTENT AREAS --- */}
-          <div className="container mx-auto max-w-7xl px-4 md:px-6 py-8 min-h-[500px]">
+          <div className="container mx-auto max-w-7xl px-4 md:px-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm min-h-[500px]">
             <TabsContent value="syllabus" className="mt-0 animate-in fade-in duration-500">
-              <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm">
+              <div className="max-w-4xl mx-auto pt-6">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-primary" /> Course Syllabus
                 </h3>
@@ -468,8 +485,7 @@ export default function SubjectWorkspacePage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="worksheet" className="mt-0 animate-in fade-in duration-500">
-             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm">
+            <TabsContent value="worksheet" className="mt-0 animate-in fade-in duration-500 pt-6">
               <Tabs defaultValue="assignments" className="w-full">
                 <div className="flex justify-center mb-8">
                   <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 grid grid-cols-2 md:inline-flex md:w-auto rounded-full w-full">
@@ -488,11 +504,10 @@ export default function SubjectWorkspacePage() {
                   <PracticeZone classId={classId} subjectId={subjectId} />
                 </TabsContent>
               </Tabs>
-             </div>
             </TabsContent>
 
-            <TabsContent value="leaderboard" className="mt-0 animate-in fade-in duration-500">
-              <div className="max-w-3xl mx-auto bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm">
+            <TabsContent value="leaderboard" className="mt-0 animate-in fade-in duration-500 pt-6">
+              <div className="max-w-3xl mx-auto">
                 <Leaderboard subjectId={subjectId} />
               </div>
             </TabsContent>
@@ -500,8 +515,7 @@ export default function SubjectWorkspacePage() {
             {visibleCustomTabs?.map(tab => {
               const isLocked = !userIsEditor && !isTabUnlocked(tab);
               return (
-                <TabsContent key={tab.id} value={tab.id} className="mt-0 animate-in fade-in duration-500">
-                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm">
+                <TabsContent key={tab.id} value={tab.id} className="mt-0 animate-in fade-in duration-500 pt-6">
                   {isLocked ? (
                     <div className="max-w-md mx-auto py-12">
                       <UnlockContentCard tab={tab} onUnlock={() => handleUnlockTab(tab)} />
@@ -522,7 +536,6 @@ export default function SubjectWorkspacePage() {
                       </div>
                     </div>
                   )}
-                  </div>
                 </TabsContent>
               )
             })}
