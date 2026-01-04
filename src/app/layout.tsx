@@ -20,6 +20,7 @@ const fontHeadline = Space_Grotesk({
 export const metadata: Metadata = {
   title: 'Nalanda',
   description: 'The personalized platform for academic excellence.',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
