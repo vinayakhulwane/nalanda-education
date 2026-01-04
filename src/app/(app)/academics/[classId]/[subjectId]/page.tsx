@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { UnlockContentCard } from "@/components/academics/unlock-content-card";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "@/components/brand-logo";
 
 // Dynamic Imports
 const SyllabusEditor = dynamic(
@@ -305,7 +306,7 @@ export default function SubjectWorkspacePage() {
             <div className="bg-slate-900 text-white relative overflow-hidden w-full">
                 {/* Decorative elements */}
                 <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
-                    <GraduationCap className="h-96 w-96 text-white" />
+                    <BrandLogo variant='white' size={300} className="opacity-10" />
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 pointer-events-none" />
 

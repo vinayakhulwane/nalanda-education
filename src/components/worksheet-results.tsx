@@ -18,6 +18,7 @@ import confetti from "canvas-confetti";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { generateSolutionAction } from '@/app/actions/ai-solution'; 
+import { BrandLogo } from './brand-logo';
 
 // --- TYPES ---
 export type AnswerState = {
@@ -458,6 +459,10 @@ export function WorksheetResults({
                     .print-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 10vw; font-weight: bold; color: rgba(100, 116, 139, 0.08); z-index: -1; pointer-events: none; text-align: center; }
                 }
             `}</style>
+            
+            <div className="print-watermark hidden print-only">
+                <BrandLogo size={400} />
+            </div>
 
             {/* --- BACK BUTTON --- */}
             <div className="no-print mb-6">

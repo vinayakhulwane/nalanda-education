@@ -8,6 +8,7 @@ import { doc } from "firebase/firestore";
 import { Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import Image from "next/image";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
@@ -24,14 +25,9 @@ export default function DashboardPage() {
   if (isUserLoading || isProfileLoading) {
     return (
       <div className="flex h-[calc(100vh-4rem)] w-full flex-col items-center justify-center gap-4 bg-background">
-        <Image 
-          src="/HD_Logo_TBG.png" 
-          alt="Nalanda Loading" 
-          width={128} 
-          height={128} 
-          className="animate-pulse-once"
-          priority
-        />
+        <div className="animate-pulse">
+            <BrandLogo variant='primary' size={64} />
+        </div>
         <p className="text-sm text-muted-foreground">Loading dashboard...</p>
       </div>
     );

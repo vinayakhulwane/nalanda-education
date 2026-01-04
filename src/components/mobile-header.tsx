@@ -1,14 +1,15 @@
 'use client';
 
-import { GraduationCap, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { BrandLogo } from "./brand-logo";
 
 export function MobileHeader() {
   return (
     <header className="lg:hidden sticky top-0 z-50 flex items-center justify-between bg-[#1e1b4b] text-white p-4 shadow-md">
       <Link href="/dashboard" className="flex items-center gap-2">
-        <GraduationCap className="h-6 w-6" />
+        <BrandLogo variant='white' size={32} />
         <span className="font-bold tracking-tight">Nalanda</span>
       </Link>
       <div className="flex items-center gap-4">

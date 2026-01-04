@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function Home() {
   const loginImage = PlaceHolderImages.find(p => p.id === 'login');
@@ -96,14 +97,8 @@ export default function Home() {
         <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/50 dark:border-slate-800 shadow-2xl rounded-3xl p-8 sm:p-10 text-center">
           
           {/* Logo with Glow Effect */}
-          <div className="mx-auto w-24 h-24 relative mb-6 shadow-xl rounded-2xl overflow-hidden bg-white dark:bg-slate-950 ring-1 ring-slate-100 dark:ring-slate-800">
-             <Image 
-                src="/HD_Logo_TBG.png" 
-                alt="Nalanda Logo" 
-                fill 
-                className="object-cover"
-                priority
-             />
+          <div className="mx-auto w-24 h-24 relative mb-6">
+             <BrandLogo variant='primary' size={96} />
           </div>
 
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-3">
