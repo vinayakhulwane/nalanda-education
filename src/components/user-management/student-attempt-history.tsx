@@ -1,4 +1,5 @@
 'use client';
+
 import { useMemo } from 'react';
 import type { User, Worksheet, WorksheetAttempt } from '@/types';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
@@ -29,7 +30,7 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
     }, [firestore, student.id, userIsAdminOrTeacher, userProfile?.id]);
 
     const { data: attempts, isLoading: areAttemptsLoading } = useCollection<WorksheetAttempt>(attemptsQuery);
-    
+
     const worksheetIds = useMemo(() => {
         if (!attempts) return [];
         return [...new Set(attempts.map(a => a.worksheetId))];
@@ -39,7 +40,7 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
         if (!firestore || worksheetIds.length === 0) return null;
         return query(collection(firestore, 'worksheets'), where(documentId(), 'in', worksheetIds.slice(0, 30)));
     }, [firestore, worksheetIds]);
-    
+
     const { data: worksheets, isLoading: areWorksheetsLoading } = useCollection<Worksheet>(worksheetsQuery);
 
     const { attemptsByWorksheet, orderedWorksheets } = useMemo(() => {
@@ -61,7 +62,7 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
 
         return { attemptsByWorksheet: attemptsMap, orderedWorksheets: sortedWs };
     }, [attempts, worksheets]);
-    
+
     const isLoading = areAttemptsLoading || areWorksheetsLoading;
 
     // Do not render the component for non-admins if they are trying to view another student's history
@@ -70,34 +71,40 @@ export function StudentAttemptHistory({ student }: StudentAttemptHistoryProps) {
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Worksheet Attempt History</CardTitle>
-                <CardDescription>A log of all worksheets this student has completed.</CardDescription>
+        // ✅ Fix: Added max-w-full and overflow handling for mobile fit
+        <Card className="w-full max-w-[100vw] overflow-hidden border-0 shadow-none md:border md:shadow-sm">
+            {/* ✅ Fix: Reduced padding on mobile (p-3) vs desktop (p-6) */}
+            <CardHeader className="p-3 pb-0 md:p-6 md:pb-2">
+                <CardTitle className="text-lg md:text-2xl">Worksheet Attempt History</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
+                    A log of all worksheets this student has completed.
+                </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 md:p-6">
                 {isLoading ? (
-                    <div className="flex h-48 items-center justify-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <div className="flex h-24 md:h-48 items-center justify-center">
+                        <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-muted-foreground" />
                     </div>
                 ) : orderedWorksheets.length > 0 ? (
-                    <div className="space-y-4">
+                    // ✅ Fix: Tighter spacing (space-y-2) and scaled down text/content on mobile
+                    <div className="space-y-2 md:space-y-4">
                         {orderedWorksheets.map(ws => {
                             const latestAttempt = attemptsByWorksheet.get(ws.id)?.[0];
                             return (
-                                <WorksheetDisplayCard
-                                    key={ws.id}
-                                    worksheet={ws}
-                                    view="list"
-                                    attempt={latestAttempt}
-                                    from="progress"
-                                    studentId={student.id}
-                                />
+                                <div key={ws.id} className="origin-left transform scale-95 md:scale-100 w-full">
+                                    <WorksheetDisplayCard
+                                        worksheet={ws}
+                                        view="list"
+                                        attempt={latestAttempt}
+                                        from="progress"
+                                        studentId={student.id}
+                                    />
+                                </div>
                             )
                         })}
                     </div>
                 ) : (
-                    <div className="text-center text-muted-foreground py-10">
+                    <div className="text-center text-muted-foreground py-6 md:py-10 text-sm md:text-base">
                         This student has not attempted any worksheets yet.
                     </div>
                 )}
