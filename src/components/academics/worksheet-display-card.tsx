@@ -77,8 +77,8 @@ export function WorksheetDisplayCard({
                         </div>
                     </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleReview}>
-                    View Results
+                <Button variant="ghost" size="icon" onClick={handleReview} className="h-10 w-10 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-full">
+                    <PlayCircle className="h-6 w-6" />
                 </Button>
             </div>
         );
