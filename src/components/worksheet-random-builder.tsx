@@ -9,7 +9,7 @@ import { ShoppingCart, PlusCircle, Filter, Trash2, Bot, Coins, Gem, Crown, Spark
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from './ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger, SheetClose } from './ui/sheet';
 import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
@@ -19,7 +19,6 @@ import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { calculateWorksheetCost } from '@/lib/wallet';
 import { useToast } from "@/components/ui/use-toast";
-import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer"; // Assuming you have a drawer component for better mobile sheets
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
 
@@ -44,7 +43,7 @@ const currencyIcons: Record<CurrencyType, React.ElementType> = {
 // Defined at top level to avoid ReferenceError
 const allCurrencyTypes: CurrencyType[] = ['spark', 'coin', 'gold', 'diamond'];
 
-// New styles map for the premium card look
+// Styles map for the premium card look
 const currencyStyles: Record<CurrencyType, { bg: string, text: string, border: string, iconBg: string }> = {
     spark: {
         bg: 'bg-slate-100 dark:bg-slate-800',
@@ -151,7 +150,6 @@ export function WorksheetRandomBuilder({
     }, [availableCategories, filterSearch.category]);
 
     const filteredCurrenciesList = useMemo(() => {
-        // Now accessible because it's defined at the top
         return allCurrencyTypes.filter(c => c.toLowerCase().includes(filterSearch.currency.toLowerCase()));
     }, [filterSearch.currency]);
 
@@ -288,7 +286,7 @@ export function WorksheetRandomBuilder({
             ((userProfile.aiCredits || 0) >= (creationCost.aiCredits || 0));
     }, [userProfile, creationCost, userIsEditor]);
 
-    // Review Sheet Content (Refactored for cleaner reuse in mobile/desktop sheets)
+    // Review Sheet Content
     const ReviewSheetContent = () => (
         <div className="flex-grow flex flex-col h-full overflow-hidden">
             <div className="px-6 py-4 border-b bg-slate-50/50 dark:bg-slate-900/50">
@@ -599,7 +597,7 @@ export function WorksheetRandomBuilder({
                     </CardContent>
                 </Card>
 
-                <Card className="hidden md:flex flex-col shadow-sm border-slate-200 dark:border-slate-800 rounded-2xl">
+                <Card className="shadow-sm border-slate-200 dark:border-slate-800 rounded-2xl hidden md:flex flex-col">
                      <CardHeader className="pb-3 pt-5 px-5">
                         <CardTitle className="text-base text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-2">
                            <Filter className="h-4 w-4" /> Breakdown by Category
@@ -688,11 +686,20 @@ export function WorksheetRandomBuilder({
                     </div>
                 </SheetTrigger>
                 <SheetContent className="w-full sm:w-[540px] flex flex-col p-0 h-[100dvh] md:h-full rounded-none md:rounded-l-2xl border-l-0 md:border-l">
-                   <ReviewSheetContent />
+                    <SheetHeader className="px-6 py-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b sticky top-0 z-10">
+                         <div className="flex items-center justify-between">
+                            <SheetTitle className="text-xl">Review Worksheet</SheetTitle>
+                            <SheetClose asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-4 w-4" /></Button>
+                            </SheetClose>
+                        </div>
+                        <SheetDescription className="hidden md:block">
+                            Review your selections before finalizing.
+                        </SheetDescription>
+                    </SheetHeader>
+                    <ReviewSheetContent />
                 </SheetContent>
             </Sheet>
         </div>
     );
 }
-
-    
