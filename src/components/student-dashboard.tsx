@@ -461,7 +461,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
                 {/* Activity Chart Container - Spans all columns on mobile, 2 on md, 1 on lg */}
                 <div className="md:col-span-2 lg:col-span-1 h-full min-h-[160px]">
 
-                    <ActivityChart />
+                    <ActivityChart attempts={attempts} />
 
                 </div>
 

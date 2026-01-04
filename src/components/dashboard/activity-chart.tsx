@@ -3,21 +3,36 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, XAxis, Tooltip, Cell } from "recharts";
 import { Zap } from "lucide-react";
+import { useMemo } from "react";
+import type { WorksheetAttempt } from "@/types";
+import { format, subDays, getDay } from 'date-fns';
 
-// MOCK DATA: This would eventually come from aggregating 'worksheet_attempts' in Firestore
-const activityData = [
-  { day: "Mon", score: 12 },
-  { day: "Tue", score: 25 },
-  { day: "Wed", score: 18 },
-  { day: "Thu", score: 30 },
-  { day: "Fri", score: 45 }, // Peak activity
-  { day: "Sat", score: 10 },
-  { day: "Sun", score: 5 },
-];
+const dayMap = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function ActivityChart() {
-  // Calculate total for the subtitle
-  const totalQuestions = activityData.reduce((acc, curr) => acc + curr.score, 0);
+export function ActivityChart({ attempts }: { attempts: WorksheetAttempt[] | null }) {
+  const { activityData, totalQuestions } = useMemo(() => {
+    const data: { day: string; score: number }[] = dayMap.map(day => ({ day, score: 0 }));
+    
+    if (attempts) {
+        const oneWeekAgo = subDays(new Date(), 7);
+        
+        attempts.forEach(attempt => {
+            const attemptDate = (attempt.attemptedAt as any)?.toDate ? (attempt.attemptedAt as any).toDate() : null;
+            if (attemptDate && attemptDate > oneWeekAgo) {
+                const dayIndex = getDay(attemptDate);
+                const questionCount = Object.keys(attempt.answers || {}).length;
+                data[dayIndex].score += questionCount;
+            }
+        });
+    }
+
+    const total = data.reduce((acc, curr) => acc + curr.score, 0);
+
+    // Reorder to start from Monday for a typical weekly view
+    const orderedData = [...data.slice(1), data[0]];
+
+    return { activityData: orderedData, totalQuestions: total };
+  }, [attempts]);
 
   return (
     <Card className="flex flex-col border-none shadow-md bg-white dark:bg-slate-900 h-full relative overflow-hidden">
@@ -68,8 +83,7 @@ export function ActivityChart() {
                 {/* Bars with Gradient-like Effect using Cell */}
                 <Bar dataKey="score" radius={[4, 4, 0, 0]} barSize={24}>
                     {activityData.map((entry, index) => {
-                        // Highlight current day (e.g., Friday) or make darker based on value
-                        const isHighActivity = entry.score > 20;
+                        const isHighActivity = entry.score > 10;
                         return (
                             <Cell 
                                 key={`cell-${index}`} 
