@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { EconomySettings } from '@/types';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 
-type Currency = 'coins' | 'gold' | 'diamonds';
+type Currency = 'coins' | 'gold' | 'diamonds' | 'aiCredits';
 
 interface CurrencySwapProps {
   userProfile: any;
@@ -43,12 +43,19 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
       case 'coins': return 1;
       case 'gold': return COIN_TO_GOLD;
       case 'diamonds': return GOLD_TO_DIAMOND * COIN_TO_GOLD;
+      // aiCredits are not part of the standard exchange, handle separately if needed
+      case 'aiCredits': return 0;
     }
   };
 
   // 3. Calculate Exchange Rate & Output
   const { receiveAmount, exchangeRateText } = useMemo(() => {
     const amount = parseInt(swapAmount) || 0;
+    
+    // Prevent swapping to/from AI Credits
+    if (fromCurrency === 'aiCredits' || toCurrency === 'aiCredits') {
+        return { receiveAmount: 0, exchangeRateText: 'Not Exchangeable' };
+    }
     
     const fromValue = getBaseValue(fromCurrency);
     const toValue = getBaseValue(toCurrency);
@@ -83,6 +90,10 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
     }
     if (fromCurrency === toCurrency) {
       toast({ variant: 'destructive', title: 'Same Currency', description: 'Please select different currencies.' });
+      return;
+    }
+     if (fromCurrency === 'aiCredits' || toCurrency === 'aiCredits') {
+      toast({ variant: 'destructive', title: 'Swap Not Allowed', description: 'AI Credits cannot be exchanged.' });
       return;
     }
     if (amount > currentBalance) {
@@ -203,6 +214,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
                   <SelectItem value="coins">Coins</SelectItem>
                   <SelectItem value="gold">Gold</SelectItem>
                   <SelectItem value="diamonds">Diamonds</SelectItem>
+                  <SelectItem value="aiCredits" disabled>AI Credits</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -241,6 +253,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
                   <SelectItem value="coins">Coins</SelectItem>
                   <SelectItem value="gold">Gold</SelectItem>
                   <SelectItem value="diamonds">Diamonds</SelectItem>
+                  <SelectItem value="aiCredits" disabled>AI Credits</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -253,7 +266,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
         <Button
           className="w-full h-14 md:h-12 text-lg md:text-base font-semibold shadow-md md:shadow-none mt-2"
           onClick={handleSwap}
-          disabled={isSwapping || receiveAmount <= 0 || fromCurrency === toCurrency}
+          disabled={isSwapping || receiveAmount <= 0 || fromCurrency === toCurrency || fromCurrency === 'aiCredits' || toCurrency === 'aiCredits'}
         >
           {isSwapping && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
           {isSwapping ? 'Processing...' : 'Confirm Swap'}

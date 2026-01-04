@@ -189,6 +189,7 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
                             <SelectItem value="coin"><div className="flex items-center gap-2"><Coins className="h-4 w-4 text-yellow-500" /> Coins</div></SelectItem>
                             <SelectItem value="gold"><div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Gold</div></SelectItem>
                             <SelectItem value="diamond"><div className="flex items-center gap-2"><Gem className="h-4 w-4 text-blue-500" /> Diamonds</div></SelectItem>
+                            <SelectItem value="aiCredits"><div className="flex items-center gap-2"><BrainCircuit className="h-4 w-4 text-indigo-500" /> AI Credits</div></SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
