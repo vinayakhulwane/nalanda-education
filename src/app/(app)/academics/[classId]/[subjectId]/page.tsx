@@ -1,12 +1,10 @@
-
-
 'use client';
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus, BookOpen, Trophy, GraduationCap, ChevronRight, Zap } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
+import { ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus, BookOpen, Trophy } from "lucide-react";
+// Removed unused imports to clean up console warnings
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,12 +13,11 @@ import { useUser, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { arrayRemove, arrayUnion, collection, doc, updateDoc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
 import type { Subject, CustomTab, CurrencyType } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from 'uuid';
 import { RichTextEditor } from "@/components/rich-text-editor";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { UnlockContentCard } from "@/components/academics/unlock-content-card";
@@ -302,15 +299,12 @@ export default function SubjectWorkspacePage() {
       
       {/* HERO SECTION */}
       <div className="bg-slate-900 text-white relative overflow-hidden w-full">
-        {/* Decorative elements */}
         <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
           <BrandLogo variant='white' size={300} className="opacity-10" />
         </div>
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 pointer-events-none" />
 
-        {/* Content Container - Consistent px-4 mobile padding */}
         <div className="container mx-auto px-4 md:px-6 py-8 md:py-12 relative z-10 max-w-7xl">
-          {/* Breadcrumb / Back */}
           <Button
             variant="ghost"
             onClick={() => router.push(`/academics/${classId}`)}
@@ -389,18 +383,27 @@ export default function SubjectWorkspacePage() {
       {/* MAIN CONTENT AREA */}
       {!isUserBlocked && (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 py-8 w-full">
-          {/* Sticky Header */}
-          <div className="container mx-auto px-4 md:px-6 max-w-7xl sticky top-0 z-30 -my-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-3 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all w-full">
+          
+          {/* Sticky Header - Flipkart Style */}
+          <div className="container mx-auto px-4 md:px-6 max-w-7xl sticky top-0 z-30 -my-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md py-3 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all w-full">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full">
               
-              <div className="w-full overflow-x-auto no-scrollbar pb-1"> 
+              {/* SCROLLABLE TABS CONTAINER */}
+              {/* Added 'touch-pan-x' to force scroll capability even if gestures are restricted globally */}
+              <div className="w-full overflow-x-auto no-scrollbar pb-1 touch-pan-x"> 
                 <TabsList className="
-                  h-auto p-2 md:p-1 gap-2 
-                  bg-slate-100 dark:bg-slate-900
+                  h-auto p-1 gap-2 
                   flex justify-start
-                  w-max min-w-full md:w-full
-                  flex-nowrap md:flex-wrap
-                  snap-x snap-mandatory
+                  
+                  /* MOBILE (Flipkart Style) */
+                  w-max min-w-full 
+                  bg-transparent 
+                  flex-nowrap 
+                  snap-x
+                  
+                  /* DESKTOP (Original Style) */
+                  md:w-full 
+                  md:flex-wrap 
                   md:bg-white md:dark:bg-slate-900 
                   md:border md:rounded-xl md:shadow-sm
                 ">
@@ -409,12 +412,14 @@ export default function SubjectWorkspacePage() {
                     value="syllabus" 
                     className="
                       min-h-[44px] px-5 py-2.5 font-medium transition-all flex-shrink-0 snap-start
-                      bg-white dark:bg-slate-800
+                      
+                      /* MOBILE: Pill Shape & Border */
                       rounded-full border border-slate-200 dark:border-slate-800
                       data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary
                       
-                      md:rounded-lg md:border-transparent md:bg-transparent
-                      md:data-[state=active]:bg-white md:dark:data-[state=active]:bg-slate-800 md:data-[state=active]:text-primary
+                      /* DESKTOP: Standard Tab */
+                      md:rounded-lg md:border-transparent
+                      md:data-[state=active]:bg-slate-100 md:dark:data-[state=active]:bg-slate-800 md:data-[state=active]:text-primary
                     "
                   >
                     <BookOpen className="mr-2 h-4 w-4" /> Syllabus
@@ -424,11 +429,10 @@ export default function SubjectWorkspacePage() {
                     value="worksheet" 
                     className="
                       min-h-[44px] px-5 py-2.5 font-medium transition-all flex-shrink-0 snap-start
-                      bg-white dark:bg-slate-800
                       rounded-full border border-slate-200 dark:border-slate-800
                       data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary
-                      md:rounded-lg md:border-transparent md:bg-transparent
-                      md:data-[state=active]:bg-white md:dark:data-[state=active]:bg-slate-800 md:data-[state=active]:text-primary
+                      md:rounded-lg md:border-transparent
+                      md:data-[state=active]:bg-slate-100 md:dark:data-[state=active]:bg-slate-800 md:data-[state=active]:text-primary
                     "
                   >
                     <BookCopy className="mr-2 h-4 w-4" /> Worksheets
@@ -438,16 +442,16 @@ export default function SubjectWorkspacePage() {
                     value="leaderboard" 
                     className="
                       min-h-[44px] px-5 py-2.5 font-medium transition-all flex-shrink-0 snap-start
-                      bg-white dark:bg-slate-800
                       rounded-full border border-slate-200 dark:border-slate-800
                       data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary
-                      md:rounded-lg md:border-transparent md:bg-transparent
-                      md:data-[state=active]:bg-white md:dark:data-[state=active]:bg-slate-800 md:data-[state=active]:text-primary
+                      md:rounded-lg md:border-transparent
+                      md:data-[state=active]:bg-slate-100 md:dark:data-[state=active]:bg-slate-800 md:data-[state=active]:text-primary
                     "
                   >
                     <Trophy className="mr-2 h-4 w-4" /> Leaderboard
                   </TabsTrigger>
-                  
+
+                  {/* Dynamic Tabs */}
                   {visibleCustomTabs?.map(tab => {
                     const isLocked = !userIsEditor && !isTabUnlocked(tab);
                     return (
@@ -456,17 +460,17 @@ export default function SubjectWorkspacePage() {
                           value={tab.id}
                           className="
                             min-h-[44px] px-5 py-2.5 font-medium transition-all flex items-center gap-2
-                            bg-white dark:bg-slate-800
                             rounded-full border border-slate-200 dark:border-slate-800
                             data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary
-                            md:rounded-lg md:border-transparent md:bg-transparent
-                            md:data-[state=active]:bg-white md:dark:data-[state=active]:bg-slate-800 md:data-[state=active]:text-primary
+                            md:rounded-lg md:border-transparent
+                            md:data-[state=active]:bg-slate-100 md:dark:data-[state=active]:bg-slate-800 md:data-[state=active]:text-primary
                           "
                         >
                           {tab.label}
                           {isLocked && <Lock className="h-3 w-3 opacity-70" />}
                         </TabsTrigger>
                         
+                        {/* Editor Menu */}
                         {userIsEditor && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -483,7 +487,7 @@ export default function SubjectWorkspacePage() {
                                 {tab.hidden ? 'Show to Students' : 'Hide from Students'}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive">
+                              <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive">
                                 <Trash className="mr-2 h-4 w-4" /> Delete Tab
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -495,6 +499,7 @@ export default function SubjectWorkspacePage() {
                 </TabsList>
               </div>
 
+              {/* Add Tab Button (Desktop) */}
               {userIsEditor && (
                 <div className="hidden md:block">
                     <Button onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} className="gap-2 shadow-sm">
@@ -504,6 +509,7 @@ export default function SubjectWorkspacePage() {
               )}
             </div>
             
+             {/* Add Tab Button (Mobile) */}
              {userIsEditor && (
                 <div className="md:hidden mt-2 px-1">
                     <Button variant="outline" onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} className="w-full gap-2 border-dashed">
@@ -529,11 +535,11 @@ export default function SubjectWorkspacePage() {
             <TabsContent value="worksheet" className="mt-0 animate-in fade-in duration-500 pt-6">
               <Tabs defaultValue="assignments" className="w-full">
                 <div className="flex justify-center mb-8">
-                  <TabsList className="grid grid-cols-2 w-full max-w-sm">
-                    <TabsTrigger value="assignments" >
+                  <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 grid grid-cols-2 md:inline-flex md:w-auto rounded-full w-full">
+                    <TabsTrigger value="assignments" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
                       <BookCopy className="mr-2 h-4 w-4" /> Assignments
                     </TabsTrigger>
-                    <TabsTrigger value="practice" >
+                    <TabsTrigger value="practice" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
                       <FilePlus className="mr-2 h-4 w-4" /> Practice Zone
                     </TabsTrigger>
                   </TabsList>
@@ -658,4 +664,3 @@ export default function SubjectWorkspacePage() {
     </div>
   );
 }
-
