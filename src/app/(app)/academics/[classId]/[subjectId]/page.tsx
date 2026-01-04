@@ -395,7 +395,7 @@ export default function SubjectWorkspacePage() {
                 {/* Modern Tabs Navigation */}
                 <div className="container mx-auto max-w-7xl px-4 sticky top-0 z-30 -my-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                        <TabsList className="h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm overflow-x-auto max-w-full flex-wrap justify-start">
+                        <TabsList className="h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm overflow-x-auto max-w-full flex-nowrap md:flex-wrap justify-start">
                             <TabsTrigger value="syllabus" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium">
                                 <BookOpen className="mr-2 h-4 w-4" /> Syllabus
                             </TabsTrigger>

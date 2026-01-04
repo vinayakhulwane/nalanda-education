@@ -114,112 +114,6 @@ function DashboardStatCard({
 
 
 
-function StudentAcademics() {
-
-    const firestore = useFirestore();
-
-
-
-    const classesCollectionRef = useMemoFirebase(() => firestore ? collection(firestore, 'classes') : null, [firestore]);
-
-    const { data: classes, isLoading: areClassesLoading } = useCollection<Class>(classesCollectionRef);
-
-
-
-    const subjectsCollectionRef = useMemoFirebase(() => firestore ? collection(firestore, 'subjects') : null, [firestore]);
-
-    const { data: subjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsCollectionRef);
-
-
-
-    const isLoading = areClassesLoading || areSubjectsLoading;
-
-
-
-    return (
-
-        <div className="space-y-6">
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-
-                <div className="space-y-1">
-
-                    <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-slate-900 dark:text-slate-100">
-
-                        <BookMarked className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-
-                        Explore Academics
-
-                    </h2>
-
-                    <p className="text-muted-foreground">Access your enrolled classes and browse all available subjects.</p>
-
-                </div>
-
-               
-
-                <Tabs defaultValue="classes" className="w-full sm:w-auto">
-
-                    <TabsList className="grid w-full sm:w-[300px] grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-full">
-
-                        <TabsTrigger
-
-                            value="classes"
-
-                            className="rounded-full px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all font-medium"
-
-                        >
-
-                            My Classes
-
-                        </TabsTrigger>
-
-                        <TabsTrigger
-
-                            value="subjects"
-
-                            className="rounded-full px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all font-medium"
-
-                        >
-
-                            All Subjects
-
-                        </TabsTrigger>
-
-                    </TabsList>
-
-                </Tabs>
-
-            </div>
-
-
-
-            {/* CONTENT AREA - Now controlled by the Tabs above but content renders below */}
-
-            <div className="min-h-[300px]">
-
-                {/* We need to wrap the triggers and content in the same Tabs context.
-
-                    Since the triggers are above, we can't easily split them in this structure without passing state.
-
-                    However, Radix/Shadcn Tabs requires context.
-
-                   
-
-                    REFACTOR: Let's move the Tabs wrapper to surround the whole section.
-
-                */}
-
-            </div>
-
-        </div>
-
-    );
-
-}
-
-
-
 // Helper for logic
 
 const getAttemptTotals = (a: WorksheetAttempt, worksheet: Worksheet | undefined, allQuestions: Map<string, any>) => {
@@ -480,7 +374,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
 
 
 
-                     <div className="flex gap-4 pt-2">
+                     <div className="flex flex-wrap gap-4 pt-2">
 
                         <Button className="bg-white text-indigo-950 hover:bg-indigo-50 font-bold px-6 h-12 rounded-full shadow-lg hover:shadow-xl transition-all" asChild>
 
@@ -511,8 +405,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
 
 
             {/* STATS GRID */}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4 sm:px-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 px-4 sm:px-0">
 
                 <DashboardStatCard
 
@@ -565,7 +458,6 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
                
 
                 {/* Activity Chart Container - Spans all columns on mobile, 2 on md, 1 on lg */}
-
                 <div className="md:col-span-2 lg:col-span-1 h-full min-h-[160px]">
 
                     <ActivityChart />
@@ -599,8 +491,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
                         </div>
 
                        
-
-                        <TabsList className="grid w-full sm:w-[320px] grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-full h-12">
+                        <TabsList className="grid w-full max-w-md grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-full h-12">
 
                             <TabsTrigger
 
@@ -652,7 +543,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
 
                             ) : (
 
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                <div className="grid gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
                                     {classes?.map((c) => (
 
@@ -708,7 +599,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
 
                             ) : (
 
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                <div className="grid gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
                                     {subjects?.map((s) => (
 
