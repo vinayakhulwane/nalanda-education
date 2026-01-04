@@ -30,11 +30,12 @@ export default function WalletPage() {
   }
 
   return (
-    // 1. MAIN WRAPPER: Matches Courses Page background
     <div className="min-h-screen bg-transparent pb-20 overflow-x-hidden">
       
-      {/* 2. HEADER: Exact alignment with Courses Page (px-6) */}
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
+      {/* HEADER: Changed 'px-6' (24px) to 'px-4' (16px).
+         This reduces the gap on the sides, making the text start closer to the edge.
+      */}
+      <div className="container mx-auto px-4 md:px-6 py-8 max-w-7xl">
          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 text-slate-900 dark:text-white">
             My Wallet
          </h1>
@@ -43,24 +44,18 @@ export default function WalletPage() {
          </p>
       </div>
 
-      {/* 3. CONTENT: Exact alignment with Courses Page (px-6) */}
-      <div className="container mx-auto px-6 max-w-7xl space-y-8">
+      {/* CONTENT: Changed 'px-6' to 'px-4'.
+         Your cards and tabs will now stretch 8px wider on each side (16px total extra width).
+      */}
+      <div className="container mx-auto px-4 md:px-6 max-w-7xl space-y-8">
         
-        {/* Wallet Balances - Wrapped to prevent overflow */}
         <div className="w-full max-w-full">
            <WalletBalances userProfile={userProfile} />
         </div>
 
-        {/* 4. TABS FIX: Force fit to screen width */}
         <div className="w-full max-w-full">
           <Tabs defaultValue="coupon" className="w-full">
             
-            {/* CRITICAL FIX: 
-               - Removed 'flex' and 'overflow-x-auto'
-               - Added 'grid grid-cols-3'
-               - This forces the 3 buttons to split the available width (33% each) 
-                 exactly like the desktop view, ensuring they NEVER overflow.
-            */}
             <TabsList className={cn(
                 "grid grid-cols-3 w-full gap-2 bg-transparent p-0 h-auto mb-6",
                 "md:bg-muted/80 md:p-1 md:rounded-xl"
@@ -71,18 +66,12 @@ export default function WalletPage() {
                    value={val} 
                    className={cn(
                      "whitespace-nowrap transition-all duration-200",
-                     // MOBILE STYLES:
-                     // 1. Removed 'min-w-[130px]' -> This was causing the overflow.
-                     // 2. Added 'w-full' -> Fills the grid cell.
-                     // 3. text-[10px] xs:text-xs -> Slightly smaller text to prevent wrapping.
-                     // 4. px-1 -> Reduced padding to fit text.
+                     // Keeping the same updated mobile styles from previous fix
                      "rounded-full border bg-background px-1 py-2.5 text-[10px] xs:text-xs font-medium shadow-sm w-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary",
-                     
-                     // DESKTOP STYLES (Unchanged):
                      "md:rounded-md md:border-none md:bg-transparent md:px-3 md:py-1.5 md:text-sm md:shadow-none md:min-w-0 md:data-[state=active]:bg-background md:data-[state=active]:text-foreground md:data-[state=active]:shadow-sm"
                    )}
                  >
-                   {val === 'coupon' && "Coupon"} {/* Shortened name for mobile if needed */}
+                   {val === 'coupon' && "Coupon"}
                    {val === 'swap' && "Swap"}
                    {val === 'history' && "History"}
                  </TabsTrigger>
@@ -98,7 +87,6 @@ export default function WalletPage() {
             </TabsContent>
 
             <TabsContent value="history">
-              {/* Ensure history table doesn't push width */}
               <div className="w-full overflow-hidden">
                  <TransactionHistory />
               </div>
