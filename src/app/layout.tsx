@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import { cn } from '@/lib/utils';
+import { MobileHeader } from '@/components/mobile-header';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -29,6 +30,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={cn("flex flex-col min-h-screen font-body antialiased", fontBody.variable, fontHeadline.variable)}>
         <FirebaseClientProvider>
+          <MobileHeader />
           <main className="flex-1 pb-20 lg:pb-0">
             {children}
           </main>
