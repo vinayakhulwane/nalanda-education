@@ -57,12 +57,17 @@ export function WorksheetDisplayCard({
         return (
              <div className="group flex flex-col gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border hover:border-primary/20 transition-all shadow-sm hover:shadow-md cursor-pointer" onClick={actionHandler}>
                 <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <BookOpen className="h-6 w-6 text-primary" />
+                    <div className={cn(
+                      "h-12 w-12 rounded-lg flex items-center justify-center shrink-0",
+                      isPractice ? "bg-pink-100 dark:bg-pink-900/30" : "bg-primary/10"
+                    )}>
+                        <BookOpen className={cn("h-6 w-6", isPractice ? "text-pink-600 dark:text-pink-400" : "text-primary")} />
                     </div>
                     <div className="flex-1 min-w-0">
                         <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate">{worksheet.title}</h4>
-                        <p className="text-sm text-muted-foreground capitalize">{worksheet.worksheetType} Assignment</p>
+                        <p className="text-sm text-muted-foreground capitalize">
+                          {isPractice ? 'Practice Test' : 'Classroom Assignment'}
+                        </p>
                     </div>
                 </div>
 
@@ -94,7 +99,10 @@ export function WorksheetDisplayCard({
                     
                     <Button
                         size="sm"
-                        className="font-semibold"
+                        className={cn(
+                          "font-semibold",
+                          isPractice ? "bg-pink-600 hover:bg-pink-700 text-white" : ""
+                        )}
                         onClick={(e) => { e.stopPropagation(); actionHandler(); }}
                     >
                         {isCompletedOrAttempted ? 'View Latest' : 'Start Solving'}
@@ -179,4 +187,3 @@ export function WorksheetDisplayCard({
         </Card>
     );
 }
-
