@@ -9,7 +9,7 @@ import { ShoppingCart, PlusCircle, Filter, Trash2, Bot, Coins, Gem, Crown, Spark
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger, SheetClose } from './ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from './ui/sheet';
 import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
@@ -599,7 +599,7 @@ export function WorksheetRandomBuilder({
                     </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-slate-200 dark:border-slate-800 rounded-2xl hidden md:flex flex-col">
+                <Card className="hidden md:flex flex-col shadow-sm border-slate-200 dark:border-slate-800 rounded-2xl">
                      <CardHeader className="pb-3 pt-5 px-5">
                         <CardTitle className="text-base text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-2">
                            <Filter className="h-4 w-4" /> Breakdown by Category
@@ -688,20 +688,11 @@ export function WorksheetRandomBuilder({
                     </div>
                 </SheetTrigger>
                 <SheetContent className="w-full sm:w-[540px] flex flex-col p-0 h-[100dvh] md:h-full rounded-none md:rounded-l-2xl border-l-0 md:border-l">
-                    <SheetHeader className="px-6 py-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b sticky top-0 z-10">
-                         <div className="flex items-center justify-between">
-                            <SheetTitle className="text-xl">Review Worksheet</SheetTitle>
-                            <SheetClose asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-4 w-4" /></Button>
-                            </SheetClose>
-                        </div>
-                        <SheetDescription className="hidden md:block">
-                            Review your selections before finalizing.
-                        </SheetDescription>
-                    </SheetHeader>
-                    <ReviewSheetContent />
+                   <ReviewSheetContent />
                 </SheetContent>
             </Sheet>
         </div>
     );
 }
+
+    
