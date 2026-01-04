@@ -24,7 +24,7 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
   const { toast } = useToast();
   
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<CurrencyType | 'aiCredits'>('coin');
+  const [currency, setCurrency] = useState<CurrencyType>('coin');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [operation, setOperation] = useState<'add' | 'remove'>('add');
@@ -48,7 +48,7 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
     const fieldMap: Record<string, string> = {
         coin: 'coins',
         gold: 'gold',
-        diamond: 'diamonds',
+        diamonds: 'diamonds',
         aiCredits: 'aiCredits'
     };
     const dbField = fieldMap[currency] || currency;
@@ -189,7 +189,6 @@ export function AdminStudentInfoCard({ student }: AdminStudentInfoCardProps) {
                             <SelectItem value="coin"><div className="flex items-center gap-2"><Coins className="h-4 w-4 text-yellow-500" /> Coins</div></SelectItem>
                             <SelectItem value="gold"><div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Gold</div></SelectItem>
                             <SelectItem value="diamond"><div className="flex items-center gap-2"><Gem className="h-4 w-4 text-blue-500" /> Diamonds</div></SelectItem>
-                            <SelectItem value="aiCredits"><div className="flex items-center gap-2"><BrainCircuit className="h-4 w-4 text-indigo-500" /> AI Credits</div></SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

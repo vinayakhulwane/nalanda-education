@@ -12,10 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import type { EconomySettings } from '@/types';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 
-type Currency = 'coins' | 'gold' | 'diamonds' | 'aiCredits';
+type Currency = 'coins' | 'gold' | 'diamonds';
 
 interface CurrencySwapProps {
-  userProfile: any; 
+  userProfile: any;
 }
 
 export function CurrencySwap({ userProfile }: CurrencySwapProps) {
@@ -36,15 +36,13 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
   // 2. Define Base Rates
   const COIN_TO_GOLD = settings?.coinToGold ?? 10;
   const GOLD_TO_DIAMOND = settings?.goldToDiamond ?? 10;
-  const GOLD_TO_AICREDITS = 10; // Placeholder, should be in settings
 
   // Helper: Get 'Value' of a currency relative to Coins (Base Unit)
   const getBaseValue = (currency: Currency) => {
     switch (currency) {
-        case 'coins': return 1;
-        case 'gold': return COIN_TO_GOLD;
-        case 'diamonds': return GOLD_TO_DIAMOND * COIN_TO_GOLD;
-        case 'aiCredits': return COIN_TO_GOLD / GOLD_TO_AICREDITS;
+      case 'coins': return 1;
+      case 'gold': return COIN_TO_GOLD;
+      case 'diamonds': return GOLD_TO_DIAMOND * COIN_TO_GOLD;
     }
   };
 
@@ -57,7 +55,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
 
     // No swap needed if currencies are same
     if (fromCurrency === toCurrency) {
-        return { receiveAmount: amount, exchangeRateText: '1:1' };
+      return { receiveAmount: amount, exchangeRateText: '1:1' };
     }
     
     const ratio = fromValue / toValue;
@@ -65,15 +63,13 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
 
     let rateText = '';
     if (ratio >= 1) {
-        rateText = `1 ${fromCurrency.slice(0,-1)} = ${ratio} ${toCurrency}`;
+      rateText = `1 ${fromCurrency.slice(0,-1)} = ${ratio} ${toCurrency}`;
     } else {
-        rateText = `${1/ratio} ${fromCurrency} = 1 ${toCurrency.slice(0,-1)}`;
+      rateText = `${1/ratio} ${fromCurrency} = 1 ${toCurrency.slice(0,-1)}`;
     }
 
     return { receiveAmount: result, exchangeRateText: rateText };
-
-  }, [swapAmount, fromCurrency, toCurrency, COIN_TO_GOLD, GOLD_TO_DIAMOND, GOLD_TO_AICREDITS]);
-
+  }, [swapAmount, fromCurrency, toCurrency, COIN_TO_GOLD, GOLD_TO_DIAMOND]);
 
   const currentBalance = userProfile?.[fromCurrency] || 0;
 
@@ -104,7 +100,6 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
         coins: 'coins',
         gold: 'gold',
         diamonds: 'diamonds',
-        aiCredits: 'aiCredits'
       };
 
       const fromField = fieldMap[fromCurrency];
@@ -129,7 +124,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
       
       // 3. Log 'earned' transaction
       const earnedTransactionRef = doc(transactionsCol);
-       batch.set(earnedTransactionRef, {
+      batch.set(earnedTransactionRef, {
         userId: user.uid,
         type: 'earned',
         currency: toCurrency,
@@ -140,7 +135,7 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
 
       // Commit all operations at once
       await batch.commit();
-
+      
       toast({ title: 'Swap Successful!', description: `You received ${receiveAmount} ${toCurrency}.` });
       setSwapAmount('');
     } catch (error) {
@@ -152,15 +147,17 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
   };
 
   return (
-    <Card>
-      <CardHeader>
+    // Mobile: Remove shadow/border for seamless look. Desktop: Keep border/shadow.
+    <Card className="w-full border-0 shadow-none md:border md:shadow-sm">
+      <CardHeader className="px-4 md:px-6">
         <CardTitle>Currency Exchange</CardTitle>
         <CardDescription>Convert any currency to another instantly.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      
+      <CardContent className="space-y-6 px-4 md:px-6">
         
         {/* Info Banner */}
-        <Alert>
+        <Alert className="bg-muted/50 border-none">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Dynamic Rates!</AlertTitle>
           <AlertDescription>
@@ -168,73 +165,98 @@ export function CurrencySwap({ userProfile }: CurrencySwapProps) {
           </AlertDescription>
         </Alert>
 
-        <div className="flex flex-col md:flex-row items-center gap-4">
+        {/* Swap Container: Increased gap on mobile for better separation */}
+        <div className="flex flex-col md:flex-row items-center gap-6 md:gap-4">
           
           {/* FROM SECTION */}
-          <div className="flex-1 w-full space-y-2">
-             <span className="text-sm font-medium">Convert From</span>
-             <div className="flex gap-2">
-               <Input 
-                 type="number" 
-                 value={swapAmount} 
-                 onChange={(e) => setSwapAmount(e.target.value)} 
-                 placeholder="Amount"
-               />
-               <Select value={fromCurrency} onValueChange={(v: any) => setFromCurrency(v)}>
-                 <SelectTrigger className="w-[130px] capitalize"><SelectValue /></SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="coins">Coins</SelectItem>
-                   <SelectItem value="gold">Gold</SelectItem>
-                   <SelectItem value="diamonds">Diamonds</SelectItem>
-                   <SelectItem value="aiCredits">AI Credits</SelectItem>
-                 </SelectContent>
-               </Select>
-             </div>
-             <div className="flex justify-between text-xs text-muted-foreground px-1">
-                <span>Available: {currentBalance}</span>
-                <button 
+          <div className="flex-1 w-full space-y-3 md:space-y-2">
+            {/* Label Row: Show Balance on top-right for mobile visibility */}
+            <div className="flex justify-between items-center">
+               <span className="text-sm font-medium">Convert From</span>
+               <span className="md:hidden text-xs text-muted-foreground">Available: {currentBalance}</span>
+            </div>
+
+            <div className="flex gap-3 md:gap-2">
+              <div className="relative flex-1">
+                  <Input
+                    type="number"
+                    value={swapAmount}
+                    onChange={(e) => setSwapAmount(e.target.value)}
+                    placeholder="0"
+                    // Mobile: Taller (h-12), Larger Text (text-lg). Desktop: Standard (h-10, text-sm)
+                    className="h-12 md:h-10 text-lg md:text-sm font-bold bg-muted/30"
+                  />
+                  {/* Mobile Only: Max Button inside input */}
+                  <button 
                     onClick={() => setSwapAmount(currentBalance.toString())}
-                    className="text-primary hover:underline"
-                >
-                    Max
-                </button>
-             </div>
+                    className="md:hidden absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-sm"
+                  >
+                    MAX
+                  </button>
+              </div>
+
+              <Select value={fromCurrency} onValueChange={(v: any) => setFromCurrency(v)}>
+                <SelectTrigger className="w-[120px] md:w-[130px] h-12 md:h-10 capitalize bg-muted/30 border-input/50">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="coins">Coins</SelectItem>
+                  <SelectItem value="gold">Gold</SelectItem>
+                  <SelectItem value="diamonds">Diamonds</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Desktop Only: Bottom info row */}
+            <div className="hidden md:flex justify-between text-xs text-muted-foreground px-1">
+              <span>Available: {currentBalance}</span>
+              <button
+                onClick={() => setSwapAmount(currentBalance.toString())}
+                className="text-primary hover:underline"
+              >
+                Max
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center justify-center pt-4 md:pt-0">
-             <ArrowRight className="h-6 w-6 text-muted-foreground rotate-90 md:rotate-0" />
+          {/* ARROW: Rounded background on mobile for better visual break */}
+          <div className="flex items-center justify-center -my-2 md:my-0 md:pt-0">
+             <div className="bg-muted rounded-full p-2 md:bg-transparent md:p-0">
+               <ArrowRight className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground rotate-90 md:rotate-0" />
+             </div>
           </div>
 
           {/* TO SECTION */}
-          <div className="flex-1 w-full space-y-2">
-             <span className="text-sm font-medium">Convert To</span>
-             <div className="flex gap-2">
-               <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm opacity-70">
-                  {receiveAmount}
-               </div>
-               <Select value={toCurrency} onValueChange={(v: any) => setToCurrency(v)}>
-                 <SelectTrigger className="w-[130px] capitalize"><SelectValue /></SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="coins">Coins</SelectItem>
-                   <SelectItem value="gold">Gold</SelectItem>
-                   <SelectItem value="diamonds">Diamonds</SelectItem>
-                   <SelectItem value="aiCredits">AI Credits</SelectItem>
-                 </SelectContent>
-               </Select>
-             </div>
-             <p className="text-xs text-muted-foreground px-1">
-                 Estimated Output
-             </p>
+          <div className="flex-1 w-full space-y-3 md:space-y-2">
+            <span className="text-sm font-medium">Convert To</span>
+            <div className="flex gap-3 md:gap-2">
+              <div className="flex items-center w-full rounded-md border border-input bg-muted px-3 h-12 md:h-10 text-lg md:text-sm font-bold opacity-70">
+                {receiveAmount || 0}
+              </div>
+              <Select value={toCurrency} onValueChange={(v: any) => setToCurrency(v)}>
+                <SelectTrigger className="w-[120px] md:w-[130px] h-12 md:h-10 capitalize bg-muted/30 border-input/50">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="coins">Coins</SelectItem>
+                  <SelectItem value="gold">Gold</SelectItem>
+                  <SelectItem value="diamonds">Diamonds</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground px-1">
+              Estimated Output
+            </p>
           </div>
         </div>
-        
-        <Button 
-            className="w-full h-12 text-lg" 
-            onClick={handleSwap} 
-            disabled={isSwapping || receiveAmount <= 0 || fromCurrency === toCurrency}
+
+        <Button
+          className="w-full h-14 md:h-12 text-lg md:text-base font-semibold shadow-md md:shadow-none mt-2"
+          onClick={handleSwap}
+          disabled={isSwapping || receiveAmount <= 0 || fromCurrency === toCurrency}
         >
-           {isSwapping && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-           {isSwapping ? 'Processing...' : 'Confirm Swap'}
+          {isSwapping && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+          {isSwapping ? 'Processing...' : 'Confirm Swap'}
         </Button>
       </CardContent>
     </Card>
