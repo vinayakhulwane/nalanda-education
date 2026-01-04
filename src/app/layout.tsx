@@ -5,6 +5,7 @@ import { FirebaseClientProvider } from '@/firebase';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { MobileHeader } from '@/components/mobile-header';
+import { MobileNav } from '@/components/mobile-nav';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -34,6 +35,7 @@ export default function RootLayout({
           <main className="flex-1 pb-20 lg:pb-0">
             {children}
           </main>
+          <MobileNav />
         </FirebaseClientProvider>
         <Toaster />
       </body>
