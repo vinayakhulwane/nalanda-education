@@ -283,8 +283,8 @@ export default function ProgressPage() {
 
     if (!selectedSubjectId) {
         return (
-            // ✅ Fix: Added safe-area padding for PWA and constrained width
-            <div className="w-full max-w-[100vw] overflow-x-hidden p-6 pb-24 lg:pb-6 space-y-6">
+            // ✅ Fix: Added safe-area padding and constrained width
+            <div className="w-full max-w-[100vw] overflow-x-hidden p-4 pb-24 lg:pb-6 space-y-6">
                  <PageHeader title="My Progress" description="Here is an overview of your progress in each subject." />
                 {isLoading ? (
                     <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
@@ -414,7 +414,7 @@ export default function ProgressPage() {
 
     return (
         // ✅ Fix: Added safe-area padding and width constraints for PWA
-        <div className="w-full max-w-[100vw] overflow-x-hidden p-6 pb-24 lg:pb-6 space-y-8">
+        <div className="w-full max-w-[100vw] overflow-x-hidden p-4 pb-24 lg:pb-6 space-y-8">
             <div className="flex flex-col gap-4">
                 <Button variant="ghost" className="w-fit -ml-2 text-muted-foreground" onClick={() => setSelectedSubjectId(null)}>
                     <ChevronLeft className="mr-2 h-4 w-4" /> Back to Subjects
