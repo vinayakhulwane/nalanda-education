@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { CurrencySwap } from "@/components/wallet/currency-swap";
 import { TransactionHistory } from "@/components/wallet/transaction-history";
 import { SurpriseCoupon } from "@/components/wallet/surprise-coupon";
+import { cn } from "@/lib/utils"; // Ensure you have this utility or use standard class strings
 
 export default function WalletPage() {
   const { userProfile, isUserProfileLoading } = useUser();
@@ -30,7 +31,6 @@ export default function WalletPage() {
   }
 
   return (
-    // Added 'px-4' for mobile gutter, 'md:px-8' for desktop spacing
     <div className="container mx-auto py-4 px-4 md:py-6 md:px-8 space-y-6 md:space-y-8">
       
       <PageHeader
@@ -41,34 +41,34 @@ export default function WalletPage() {
       <WalletBalances userProfile={userProfile} />
 
       <Tabs defaultValue="coupon" className="w-full">
-        {/* TabsList Changes for Mobile:
-           1. h-auto: Allows the list to grow in height if text wraps (prevents cut-off).
-           2. p-1: Slightly tighter padding on mobile.
-        */}
-        <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/80 rounded-xl">
-          {/* TabsTrigger Changes for Mobile:
-             1. text-[10px] xs:text-xs: Smaller text on very small screens to fit 3 columns.
-             2. whitespace-normal: Allows text like "Transaction History" to wrap to two lines.
-             3. h-auto py-2: Ensures the button grows to fit wrapped text.
-          */}
-          <TabsTrigger 
-            value="coupon" 
-            className="text-[10px] xs:text-xs md:text-sm h-auto py-2 md:py-1.5 whitespace-normal leading-tight"
-          >
-            Surprise Coupon
-          </TabsTrigger>
-          <TabsTrigger 
-            value="swap" 
-            className="text-[10px] xs:text-xs md:text-sm h-auto py-2 md:py-1.5 whitespace-normal leading-tight"
-          >
-            Currency Swap
-          </TabsTrigger>
-          <TabsTrigger 
-            value="history" 
-            className="text-[10px] xs:text-xs md:text-sm h-auto py-2 md:py-1.5 whitespace-normal leading-tight"
-          >
-            Transaction History
-          </TabsTrigger>
+        
+        {/* --- TABS LIST --- */}
+        <TabsList className={cn(
+            // Mobile: Horizontal Scroll (Sliding), Transparent Background, Spaced items
+            "flex w-full overflow-x-auto no-scrollbar gap-2 bg-transparent p-0 h-auto",
+            // Desktop: Grid Layout, Muted Background, Standard Padding
+            "md:grid md:grid-cols-3 md:gap-0 md:bg-muted/80 md:p-1 md:rounded-xl"
+        )}>
+          {['coupon', 'swap', 'history'].map((val) => (
+             <TabsTrigger 
+               key={val}
+               value={val} 
+               className={cn(
+                 // Base Styles
+                 "whitespace-nowrap transition-all duration-200",
+                 
+                 // Mobile Styles: Pill Shape, Border, Min-Width for touch
+                 "rounded-full border bg-background px-4 py-2.5 text-xs font-medium shadow-sm min-w-[130px] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary",
+                 
+                 // Desktop Styles: Standard Segmented Control Look (Overrides Mobile)
+                 "md:rounded-md md:border-none md:bg-transparent md:px-3 md:py-1.5 md:text-sm md:shadow-none md:min-w-0 md:data-[state=active]:bg-background md:data-[state=active]:text-foreground md:data-[state=active]:shadow-sm"
+               )}
+             >
+               {val === 'coupon' && "Surprise Coupon"}
+               {val === 'swap' && "Currency Swap"}
+               {val === 'history' && "History"}
+             </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="coupon" className="mt-4 md:mt-6">
