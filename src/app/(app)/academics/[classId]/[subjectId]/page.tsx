@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from "react";
@@ -6,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { 
   ArrowLeft, Loader2, MoreVertical, Edit, Eye, EyeOff, Trash, Pencil, 
   ShieldAlert, UserMinus, UserPlus, BookCopy, FilePlus, Lock, Plus, 
-  BookOpen, Trophy 
+  BookOpen, Trophy, ChevronDown, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -56,6 +57,7 @@ export default function SubjectWorkspacePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  const [activeTab, setActiveTab] = useState('syllabus');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -284,6 +286,17 @@ export default function SubjectWorkspacePage() {
   }
 
   const visibleCustomTabs = userIsEditor ? subject?.customTabs : subject?.customTabs?.filter(t => !t.hidden);
+  
+  const allTabs = [
+    { value: 'syllabus', label: 'Syllabus', icon: BookOpen },
+    { value: 'worksheet', label: 'Worksheets', icon: BookCopy },
+    { value: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+    ...(visibleCustomTabs || []).map(tab => ({
+      value: tab.id,
+      label: tab.label,
+      icon: isTabUnlocked(tab) ? BookOpen : Lock,
+    })),
+  ];
 
   if (isUserProfileLoading || isSubjectLoading) {
     return (
@@ -382,64 +395,82 @@ export default function SubjectWorkspacePage() {
 
       {/* MAIN CONTENT AREA */}
       {!isUserBlocked && (
-        <Tabs defaultValue="syllabus" className="space-y-8 py-8 w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 py-8 w-full">
           {/* Modern Tabs Navigation - Sticky Header */}
           <div className="container mx-auto px-4 md:px-6 max-w-7xl sticky top-0 z-30 -my-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-sm py-4 border-b border-transparent data-[stuck=true]:border-slate-200 transition-all w-full">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full">
               
-              <div className="w-full overflow-hidden min-w-0">
-                <TabsList className="h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm w-full max-w-full overflow-x-auto flex flex-nowrap md:flex-wrap justify-start no-scrollbar">
-                  <TabsTrigger value="syllabus" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
-                    <BookOpen className="mr-2 h-4 w-4" /> Syllabus
-                  </TabsTrigger>
-                  <TabsTrigger value="worksheet" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
-                    <BookCopy className="mr-2 h-4 w-4" /> Worksheets
-                  </TabsTrigger>
-                  <TabsTrigger value="leaderboard" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex-shrink-0">
-                    <Trophy className="mr-2 h-4 w-4" /> Leaderboard
-                  </TabsTrigger>
-                  {/* Dynamic Tabs */}
-                  {visibleCustomTabs?.map(tab => {
-                    const isLocked = !userIsEditor && !isTabUnlocked(tab);
-                    return (
-                      <div key={tab.id} className="relative group flex items-center flex-shrink-0">
-                        <TabsTrigger
-                          value={tab.id}
-                          className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex items-center gap-2"
-                        >
-                          {tab.label}
-                          {isLocked && <Lock className="h-3 w-3 text-muted-foreground opacity-70" />}
-                        </TabsTrigger>
-                        {userIsEditor && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 -mr-2 opacity-50 hover:opacity-100 rounded-full">
-                                <MoreVertical className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start">
-                              <DropdownMenuItem onClick={() => openEditTabDialog(tab)}>
-                                <Edit className="mr-2 h-4 w-4" /> Edit Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleToggleTabVisibility(tab)}>
-                                {tab.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-                                {tab.hidden ? 'Show to Students' : 'Hide from Students'}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => openDeleteTabDialog(tab)} className="text-destructive focus:text-destructive">
-                                <Trash className="mr-2 h-4 w-4" /> Delete Tab
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </div>
-                    )
+              {/* DESKTOP TABS */}
+              <div className="hidden md:flex w-full overflow-hidden min-w-0">
+                <TabsList className="h-auto p-1 bg-white dark:bg-slate-900 border rounded-xl shadow-sm w-full max-w-full overflow-x-auto flex-nowrap justify-start no-scrollbar">
+                  {allTabs.map(tab => {
+                      const Icon = tab.icon;
+                      const isLocked = !userIsEditor && tab.value !== 'syllabus' && tab.value !== 'worksheet' && tab.value !== 'leaderboard' && !isTabUnlocked(subject?.customTabs?.find(t => t.id === tab.value) as CustomTab);
+                      
+                      return (
+                         <div key={tab.value} className="relative group flex items-center flex-shrink-0">
+                          <TabsTrigger
+                            value={tab.value}
+                            className="rounded-lg px-4 py-2.5 data-[state=active]:bg-slate-100 dark:data-[state=active]:bg-slate-800 data-[state=active]:text-primary font-medium flex items-center gap-2"
+                          >
+                            <Icon className="h-4 w-4" />
+                            {tab.label}
+                            {isLocked && <Lock className="h-3 w-3 text-muted-foreground opacity-70" />}
+                          </TabsTrigger>
+                          {userIsEditor && subject?.customTabs?.some(ct => ct.id === tab.value) && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 -mr-2 opacity-50 hover:opacity-100 rounded-full">
+                                  <MoreVertical className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                <DropdownMenuItem onClick={() => openEditTabDialog(subject?.customTabs?.find(ct => ct.id === tab.value)!)}>
+                                  <Edit className="mr-2 h-4 w-4" /> Edit Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleToggleTabVisibility(subject?.customTabs?.find(ct => ct.id === tab.value)!)}>
+                                  {subject?.customTabs?.find(ct => ct.id === tab.value)?.hidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                                  {subject?.customTabs?.find(ct => ct.id === tab.value)?.hidden ? 'Show to Students' : 'Hide from Students'}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => openDeleteTabDialog(subject?.customTabs?.find(ct => ct.id === tab.value)!)} className="text-destructive focus:text-destructive">
+                                  <Trash className="mr-2 h-4 w-4" /> Delete Tab
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
+                      )
                   })}
                 </TabsList>
               </div>
+
+               {/* MOBILE DROPDOWN */}
+               <div className="md:hidden w-full">
+                  <Select value={activeTab} onValueChange={setActiveTab}>
+                      <SelectTrigger className="w-full h-12 text-base rounded-xl border-2 shadow-sm font-semibold">
+                          <SelectValue placeholder="Select a section..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                          {allTabs.map(tab => {
+                              const Icon = tab.icon;
+                              const isLocked = !userIsEditor && tab.value !== 'syllabus' && tab.value !== 'worksheet' && tab.value !== 'leaderboard' && !isTabUnlocked(subject?.customTabs?.find(t => t.id === tab.value) as CustomTab);
+                              return (
+                                  <SelectItem key={tab.value} value={tab.value}>
+                                      <div className="flex items-center gap-3">
+                                          <Icon className="h-5 w-5" />
+                                          <span>{tab.label}</span>
+                                          {isLocked && <Lock className="ml-auto h-4 w-4 text-muted-foreground" />}
+                                      </div>
+                                  </SelectItem>
+                              );
+                          })}
+                      </SelectContent>
+                  </Select>
+              </div>
               
               {userIsEditor && (
-                <Button onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} className="gap-2 shadow-sm flex-shrink-0">
+                <Button onClick={() => { setNewTabName(''); setTabCost(0); setAddTabDialogOpen(true); }} className="gap-2 shadow-sm flex-shrink-0 w-full md:w-auto">
                   <Plus className="h-4 w-4" /> New Tab
                 </Button>
               )}
@@ -460,17 +491,16 @@ export default function SubjectWorkspacePage() {
             <TabsContent value="worksheet" className="mt-0 animate-in fade-in duration-500 pt-6">
               <Tabs defaultValue="assignments" className="w-full">
                 <div className="flex justify-center mb-8">
-                  <TabsList className="bg-slate-100 dark:bg-slate-800 p-1 rounded-full overflow-x-auto max-w-full">
-                    <TabsTrigger value="assignments" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
+                  <TabsList className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-full h-12 w-full max-w-md">
+                    <TabsTrigger value="assignments" className="rounded-full h-10 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:shadow-sm transition-all font-bold">
                       <BookCopy className="mr-2 h-4 w-4" /> Assignments
                     </TabsTrigger>
-                    <TabsTrigger value="practice" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:shadow-sm">
+                    <TabsTrigger value="practice" className="rounded-full h-10 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-950 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:shadow-sm transition-all font-bold">
                       <FilePlus className="mr-2 h-4 w-4" /> Practice Zone
                     </TabsTrigger>
                   </TabsList>
                 </div>
                 <TabsContent value="assignments">
-                  {/* ✅ FIXED: Use the statically imported component */}
                   <WorksheetList subjectId={subjectId} isEnrolled={isEnrolled} userIsEditor={userIsEditor} />
                 </TabsContent>
                 <TabsContent value="practice">
