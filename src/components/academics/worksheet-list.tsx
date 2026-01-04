@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import type { Worksheet, WorksheetAttempt } from "@/types";
 import { cn } from "@/lib/utils";
 
-interface WorksheetListProps {
+interface WorksheetDisplayCardProps {
     worksheet: Worksheet;
     isPractice?: boolean;
     attempts?: WorksheetAttempt[];
@@ -17,18 +17,27 @@ interface WorksheetListProps {
     studentId?: string;
 }
 
-export function WorksheetList({
+export function WorksheetDisplayCard({
     worksheet,
     isPractice = false,
     attempts = [],
     view = 'card',
     from,
     studentId,
-}: WorksheetListProps) {
+}: WorksheetDisplayCardProps) {
+    // ✅ FIX: Safety check. If worksheet is undefined/null, don't render anything.
+    if (!worksheet) {
+        return null;
+    }
+
     const router = useRouter();
 
-    const latestAttempt = attempts.length > 0 ? attempts[0] : undefined;
-    const isCompletedOrAttempted = attempts.length > 0;
+    // Ensure attempts is an array (safeguard against null)
+    const safeAttempts = attempts || [];
+    const latestAttempt = safeAttempts.length > 0 ? safeAttempts[0] : undefined;
+    const isCompletedOrAttempted = safeAttempts.length > 0;
+    
+    // Safely access questions length
     const questionCount = worksheet.questions?.length || 0;
 
     const totalMarks = questionCount * 10;
@@ -73,7 +82,7 @@ export function WorksheetList({
                         <BookOpen className="h-6 w-6" />
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                        {/* ✅ UPDATED HERE: Changed 'truncate' to 'line-clamp-2' */}
+                        {/* Title with line-clamp-2 for double line support */}
                         <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 leading-tight line-clamp-2">
                             {worksheet.title}
                         </h4>
@@ -104,7 +113,7 @@ export function WorksheetList({
                         {isCompletedOrAttempted ? (
                             <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
                                 <Repeat className="h-3.5 w-3.5" />
-                                <span>Tried {attempts.length}x</span>
+                                <span>Tried {safeAttempts.length}x</span>
                             </div>
                         ) : (
                             <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-500 animate-pulse">
