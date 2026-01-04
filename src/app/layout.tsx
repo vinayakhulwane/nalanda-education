@@ -27,9 +27,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("font-body antialiased", fontBody.variable, fontHeadline.variable)}>
+      <body className={cn("flex flex-col min-h-screen font-body antialiased", fontBody.variable, fontHeadline.variable)}>
         <FirebaseClientProvider>
-          {children}
+          <main className="flex-1 pb-20 lg:pb-0">
+            {children}
+          </main>
         </FirebaseClientProvider>
         <Toaster />
       </body>
