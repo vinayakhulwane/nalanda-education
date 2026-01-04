@@ -219,14 +219,13 @@ function MobileHistoryItem({
                 </div>
 
                 <div className="flex flex-col gap-3">
-                    {/* ✅ FIX: Simplified button structure to match desktop functionality exactly */}
                     <Button asChild className="w-full h-12 text-base rounded-xl font-semibold shadow-lg shadow-blue-500/20" size="lg">
-                        <Link href={`/analytics/worksheet/${attempt.id}`}>
+                        {/* ✅ Fix: Corrected URL path to /worksheets/review/[id] */}
+                        <Link href={`/worksheets/review/${attempt.id}`}>
                             <FileText className="mr-2 h-5 w-5" /> View Detailed Report
                         </Link>
                     </Button>
                 </div>
-                {/* Close and Retake buttons removed as requested */}
             </SheetContent>
         </Sheet>
     );

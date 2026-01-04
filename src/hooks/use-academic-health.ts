@@ -8,8 +8,8 @@ import type { User, WorksheetAttempt, Worksheet, Question } from '@/types';
 
 // --- HELPER: ROBUST SCORE EXTRACTION (Exact replica of Progress Page logic) ---
 const getAttemptTotals = (
-  a: WorksheetAttempt, 
-  worksheet: Worksheet | undefined, 
+  a: WorksheetAttempt,
+  worksheet: Worksheet | undefined,
   questionMap: Map<string, any>
 ) => {
   // 1. Try saved summary stats first
@@ -32,9 +32,9 @@ const getAttemptTotals = (
     worksheet.questions.forEach(qId => {
       const question = questionMap.get(qId);
       if (question) {
-        const qMax = question.solutionSteps?.reduce((acc: number, s: any) => 
+        const qMax = question.solutionSteps?.reduce((acc: number, s: any) =>
           acc + s.subQuestions.reduce((ss: number, sub: any) => ss + (sub.marks || 0), 0), 0) || 0;
-        
+
         calcTotal += qMax;
 
         let qEarned = 0;
@@ -62,7 +62,7 @@ const getAttemptTotals = (
 
 export function useAcademicHealth(userProfile: User) {
   const firestore = useFirestore();
-  
+
   const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
 
@@ -79,47 +79,48 @@ export function useAcademicHealth(userProfile: User) {
     );
   }, [firestore, userProfile?.id]);
   const { data: attempts } = useCollection<WorksheetAttempt>(attemptsQuery);
-  
+
   // 2. Fetch related Worksheets and Questions based on attempts
   useEffect(() => {
     const fetchRelatedData = async () => {
-        if (!firestore || !attempts || attempts.length === 0) {
-            setWorksheets([]);
-            setQuestions([]);
-            return;
-        }
-        
-        const worksheetIds = [...new Set(attempts.map(a => a.worksheetId))];
+      if (!firestore || !attempts || attempts.length === 0) {
+        setWorksheets([]);
+        setQuestions([]);
+        return;
+      }
 
-        // Fetch Worksheets
-        const wsChunks = [];
-        for (let i = 0; i < worksheetIds.length; i += 30) {
-            wsChunks.push(worksheetIds.slice(i, i + 30));
+      const worksheetIds = [...new Set(attempts.map(a => a.worksheetId))];
+
+      // Fetch Worksheets
+      const wsChunks = [];
+      for (let i = 0; i < worksheetIds.length; i += 30) {
+        wsChunks.push(worksheetIds.slice(i, i + 30));
+      }
+      const worksheetPromises = wsChunks.map(chunk =>
+        getDocs(query(collection(firestore, 'worksheets'), where(documentId(), 'in', chunk)))
+      );
+      const worksheetSnapshots = await Promise.all(worksheetPromises);
+      const fetchedWorksheets = worksheetSnapshots.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Worksheet)));
+      setWorksheets(fetchedWorksheets);
+
+      // Fetch Questions from the fetched worksheets
+      const questionIds = [...new Set(fetchedWorksheets.flatMap(w => w.questions))];
+      if (questionIds.length > 0) {
+        const qChunks = [];
+        for (let i = 0; i < questionIds.length; i += 30) {
+          qChunks.push(questionIds.slice(i, i + 30));
         }
-        const worksheetPromises = wsChunks.map(chunk => 
-            getDocs(query(collection(firestore, 'worksheets'), where(documentId(), 'in', chunk)))
+        const questionPromises = qChunks.map(chunk =>
+          getDocs(query(collection(firestore, 'questions'), where(documentId(), 'in', chunk)))
         );
-        const worksheetSnapshots = await Promise.all(worksheetPromises);
-        const fetchedWorksheets = worksheetSnapshots.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Worksheet)));
-        setWorksheets(fetchedWorksheets);
-
-        // Fetch Questions from the fetched worksheets
-        const questionIds = [...new Set(fetchedWorksheets.flatMap(w => w.questions))];
-        if (questionIds.length > 0) {
-            const qChunks = [];
-            for (let i = 0; i < questionIds.length; i += 30) {
-                qChunks.push(questionIds.slice(i, i + 30));
-            }
-            const questionPromises = qChunks.map(chunk => 
-                getDocs(query(collection(firestore, 'questions'), where(documentId(), 'in', chunk)))
-            );
-            const questionSnapshots = await Promise.all(questionPromises);
-            const fetchedQuestions = questionSnapshots.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Question)));
-            setQuestions(fetchedQuestions);
-        } else {
-            setQuestions([]);
-        }
+        const questionSnapshots = await Promise.all(questionPromises);
+        const fetchedQuestions = questionSnapshots.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Question)));
+        setQuestions(fetchedQuestions);
+      } else {
+        setQuestions([]);
+      }
     };
+
     fetchRelatedData();
   }, [firestore, attempts]);
 
@@ -133,10 +134,10 @@ export function useAcademicHealth(userProfile: User) {
 
     attempts.forEach(a => {
       if (!a.attemptedAt) return;
-      
+
       const w = worksheetMap.get(a.worksheetId);
       const data = getAttemptTotals(a, w, questionMap);
-      
+
       if (data) {
         const dateObj = (a.attemptedAt as any).toDate ? (a.attemptedAt as any).toDate() : new Date((a.attemptedAt as any));
         const dateKey = format(dateObj, 'yyyy-MM-dd');
@@ -148,7 +149,8 @@ export function useAcademicHealth(userProfile: User) {
     });
 
     // 14-Day Rolling Window
-    let currentHealth = 80; 
+    let currentHealth = 80;
+
     const today = new Date();
 
     for (let i = 13; i >= 0; i--) {
