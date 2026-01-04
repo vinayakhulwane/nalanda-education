@@ -661,13 +661,15 @@ export function WorksheetManualBuilder({
                     <SheetTrigger asChild>
                        <Button 
                             size="lg" 
-                            className={cn("rounded-full h-16 w-16 shadow-2xl bg-gradient-to-r from-primary to-indigo-600 hover:scale-105 transition-transform", animateCart && "animate-pulse")}
+                            className={cn("rounded-full h-16 w-16 shadow-2xl bg-gradient-to-r from-primary to-indigo-600 hover:scale-105 transition-transform border-4 border-white dark:border-slate-950", animateCart && "animate-pulse ring-4 ring-primary/30")}
                             disabled={selectedQuestions.length === 0}
                         >
                             <ShoppingCart className="h-6 w-6 text-white" />
-                            <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-sm border-2 border-white">
-                                {selectedQuestions.length}
-                            </span>
+                            {selectedQuestions.length > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-sm border-2 border-white dark:border-slate-950">
+                                    {selectedQuestions.length}
+                                </span>
+                            )}
                         </Button>
                     </SheetTrigger>
                      <SheetContent className="w-[90vw] flex flex-col p-0">
