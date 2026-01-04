@@ -1,3 +1,4 @@
+
 import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -41,7 +42,7 @@ export default function RootLayout({
       <body className={cn("flex flex-col min-h-screen font-body antialiased", fontBody.variable, fontHeadline.variable)}>
         <FirebaseClientProvider>
           <MobileHeader />
-          <main className="flex-1 pb-20 lg:pb-0">
+          <main className="flex-1 pb-20 lg:pb-0 overflow-x-hidden max-w-[100vw]">
             {children}
           </main>
           <MobileNav />
