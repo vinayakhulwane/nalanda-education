@@ -56,7 +56,7 @@ function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: Colla
 // ✅ HELPER: To get plain text for previews
 const getPlainText = (htmlString: string) => {
     if (typeof window === 'undefined') {
-        return htmlString.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
+        return (htmlString || "").replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
     }
     if (!htmlString) return '';
     const tempDiv = document.createElement('div');
@@ -399,7 +399,7 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                         className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-slate-50 ${isOpen ? 'border-b bg-slate-50/50' : ''}`}
                                         onClick={() => setOpenSubId(isOpen ? null : sub.id)}
                                     >
-                                        <div className="text-slate-400"><GripVertical className="w-5 h-5"/></div>
+                                        <div className="text-slate-400" onClick={(e) => e.stopPropagation()}><GripVertical className="w-5 h-5"/></div>
                                         <div className="flex-1 min-w-0">
                                             {/* ✅ FIXED: Use getPlainText for preview */}
                                             <div className={`font-medium truncate ${!sub.questionText || sub.questionText === '<p><br></p>' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
@@ -414,8 +414,8 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                             </span>
                                             <div className="h-4 w-px bg-slate-200"></div>
                                             <div className="flex items-center text-slate-400">
-                                                <button type="button" onClick={(e) => duplicateSubQuestion(sub, e)} className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded" title="Duplicate"><Copy className="w-4 h-4" /></button>
-                                                <button type="button" onClick={(e) => deleteSubQuestion(sub.id, e)} className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); duplicateSubQuestion(sub, e); }} className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded" title="Duplicate"><Copy className="w-4 h-4" /></button>
+                                                <button type="button" onClick={(e) => { e.stopPropagation(); deleteSubQuestion(sub.id, e); }} className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button>
                                             </div>
                                             <div className="text-slate-400">
                                                 {isOpen ? <ChevronDown className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
