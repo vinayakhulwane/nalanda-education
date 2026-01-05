@@ -10,10 +10,11 @@ import { Loader2, BookPlus, ArrowLeft, Download } from 'lucide-react';
 import { QuestionBankTable } from '@/components/question-bank/question-bank-table';
 import { QuestionBankFilters } from '@/components/question-bank/question-bank-filters';
 import type { Class, Subject, Unit, Category, Question } from '@/types';
-import * as XLSX from 'xlsx';
+import type * as XLSX from 'xlsx';
 
 // Helper to strip HTML for Excel export
 const getCleanText = (html: string) => {
+    if (typeof window === 'undefined') return html;
     const doc = new DOMParser().parseFromString(html, 'text/html');
     return doc.body.textContent || "";
 };
@@ -113,7 +114,8 @@ function QuestionBankPageContent() {
     }
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    const XLSX = await import('xlsx');
     const dataToExport = filteredQuestions.map(q => ({
       ID: q.id,
       Name: q.name,
