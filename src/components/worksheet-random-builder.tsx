@@ -9,7 +9,7 @@ import { ShoppingCart, PlusCircle, Filter, Trash2, Bot, Coins, Gem, Crown, Spark
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger, SheetClose } from './ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from './ui/sheet';
 import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
@@ -578,7 +578,7 @@ export function WorksheetRandomBuilder({
 
             {/* 2. BREAKDOWNS (Scrollable on Mobile) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                <Card className="shadow-sm border-slate-200 dark:border-slate-800 rounded-2xl">
+                <Card className="shadow-sm border-slate-200 dark:border-slate-800 rounded-2xl hidden md:flex flex-col">
                     <CardHeader className="pb-3 pt-5 px-5">
                         <CardTitle className="text-base text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-2">
                            <Filter className="h-4 w-4" /> Breakdown by Unit
