@@ -55,6 +55,9 @@ function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: Colla
 
 // ✅ HELPER: To get plain text for previews
 const getPlainText = (htmlString: string) => {
+    if (typeof window === 'undefined') {
+        return htmlString.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
+    }
     if (!htmlString) return '';
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlString;
