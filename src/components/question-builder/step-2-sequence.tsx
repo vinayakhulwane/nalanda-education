@@ -443,7 +443,7 @@ export function Step2Sequence({
                                     </div>
 
                                     {isOpen && (
-                                        <div className="p-6 space-y-6 bg-white animate-in slide-in-from-top-1">
+                                        <div className="p-6 space-y-6 bg-white animate-in slide-in-from-top-1" onClick={(e) => e.stopPropagation()}>
                                             <CollapsibleEditor 
                                                 label="Question Text"
                                                 value={sub.questionText}
