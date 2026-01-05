@@ -70,24 +70,29 @@ interface Step2Props {
   setQuestion: React.Dispatch<React.SetStateAction<Question>>;
   focusStepId?: string | null;
   setFocusStepId?: (id: string | null) => void;
+  onEditComplete?: () => void;
 }
 
-export function Step2Sequence({ question, setQuestion, focusStepId, setFocusStepId }: Step2Props) {
+export function Step2Sequence({ 
+  question, 
+  setQuestion, 
+  focusStepId, 
+  setFocusStepId,
+  onEditComplete 
+}: Step2Props) {
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [openSubId, setOpenSubId] = useState<string | null>(null);
 
-  // --- FOCUS LOGIC ---
+  // --- FOCUS LOGIC (FIXED) ---
   useEffect(() => {
     if (focusStepId) {
       setActiveStepId(focusStepId);
       // Optional: scroll into view
       // document.getElementById(`step-editor-${focusStepId}`)?.scrollIntoView({ behavior: 'smooth' });
       setFocusStepId?.(null); // Reset after focusing
-    } else if (!activeStepId && question.solutionSteps.length > 0) {
-      // If no step is active, default to the first one
-      setActiveStepId(question.solutionSteps[0].id);
     }
-  }, [focusStepId, setFocusStepId, activeStepId, question.solutionSteps]);
+    // REMOVED: The else-if block that auto-opened the first step on close
+  }, [focusStepId, setFocusStepId]);
 
   // --- STEP ACTIONS ---
   const addStep = () => {
@@ -210,12 +215,12 @@ export function Step2Sequence({ question, setQuestion, focusStepId, setFocusStep
   const addMcqOption = (subId: string) => {
      if (!activeStepId) return;
      setQuestion(prev => ({
-        ...prev,
-        solutionSteps: prev.solutionSteps.map(s => s.id === activeStepId ? {
-            ...s, subQuestions: s.subQuestions.map(sq => sq.id === subId && sq.mcqAnswer ? {
-                ...sq, mcqAnswer: { ...sq.mcqAnswer, options: [...sq.mcqAnswer.options, { id: uuidv4(), text: '' }] }
-            } : sq)
-        } : s)
+       ...prev,
+       solutionSteps: prev.solutionSteps.map(s => s.id === activeStepId ? {
+           ...s, subQuestions: s.subQuestions.map(sq => sq.id === subId && sq.mcqAnswer ? {
+               ...sq, mcqAnswer: { ...sq.mcqAnswer, options: [...sq.mcqAnswer.options, { id: uuidv4(), text: '' }] }
+           } : sq)
+       } : s)
      }));
   };
 
@@ -505,8 +510,17 @@ export function Step2Sequence({ question, setQuestion, focusStepId, setFocusStep
                         )}
                     </div>
                 </div>
+                {/* ✅ FIXED: CALL onEditComplete WHEN CLICKING DONE */}
                 <div className="p-4 border-t bg-slate-50 flex justify-end">
-                    <Button onClick={() => setActiveStepId(null)} className="bg-violet-600 text-white hover:bg-violet-700">Done Editing</Button>
+                    <Button 
+                        onClick={() => { 
+                            setActiveStepId(null); 
+                            onEditComplete?.(); 
+                        }} 
+                        className="bg-violet-600 text-white hover:bg-violet-700"
+                    >
+                        Done Editing
+                    </Button>
                 </div>
             </div>
         </div>

@@ -59,7 +59,10 @@ export function QuestionBuilderWizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false); 
   const [isLoading, setIsLoading] = useState(true);
+  
+  // --- DEEP LINK EDITING STATE ---
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [returnToStep, setReturnToStep] = useState<number | null>(null);
   
   // Validation
   const [isStep1Valid, setIsStep1Valid] = useState(false);
@@ -97,10 +100,20 @@ export function QuestionBuilderWizard() {
     loadData();
   }, [firestore, searchParams, toast]);
 
-  // --- DEEP EDIT HANDLER ---
+  // --- DEEP EDIT HANDLER (From Step 5) ---
   const handleEditStep = (stepId: string) => {
     setEditingStepId(stepId);
-    setCurrentStep(2); // Navigate back to the editor
+    setReturnToStep(5); // Remember we came from Preview (Step 5)
+    setCurrentStep(2);  // Go to Editor
+  };
+
+  // --- EDITOR DONE HANDLER (From Step 2) ---
+  const handleEditorDone = () => {
+    // If we have a return step stored, go back there
+    if (returnToStep) {
+        setCurrentStep(returnToStep);
+        setReturnToStep(null); // Clear it so subsequent edits behave normally
+    }
   };
 
   // --- SAVE ENGINE ---
@@ -226,9 +239,22 @@ export function QuestionBuilderWizard() {
         <div className="min-h-[400px] bg-white p-6 rounded-lg shadow-sm border mb-6">
           <div key={question.id || 'new'}>
               {currentStep === 1 && <Step1Metadata question={question} setQuestion={setQuestion} onValidityChange={setIsStep1Valid} />}
-              {currentStep === 2 && <Step2Sequence question={question} setQuestion={setQuestion} focusStepId={editingStepId} setFocusStepId={setEditingStepId} />}
+              
+              {/* ✅ UPDATED: Step 2 receives the completion handler */}
+              {currentStep === 2 && (
+                <Step2Sequence 
+                    question={question} 
+                    setQuestion={setQuestion} 
+                    focusStepId={editingStepId} 
+                    setFocusStepId={setEditingStepId} 
+                    onEditComplete={handleEditorDone}
+                />
+              )}
+
               {currentStep === 3 && <Step3Validation question={question} onValidityChange={setIsStep3Valid} />}
               {currentStep === 4 && <Step4Grading question={question} setQuestion={setQuestion} />}
+              
+              {/* ✅ UPDATED: Step 5 receives the edit handler */}
               {currentStep === 5 && <Step5Preview question={question} onEditStep={handleEditStep} />} 
           </div>
         </div>
