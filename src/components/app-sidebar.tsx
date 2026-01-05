@@ -26,6 +26,7 @@ import {
   Briefcase, 
   Info, 
   ChevronsLeft,
+  BrainCircuit,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -115,6 +116,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     { href: "/academics", icon: Briefcase, label: "Academics" },
     { href: "/numerical-management", icon: BookPlus, label: "Numerical Management" },
     { href: "/worksheets", icon: FilePlus2, label: "Worksheet Generator" },
+    { href: "/ai-settings", icon: BrainCircuit, label: "AI Settings" },
     { href: "/economy-settings", icon: Building2, label: "Economy Setting" },
   ];
   

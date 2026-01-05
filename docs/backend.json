@@ -98,6 +98,17 @@
       },
       "required": ["coinsPerGold", "goldPerDiamond"]
     },
+    "AISettings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AI Settings", "type": "object", "description": "Defines the global settings for Generative AI.",
+      "properties": {
+        "provider": { "type": "string", "enum": ["google-gemini"] },
+        "apiKey": { "type": "string" },
+        "gradingModel": { "type": "string" },
+        "questionModel": { "type": "string" }
+      },
+      "required": ["provider", "apiKey"]
+    },
     "Transaction": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Transaction", "description": "Represents a currency transaction for a user.", "type": "object",
@@ -136,6 +147,7 @@
       { "path": "/worksheets/{worksheetId}", "definition": { "entityName": "Worksheet", "schema": { "$ref": "#/backend/entities/Worksheet" }, "description": "Stores created worksheets." } },
       { "path": "/attempts/{attemptId}", "definition": { "entityName": "WorksheetAttempt", "schema": { "$ref": "#/backend/entities/WorksheetAttempt" }, "description": "Stores user attempts for worksheets." } },
       { "path": "/settings/economy", "definition": { "entityName": "EconomySettings", "schema": { "$ref": "#/backend/entities/EconomySettings" }, "description": "A single document for global economy settings." } },
+      { "path": "/settings/ai", "definition": { "entityName": "AISettings", "schema": { "$ref": "#/backend/entities/AISettings" }, "description": "A single document for global AI settings." } },
       { "path": "/transactions/{transactionId}", "definition": { "entityName": "Transaction", "schema": { "$ref": "#/backend/entities/Transaction" }, "description": "Stores all currency transactions." } },
       { "path": "/coupons/{couponId}", "definition": { "entityName": "Coupon", "schema": { "$ref": "#/backend/entities/Coupon" }, "description": "Stores promotional coupons." } }
     ]
