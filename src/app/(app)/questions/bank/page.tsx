@@ -10,7 +10,6 @@ import { Loader2, BookPlus, ArrowLeft, Download } from 'lucide-react';
 import { QuestionBankTable } from '@/components/question-bank/question-bank-table';
 import { QuestionBankFilters } from '@/components/question-bank/question-bank-filters';
 import type { Class, Subject, Unit, Category, Question } from '@/types';
-import type * as XLSX from 'xlsx';
 
 // Helper to strip HTML for Excel export
 const getCleanText = (html: string) => {
