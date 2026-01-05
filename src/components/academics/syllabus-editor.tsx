@@ -14,8 +14,6 @@ import { Accordion } from "@/components/ui/accordion";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Loader2, PlusCircle, Plus } from "lucide-react";
-import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableUnitItem } from "@/components/academics/sortable-unit-item";
 import { useToast } from '@/hooks/use-toast'; // Assuming you have this hook
 
@@ -153,22 +151,6 @@ export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: 
         }
     }
 
-    const handleUnitDragEnd = async (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (firestore && over && active.id !== over.id) {
-            const oldIndex = sortedUnits.findIndex(u => u.id === active.id);
-            const newIndex = sortedUnits.findIndex(u => u.id === over.id);
-            const newOrder = arrayMove(sortedUnits, oldIndex, newIndex);
-            
-            const batch = writeBatch(firestore);
-            newOrder.forEach((unit, index) => {
-                const unitRef = doc(firestore, 'units', unit.id);
-                batch.update(unitRef, { order: index });
-            });
-            await batch.commit();
-        }
-    }
-
     if (areUnitsLoading || areCategoriesLoading) {
          return (
              <div className="flex justify-center items-center h-64">
@@ -183,21 +165,17 @@ export default function SyllabusEditor({ subjectId, subjectName }: { subjectId: 
                 <h3 className="text-2xl font-bold font-headline">{userIsEditor ? 'Syllabus Builder' : 'Syllabus'}</h3>
             </div>
             
-            <DndContext collisionDetection={closestCenter} onDragEnd={handleUnitDragEnd}>
-                <SortableContext items={sortedUnits.map(u => u.id)} strategy={verticalListSortingStrategy}>
-                    <Accordion type="multiple" className="w-full space-y-4">
-                        {sortedUnits.map(unit => (
-                            <SortableUnitItem
-                                key={unit.id}
-                                unit={unit}
-                                categories={categoriesByUnit[unit.id] || []}
-                                userIsEditor={userIsEditor}
-                                openDialog={openDialog}
-                            />
-                        ))}
-                    </Accordion>
-                </SortableContext>
-            </DndContext>
+            <Accordion type="multiple" className="w-full space-y-4">
+                {sortedUnits.map(unit => (
+                    <SortableUnitItem
+                        key={unit.id}
+                        unit={unit}
+                        categories={categoriesByUnit[unit.id] || []}
+                        userIsEditor={userIsEditor}
+                        openDialog={openDialog}
+                    />
+                ))}
+            </Accordion>
 
              {userIsEditor && (
                 <Button 

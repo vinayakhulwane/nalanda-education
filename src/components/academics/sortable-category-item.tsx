@@ -1,7 +1,5 @@
 'use client';
 import type { Category, Unit } from "@/types";
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { Button } from "../ui/button";
 import { Edit, GripVertical, Trash } from "lucide-react";
 
@@ -13,21 +11,12 @@ type SortableCategoryItemProps = {
 };
 
 export function SortableCategoryItem({ category, unit, userIsEditor, openDialog }: SortableCategoryItemProps) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: category.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-    };
-
     return (
         <div
-            ref={setNodeRef}
-            style={style}
             className="flex items-center justify-between rounded-md p-2 hover:bg-muted/50"
         >
             <div className="flex items-center">
-                 {userIsEditor && <button {...attributes} {...listeners} className="cursor-grab p-1">
+                 {userIsEditor && <button className="cursor-grab p-1">
                     <GripVertical className="h-5 w-5 text-muted-foreground mr-2" />
                 </button>}
                 <div>
