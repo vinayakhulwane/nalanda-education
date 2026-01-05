@@ -53,6 +53,14 @@ function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: Colla
   );
 }
 
+// ✅ HELPER: To get plain text for previews
+const getPlainText = (htmlString: string) => {
+    if (!htmlString) return '';
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlString;
+    return tempDiv.textContent || tempDiv.innerText || '';
+};
+
 // --- MAIN COMPONENT ---
 interface Step2Props {
   question: Question;
@@ -390,8 +398,9 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                                     >
                                         <div className="text-slate-400"><GripVertical className="w-5 h-5"/></div>
                                         <div className="flex-1 min-w-0">
+                                            {/* ✅ FIXED: Use getPlainText for preview */}
                                             <div className={`font-medium truncate ${!sub.questionText || sub.questionText === '<p><br></p>' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
-                                                {(sub.questionText && sub.questionText !== '<p><br></p>') ? sub.questionText.replace(/<[^>]*>?/gm, '') : `Sub-Question ${idx + 1}`}
+                                                {getPlainText(sub.questionText) || `Sub-Question ${idx + 1}`}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
