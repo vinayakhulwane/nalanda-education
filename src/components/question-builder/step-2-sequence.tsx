@@ -13,6 +13,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { Question, SolutionStep, SubQuestion } from "@/types";
 import { RichTextEditor } from '../rich-text-editor';
+import { Card } from '../ui/card';
 
 // --- HELPER: Collapsible Editor ---
 interface CollapsibleEditorProps {
@@ -252,6 +253,15 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
       
       {/* --- MAIN CONTENT: FULL-WIDTH STEP SEQUENCE LIST --- */}
       <div className="space-y-6 pb-20">
+        
+        <Card className="p-4 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Main Question</h3>
+            <div
+              className="prose dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: question.mainQuestionText || '<p><em>Question text will appear here...</em></p>' }}
+            />
+        </Card>
+
         <div className="flex justify-between items-center border-b pb-4">
             <div>
                 <h3 className="text-lg font-bold text-slate-800">Solution Sequence</h3>
