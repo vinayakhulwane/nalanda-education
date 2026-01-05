@@ -59,6 +59,7 @@ export function QuestionBuilderWizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false); 
   const [isLoading, setIsLoading] = useState(true);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
   
   // Validation
   const [isStep1Valid, setIsStep1Valid] = useState(false);
@@ -95,6 +96,12 @@ export function QuestionBuilderWizard() {
     };
     loadData();
   }, [firestore, searchParams, toast]);
+
+  // --- DEEP EDIT HANDLER ---
+  const handleEditStep = (stepId: string) => {
+    setEditingStepId(stepId);
+    setCurrentStep(2); // Navigate back to the editor
+  };
 
   // --- SAVE ENGINE ---
   const saveToDatabase = async (status: 'draft' | 'published') => {
@@ -219,10 +226,10 @@ export function QuestionBuilderWizard() {
         <div className="min-h-[400px] bg-white p-6 rounded-lg shadow-sm border mb-6">
           <div key={question.id || 'new'}>
               {currentStep === 1 && <Step1Metadata question={question} setQuestion={setQuestion} onValidityChange={setIsStep1Valid} />}
-              {currentStep === 2 && <Step2Sequence question={question} setQuestion={setQuestion} />}
+              {currentStep === 2 && <Step2Sequence question={question} setQuestion={setQuestion} focusStepId={editingStepId} setFocusStepId={setEditingStepId} />}
               {currentStep === 3 && <Step3Validation question={question} onValidityChange={setIsStep3Valid} />}
               {currentStep === 4 && <Step4Grading question={question} setQuestion={setQuestion} />}
-              {currentStep === 5 && <Step5Preview question={question} />} 
+              {currentStep === 5 && <Step5Preview question={question} onEditStep={handleEditStep} />} 
           </div>
         </div>
 

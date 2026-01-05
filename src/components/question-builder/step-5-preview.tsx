@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { 
   Calculator, Bot, FileText, Layers, 
-  Hash, ListChecks, CheckCircle2, Download
+  Hash, ListChecks, CheckCircle2, Download, Pencil
 } from 'lucide-react';
 
 interface Step5Props {
   question: Question;
+  onEditStep: (stepId: string) => void;
 }
 
 // ✅ HELPER: Convert "Sticky" spaces (&nbsp;) to normal spaces
@@ -22,7 +23,7 @@ const cleanHtml = (html: string = '') => {
   return html.replace(/&nbsp;/g, ' ');
 };
 
-export function Step5Preview({ question }: Step5Props) {
+export function Step5Preview({ question, onEditStep }: Step5Props) {
   
   const isAiGraded = question.gradingMode === 'ai';
 
@@ -107,14 +108,24 @@ export function Step5Preview({ question }: Step5Props) {
 
         <div className="relative border-l-2 border-slate-200 ml-3 space-y-8 pl-8 py-2">
             {question.solutionSteps.map((step, index) => (
-                <div key={step.id} className="relative max-w-full">
+                <div key={step.id} className="relative max-w-full group">
                     {/* Step Number Badge */}
                     <div className="absolute -left-[41px] top-0 w-6 h-6 rounded-full bg-white border-2 border-violet-600 text-violet-600 flex items-center justify-center text-xs font-bold z-10 shadow-sm">
                         {index + 1}
                     </div>
 
                     <div className="mb-4 max-w-full">
-                        <h4 className="text-lg font-bold text-slate-800 break-words">{step.title}</h4>
+                         <div className="flex justify-between items-start">
+                            <h4 className="text-lg font-bold text-slate-800 break-words pr-4">{step.title}</h4>
+                            <Button 
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => onEditStep(step.id)}
+                            >
+                                <Pencil className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                        </div>
                         {step.stepQuestion && (
                             <div className="w-full overflow-x-auto">
                                 <div 

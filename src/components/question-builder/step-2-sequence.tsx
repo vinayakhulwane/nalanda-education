@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,24 +55,39 @@ function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: Colla
 
 // ✅ HELPER: To get plain text for previews
 const getPlainText = (htmlString: string) => {
-    if (typeof window === 'undefined') {
-        return (htmlString || "").replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
+    if (typeof window !== 'undefined') {
+        if (!htmlString) return '';
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlString;
+        return tempDiv.textContent || tempDiv.innerText || '';
     }
-    if (!htmlString) return '';
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlString;
-    return tempDiv.textContent || tempDiv.innerText || '';
+    return (htmlString || "").replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
 };
 
 // --- MAIN COMPONENT ---
 interface Step2Props {
   question: Question;
   setQuestion: React.Dispatch<React.SetStateAction<Question>>;
+  focusStepId?: string | null;
+  setFocusStepId?: (id: string | null) => void;
 }
 
-export function Step2Sequence({ question, setQuestion }: Step2Props) {
+export function Step2Sequence({ question, setQuestion, focusStepId, setFocusStepId }: Step2Props) {
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [openSubId, setOpenSubId] = useState<string | null>(null);
+
+  // --- FOCUS LOGIC ---
+  useEffect(() => {
+    if (focusStepId) {
+      setActiveStepId(focusStepId);
+      // Optional: scroll into view
+      // document.getElementById(`step-editor-${focusStepId}`)?.scrollIntoView({ behavior: 'smooth' });
+      setFocusStepId?.(null); // Reset after focusing
+    } else if (!activeStepId && question.solutionSteps.length > 0) {
+      // If no step is active, default to the first one
+      setActiveStepId(question.solutionSteps[0].id);
+    }
+  }, [focusStepId, setFocusStepId, activeStepId, question.solutionSteps]);
 
   // --- STEP ACTIONS ---
   const addStep = () => {
@@ -346,7 +361,7 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
         <div className="fixed inset-0 z-50 overflow-hidden">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setActiveStepId(null)}></div>
             
-            <div className="absolute inset-y-0 right-0 w-full max-w-2xl bg-white shadow-2xl border-l flex flex-col animate-in slide-in-from-right sm:duration-300">
+            <div id={`step-editor-${activeStepId}`} className="absolute inset-y-0 right-0 w-full max-w-2xl bg-white shadow-2xl border-l flex flex-col animate-in slide-in-from-right sm:duration-300">
                 <div className="flex items-center justify-between p-6 border-b bg-slate-50/50">
                     <div>
                         <h2 className="text-xl font-bold text-slate-800">Edit Step</h2>
@@ -394,10 +409,9 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
                             const isOpen = openSubId === sub.id;
                             
                             return (
-                                <div key={sub.id} className="bg-white rounded-lg border shadow-sm transition-all duration-200 overflow-hidden">
+                                <div key={sub.id} className="bg-white rounded-lg border shadow-sm transition-all duration-200 overflow-hidden" onClick={() => setOpenSubId(isOpen ? null : sub.id)}>
                                     <div 
                                         className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-slate-50 ${isOpen ? 'border-b bg-slate-50/50' : ''}`}
-                                        onClick={() => setOpenSubId(isOpen ? null : sub.id)}
                                     >
                                         <div className="text-slate-400" onClick={(e) => e.stopPropagation()}><GripVertical className="w-5 h-5"/></div>
                                         <div className="flex-1 min-w-0">
