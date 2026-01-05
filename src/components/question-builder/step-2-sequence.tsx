@@ -31,18 +31,18 @@ function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: Colla
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <Label className="text-xs font-semibold text-slate-500 uppercase">{label}</Label>
+      <div className="flex items-center gap-2">
         <Button
           type="button" 
           variant="ghost"
           size="sm"
           onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-          className="h-6 px-2 text-slate-400 hover:text-slate-600"
+          className="h-6 w-6 p-0 text-slate-400 hover:text-slate-600"
           title={isOpen ? "Hide Editor" : "Show Editor"}
         >
           {isOpen ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
         </Button>
+        <Label className="text-xs font-semibold text-slate-500 uppercase">{label}</Label>
       </div>
       {isOpen && (
         <div className="border rounded-md overflow-hidden relative group">
