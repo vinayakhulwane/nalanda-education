@@ -3,11 +3,10 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, CalendarDays, BookOpen, Repeat } from "lucide-react";
+import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, BookOpen, Repeat } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Worksheet, WorksheetAttempt } from "@/types";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 
 interface WorksheetDisplayCardProps {
     worksheet: Worksheet;
@@ -58,31 +57,30 @@ export function WorksheetDisplayCard({
         return (
             <div
                 className={cn(
-                    "group flex flex-col gap-3 p-4 bg-white dark:bg-slate-900 rounded-2xl border transition-all shadow-sm active:scale-[0.98] overflow-hidden",
+                    "group flex flex-col gap-3 p-4 bg-white dark:bg-slate-900 rounded-2xl border transition-all shadow-sm active:scale-[0.98] w-full max-w-full overflow-hidden",
                     isPractice ? "border-pink-100 dark:border-pink-900/20" : "border-slate-200 dark:border-slate-800"
                 )}
                 onClick={actionHandler}
             >
-                {/* Header Section */}
-                <div className="flex items-start gap-4 w-full">
+                {/* Header Section - Changed to GRID for strict width control */}
+                <div className="grid grid-cols-[3rem_1fr] gap-4 w-full items-start">
+                    
+                    {/* Icon Column */}
                     <div className={cn(
-                        "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+                        "h-12 w-12 rounded-xl flex items-center justify-center shadow-sm",
                         isPractice
                             ? "bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400"
                             : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
                     )}>
                         <BookOpen className="h-6 w-6" />
                     </div>
-                    {/* TRUNCATION FIX: 
-                       1. flex-1: Takes up remaining width
-                       2. min-w-0: Allows the container to shrink below content size (crucial for flex truncation)
-                       3. w-full: Ensures width constraint is respected
-                    */}
-                    <div className="flex-1 min-w-0 pt-0.5">
-                        <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate leading-tight w-full block">
+
+                    {/* Text Column - min-w-0 is critical here */}
+                    <div className="flex flex-col min-w-0 pt-0.5">
+                        <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate w-full leading-tight">
                             {worksheet.title}
                         </h4>
-                        <p className="text-xs text-muted-foreground capitalize mt-1 truncate">
+                        <p className="text-xs text-muted-foreground capitalize mt-1 truncate w-full">
                             {isPractice ? 'Practice Test' : 'Classroom Assignment'}
                         </p>
                     </div>
@@ -92,29 +90,29 @@ export function WorksheetDisplayCard({
 
                 {/* Stats Row */}
                 <div className="flex items-center gap-4 text-xs font-medium text-slate-500 dark:text-slate-400">
-                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md shrink-0">
                         <FileQuestion className="h-3.5 w-3.5" />
                         <span>{questionCount} Qs</span>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
+                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md shrink-0">
                         <Clock className="h-3.5 w-3.5" />
                         <span>~{estimatedTime} min</span>
                     </div>
                 </div>
 
                 {/* Footer Action Row */}
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center justify-between pt-1 gap-2">
                     {/* Left Side: Reward or Attempt Status */}
-                    <div className="flex items-center shrink-0">
+                    <div className="flex items-center min-w-0 shrink-0">
                         {isCompletedOrAttempted ? (
                             <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
-                                <Repeat className="h-3.5 w-3.5" />
-                                <span>Tried {attempts.length}x</span>
+                                <Repeat className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">Tried {attempts.length}x</span>
                             </div>
                         ) : (
                             <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-500 animate-pulse">
-                                <Sparkles className="h-3.5 w-3.5 fill-amber-600 dark:fill-amber-500" />
-                                <span>Win {rewardXP} XP</span>
+                                <Sparkles className="h-3.5 w-3.5 fill-amber-600 dark:fill-amber-500 shrink-0" />
+                                <span className="truncate">Win {rewardXP} XP</span>
                             </div>
                         )}
                     </div>
