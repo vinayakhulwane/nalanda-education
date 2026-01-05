@@ -1,23 +1,13 @@
 'use client';
 
-import { useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, documentId } from "firebase/firestore";
-// ✅ FIXED IMPORTS: Using '@/' alias instead of relative paths
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  BookOpen, 
-  Clock, 
-  FileQuestion, 
-  Sparkles, 
-  ArrowRight, 
-  CheckCircle2 
-} from "lucide-react";
+import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, CalendarDays, BookOpen, Repeat } from "lucide-react";
+import { useRouter } from "next/navigation";
+import type { Worksheet, WorksheetAttempt } from "@/types";
 import { cn } from "@/lib/utils";
-import type { Worksheet, Question, WorksheetAttempt } from "@/types";
+import { format } from "date-fns";
 
 interface WorksheetDisplayCardProps {
     worksheet: Worksheet;
@@ -68,13 +58,13 @@ export function WorksheetDisplayCard({
         return (
             <div
                 className={cn(
-                    "group flex flex-col gap-3 p-4 bg-white dark:bg-slate-900 rounded-2xl border transition-all shadow-sm active:scale-[0.98]",
+                    "group flex flex-col gap-3 p-4 bg-white dark:bg-slate-900 rounded-2xl border transition-all shadow-sm active:scale-[0.98] overflow-hidden",
                     isPractice ? "border-pink-100 dark:border-pink-900/20" : "border-slate-200 dark:border-slate-800"
                 )}
                 onClick={actionHandler}
             >
                 {/* Header Section */}
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-4 w-full">
                     <div className={cn(
                         "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
                         isPractice
@@ -83,12 +73,16 @@ export function WorksheetDisplayCard({
                     )}>
                         <BookOpen className="h-6 w-6" />
                     </div>
-                    {/* ✅ FIX: Added min-w-0 to enable truncation */}
+                    {/* TRUNCATION FIX: 
+                       1. flex-1: Takes up remaining width
+                       2. min-w-0: Allows the container to shrink below content size (crucial for flex truncation)
+                       3. w-full: Ensures width constraint is respected
+                    */}
                     <div className="flex-1 min-w-0 pt-0.5">
-                        <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate leading-tight">
+                        <h4 className="font-bold text-base text-slate-900 dark:text-slate-100 truncate leading-tight w-full block">
                             {worksheet.title}
                         </h4>
-                        <p className="text-xs text-muted-foreground capitalize mt-1">
+                        <p className="text-xs text-muted-foreground capitalize mt-1 truncate">
                             {isPractice ? 'Practice Test' : 'Classroom Assignment'}
                         </p>
                     </div>
@@ -111,11 +105,11 @@ export function WorksheetDisplayCard({
                 {/* Footer Action Row */}
                 <div className="flex items-center justify-between pt-1">
                     {/* Left Side: Reward or Attempt Status */}
-                    <div className="flex items-center">
+                    <div className="flex items-center shrink-0">
                         {isCompletedOrAttempted ? (
                             <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                <span>Attempted {attempts.length}x</span>
+                                <Repeat className="h-3.5 w-3.5" />
+                                <span>Tried {attempts.length}x</span>
                             </div>
                         ) : (
                             <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-500 animate-pulse">
@@ -129,14 +123,14 @@ export function WorksheetDisplayCard({
                     <Button
                         size="sm"
                         className={cn(
-                            "h-9 px-4 rounded-full font-bold text-xs shadow-sm transition-all",
+                            "h-9 px-4 rounded-full font-bold text-xs shadow-sm transition-all shrink-0",
                             isPractice
                                 ? "bg-pink-600 hover:bg-pink-700 text-white"
                                 : "bg-primary hover:bg-primary/90 text-primary-foreground"
                         )}
                         onClick={(e) => { e.stopPropagation(); actionHandler(); }}
                     >
-                        {isCompletedOrAttempted ? 'Review' : 'Start Solving'}
+                        {isCompletedOrAttempted ? 'Review' : 'Start'}
                         <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                     </Button>
                 </div>
@@ -154,14 +148,14 @@ export function WorksheetDisplayCard({
 
             <CardHeader className="pt-6 pb-2">
                 <div className="flex justify-between items-start mb-3">
-                    <div className={cn(
-                        "font-medium border-0 px-2 py-0.5 rounded-full text-xs",
+                    <Badge variant="outline" className={cn(
+                        "font-medium border-0 px-2 py-0.5",
                         isPractice
                             ? "bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 ring-1 ring-purple-200 dark:ring-purple-800"
                             : "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-800"
                     )}>
                         {isPractice ? 'Practice Zone' : 'Classroom'}
-                    </div>
+                    </Badge>
                     {isCompletedOrAttempted && (
                         <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded-full">
                             <CheckCircle2 className="h-3 w-3" /> Done
@@ -183,10 +177,10 @@ export function WorksheetDisplayCard({
                         </div>
                     </div>
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <Trophy className="h-4 w-4 text-muted-foreground" />
                         <div className="flex flex-col">
-                            <span className="text-xs font-bold">~{estimatedTime}</span>
-                            <span className="text-[10px] text-muted-foreground uppercase">Mins</span>
+                            <span className="text-xs font-bold">{totalMarks}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase">Total Marks</span>
                         </div>
                     </div>
                 </div>
@@ -212,7 +206,7 @@ export function WorksheetDisplayCard({
                     onClick={isCompletedOrAttempted ? handleReview : handleStart}
                 >
                     {isCompletedOrAttempted ? 'Review Results' : 'Start Assignment'}
-                    {!isCompletedOrAttempted && <ArrowRight className="ml-2 h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />}
+                    {!isCompletedOrAttempted && <PlayCircle className="ml-2 h-4 w-4 group-hover/btn:scale-110 transition-transform" />}
                 </Button>
             </CardFooter>
         </Card>
