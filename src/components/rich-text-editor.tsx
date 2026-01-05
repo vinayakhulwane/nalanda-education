@@ -1,13 +1,8 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useRef } from 'react';
 import 'react-quill-new/dist/quill.snow.css';
-
-// Dynamically import react-quill-new to ensure it only runs in the browser
-const ReactQuill = dynamic(() => import('react-quill-new'), { 
-    ssr: false,
-    loading: () => <div className="h-[340px] w-full animate-pulse bg-muted rounded-md" />
-});
+import type ReactQuill from 'react-quill-new';
 
 interface RichTextEditorProps {
     value: string;
@@ -25,14 +20,29 @@ const modules = {
 };
 
 export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
+    const [isClient, setIsClient] = useState(false);
+    const QuillComponent = useRef<typeof ReactQuill | null>(null);
+
+    useEffect(() => {
+        setIsClient(true);
+        import('react-quill-new').then((Quill) => {
+            QuillComponent.current = Quill.default;
+        });
+    }, []);
+
+    if (!isClient || !QuillComponent.current) {
+        return <div className="h-[340px] w-full animate-pulse bg-muted rounded-md" />;
+    }
+
+    const TheQuill = QuillComponent.current;
+
     return (
         <div className="bg-background">
-             <ReactQuill 
+             <TheQuill
                 theme="snow" 
                 value={value} 
                 onChange={onChange}
                 modules={modules}
-                // Using a container class or CSS is preferred over inline styles for Quill
                 className="h-[300px] mb-12"
             />
         </div>
