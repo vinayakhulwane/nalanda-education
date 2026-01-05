@@ -248,6 +248,9 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
 
   const activeStep = question.solutionSteps.find(s => s.id === activeStepId);
 
+  // ✅ HELPER to clean HTML text
+  const cleanHtml = (html: string) => html.replace(/&nbsp;/g, ' ');
+
   return (
     <div className="relative min-h-[600px]">
       
@@ -256,9 +259,10 @@ export function Step2Sequence({ question, setQuestion }: Step2Props) {
         
         <Card className="p-4 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Main Question</h3>
+            {/* ✅ FIX: Added `break-words` and `whitespace-pre-wrap` for better wrapping */}
             <div
-              className="prose dark:prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: question.mainQuestionText || '<p><em>Question text will appear here...</em></p>' }}
+              className="prose dark:prose-invert max-w-none break-words whitespace-pre-wrap"
+              dangerouslySetInnerHTML={{ __html: cleanHtml(question.mainQuestionText) || '<p><em>Question text will appear here...</em></p>' }}
             />
         </Card>
 

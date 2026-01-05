@@ -402,8 +402,11 @@ export default function SolveWorksheetPage() {
                     </CardHeader>
                     
                     <CardContent>
-                        <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-base leading-relaxed bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(activeQuestion.mainQuestionText) }} />
+                        {/* ✅ FIX: Added container with overflow-x-auto */}
+                        <div className="overflow-x-auto">
+                            <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-base leading-relaxed bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap break-words min-w-0">
+                                <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(activeQuestion.mainQuestionText) }} />
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
