@@ -14,6 +14,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { Question, SolutionStep, SubQuestion } from "@/types";
 import { RichTextEditor } from '../rich-text-editor';
 import { Card } from '../ui/card';
+import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // --- HELPER: Collapsible Editor ---
 interface CollapsibleEditorProps {
@@ -53,7 +56,7 @@ function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: Colla
   );
 }
 
-// ✅ HELPER: To get plain text for previews
+
 const getPlainText = (htmlString: string) => {
     if (typeof window !== 'undefined') {
         if (!htmlString) return '';
@@ -63,6 +66,154 @@ const getPlainText = (htmlString: string) => {
     }
     return (htmlString || "").replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
 };
+
+function SortableSubQuestionItem({ subQuestion, index, openSubId, setOpenSubId, updateSubQuestion, duplicateSubQuestion, deleteSubQuestion }: any) {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: subQuestion.id });
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+    const isOpen = openSubId === subQuestion.id;
+
+    const toggleMcqCorrect = (subId: string, optId: string) => {
+        const sq = subQuestion;
+        if (sq.id === subId && sq.mcqAnswer) {
+            const isMulti = sq.mcqAnswer.isMultiCorrect;
+            let newCorrect = [...sq.mcqAnswer.correctOptions];
+            if (isMulti) {
+                newCorrect.includes(optId) ? newCorrect = newCorrect.filter(id => id !== optId) : newCorrect.push(optId);
+            } else {
+                newCorrect = [optId];
+            }
+            updateSubQuestion(subId, 'mcqAnswer', { ...sq.mcqAnswer, correctOptions: newCorrect });
+        }
+    };
+    const updateMcqOption = (subId: string, optId: string, text: string) => {
+        const sq = subQuestion;
+        if (sq.id === subId && sq.mcqAnswer) {
+            updateSubQuestion(subId, 'mcqAnswer', {
+                ...sq.mcqAnswer,
+                options: sq.mcqAnswer.options.map(o => o.id === optId ? { ...o, text } : o)
+            });
+        }
+    };
+    const deleteMcqOption = (subId: string, optId: string) => {
+        const sq = subQuestion;
+        if (sq.id === subId && sq.mcqAnswer) {
+            updateSubQuestion(subId, 'mcqAnswer', {
+                ...sq.mcqAnswer,
+                options: sq.mcqAnswer.options.filter(o => o.id !== optId),
+                correctOptions: sq.mcqAnswer.correctOptions.filter(id => id !== optId)
+            });
+        }
+    };
+    const addMcqOption = (subId: string) => {
+        const sq = subQuestion;
+        if (sq.id === subId && sq.mcqAnswer) {
+            updateSubQuestion(subId, 'mcqAnswer', {
+                ...sq.mcqAnswer,
+                options: [...sq.mcqAnswer.options, { id: uuidv4(), text: '' }]
+            });
+        }
+    };
+    const updateNested = (subId: string, type: 'numericalAnswer'|'mcqAnswer', field: string, val: any) => {
+        const sq = subQuestion;
+        if (sq.id === subId) {
+            updateSubQuestion(subId, type, { ...sq[type] as any, [field]: val });
+        }
+    };
+
+
+    return (
+        <div ref={setNodeRef} style={style} className="bg-white rounded-lg border shadow-sm transition-all duration-200 overflow-hidden" onClick={() => setOpenSubId(isOpen ? null : subQuestion.id)}>
+            <div className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-slate-50 ${isOpen ? 'border-b bg-slate-50/50' : ''}`}>
+                <div {...attributes} {...listeners} className="text-slate-400 cursor-grab" onClick={(e) => e.stopPropagation()}><GripVertical className="w-5 h-5"/></div>
+                <div className="flex-1 min-w-0">
+                    <div className={`font-medium truncate ${!subQuestion.questionText || subQuestion.questionText === '<p><br></p>' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
+                        {getPlainText(subQuestion.questionText) || `Sub-Question ${index + 1}`}
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded border ${
+                        subQuestion.answerType === 'numerical' ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-orange-100 text-orange-700 border-orange-200'
+                    }`}>
+                        {subQuestion.answerType}
+                    </span>
+                    <div className="h-4 w-px bg-slate-200"></div>
+                    <div className="flex items-center text-slate-400">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); duplicateSubQuestion(subQuestion.id, e); }} className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded" title="Duplicate"><Copy className="w-4 h-4" /></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); deleteSubQuestion(subQuestion.id, e); }} className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                    <div className="text-slate-400">
+                        {isOpen ? <ChevronDown className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
+                    </div>
+                </div>
+            </div>
+
+            {isOpen && (
+                <div className="p-6 space-y-6 bg-white animate-in slide-in-from-top-1" onClick={(e) => e.stopPropagation()}>
+                    <CollapsibleEditor 
+                        label="Question Text"
+                        value={subQuestion.questionText}
+                        onChange={(val) => updateSubQuestion(subQuestion.id, 'questionText', val)}
+                        defaultOpen={true}
+                    />
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Answer Type</Label>
+                            <Select value={subQuestion.answerType} onValueChange={(val)=>updateSubQuestion(subQuestion.id,'answerType',val)}>
+                                <SelectTrigger className="w-full"><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="numerical">Numerical</SelectItem>
+                                    <SelectItem value="mcq">MCQ</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Marks</Label>
+                            <Input type="number" min={1} value={subQuestion.marks} onChange={(e)=>updateSubQuestion(subQuestion.id,'marks',parseInt(e.target.value)||0)}/>
+                        </div>
+                    </div>
+                    
+                     <div className={`rounded-lg p-5 border ${subQuestion.answerType === 'numerical' ? 'bg-violet-50/50 border-violet-100' : 'bg-orange-50/50 border-orange-100'}`}>
+                        <h5 className={`text-xs font-bold uppercase mb-4 border-b pb-2 ${subQuestion.answerType === 'numerical' ? 'text-violet-700 border-violet-200' : 'text-orange-700 border-orange-200'}`}>
+                            {subQuestion.answerType === 'numerical' ? 'Numerical Answer Settings' : 'MCQ Options & Settings'}
+                        </h5>
+                        {subQuestion.answerType === 'numerical' && (
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="space-y-1"><Label className="text-xs text-violet-600">Correct Value</Label><Input type="number" value={subQuestion.numericalAnswer?.correctValue ?? 0} onChange={(e)=>updateNested(subQuestion.id,'numericalAnswer','correctValue',parseFloat(e.target.value))} className="bg-white border-violet-200"/></div>
+                                <div className="space-y-1"><Label className="text-xs text-violet-600">Tolerance (±)</Label><Input type="number" value={subQuestion.numericalAnswer?.toleranceValue ?? 0} onChange={(e)=>updateNested(subQuestion.id,'numericalAnswer','toleranceValue',parseFloat(e.target.value))} className="bg-white border-violet-200"/></div>
+                                <div className="space-y-1"><Label className="text-xs text-violet-600">Base Unit <span className="text-red-400">*</span></Label><Input value={subQuestion.numericalAnswer?.baseUnit || ''} onChange={(e)=>updateNested(subQuestion.id,'numericalAnswer','baseUnit',e.target.value)} placeholder="e.g. N" className="bg-white border-violet-200"/></div>
+                            </div>
+                        )}
+                        {subQuestion.answerType === 'mcq' && subQuestion.mcqAnswer && (
+                            <div className="space-y-5">
+                                <div className="flex gap-6 p-3 bg-orange-100/50 rounded-md">
+                                    <div className="flex items-center gap-2"><Switch checked={subQuestion.mcqAnswer.isMultiCorrect} onCheckedChange={(c) => updateNested(subQuestion.id, 'mcqAnswer', 'isMultiCorrect', c)} /><Label className="text-sm text-orange-800">Multi-Select</Label></div>
+                                    <div className="flex items-center gap-2"><Switch checked={subQuestion.mcqAnswer.shuffleOptions} onCheckedChange={(c) => updateNested(subQuestion.id, 'mcqAnswer', 'shuffleOptions', c)} /><Label className="text-sm text-orange-800">Shuffle</Label></div>
+                                </div>
+                                <div className="space-y-3">
+                                    {subQuestion.mcqAnswer.options.map((opt, optIdx) => {
+                                        const isCorrect = subQuestion.mcqAnswer!.correctOptions.includes(opt.id);
+                                        return (
+                                            <div key={opt.id} className="flex gap-3 items-center group">
+                                                <button type="button" onClick={() => toggleMcqCorrect(subQuestion.id, opt.id)} className={`shrink-0 transition-colors p-1 rounded-full ${isCorrect ? 'text-green-600 bg-green-100' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}>{isCorrect ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}</button>
+                                                <Input value={opt.text} onChange={(e) => updateMcqOption(subQuestion.id, opt.id, e.target.value)} className={`bg-white ${isCorrect ? 'border-green-400 ring-1 ring-green-400' : 'border-orange-200'}`} placeholder={`Option ${optIdx + 1}`}/>
+                                                <button type="button" onClick={() => deleteMcqOption(subQuestion.id, opt.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-5 h-5" /></button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <Button type="button" onClick={() => addMcqOption(subQuestion.id)} variant="outline" className="w-full border-dashed border-orange-300 text-orange-700 hover:bg-orange-50 mt-2"><Plus className="w-4 h-4 mr-2" /> Add Option</Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 
 // --- MAIN COMPONENT ---
 interface Step2Props {
@@ -91,7 +242,6 @@ export function Step2Sequence({
       // document.getElementById(`step-editor-${focusStepId}`)?.scrollIntoView({ behavior: 'smooth' });
       setFocusStepId?.(null); // Reset after focusing
     }
-    // REMOVED: The else-if block that auto-opened the first step on close
   }, [focusStepId, setFocusStepId]);
 
   // --- STEP ACTIONS ---
@@ -110,9 +260,8 @@ export function Step2Sequence({
 
   const deleteStep = (id: string, e: React.MouseEvent) => {
     e.preventDefault(); 
-    e.stopPropagation(); // ✅ CRITICAL FIX: Stops the click from reaching the parent div
+    e.stopPropagation();
     
-    // Safety check: Don't accidentally delete if user mis-clicked
     if (!confirm("Are you sure you want to delete this step?")) return;
     
     setQuestion(prev => ({ 
@@ -120,13 +269,12 @@ export function Step2Sequence({
         solutionSteps: prev.solutionSteps.filter(s => s.id !== id) 
     }));
     
-    // If we deleted the step that was open, close the panel
     if (activeStepId === id) setActiveStepId(null);
   };
 
   const moveStep = (idx: number, dir: 'up' | 'down', e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation(); // ✅ Fix: Prevents opening the step while moving it
+    e.stopPropagation();
     
     const steps = [...question.solutionSteps];
     const target = dir === 'up' ? idx - 1 : idx + 1;
@@ -162,12 +310,15 @@ export function Step2Sequence({
     setOpenSubId(newSub.id);
   };
 
-  const duplicateSubQuestion = (sub: SubQuestion, e: React.MouseEvent) => {
+  const duplicateSubQuestion = (subId: string, e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation(); // ✅ Fix: Prevents toggling the accordion
+    e.stopPropagation();
     
     if (!activeStepId) return;
-    const newSub = { ...sub, id: uuidv4() };
+    const subToCopy = question.solutionSteps.find(s => s.id === activeStepId)?.subQuestions.find(sq => sq.id === subId);
+    if (!subToCopy) return;
+
+    const newSub = { ...subToCopy, id: uuidv4() };
     setQuestion(prev => ({
         ...prev,
         solutionSteps: prev.solutionSteps.map(s => 
@@ -178,7 +329,7 @@ export function Step2Sequence({
 
   const deleteSubQuestion = (subId: string, e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation(); // ✅ Fix: Prevents toggling the accordion
+    e.stopPropagation();
     
     if (!activeStepId) return;
     setQuestion(prev => ({
@@ -198,88 +349,23 @@ export function Step2Sequence({
         )
     }));
   };
-
-  const updateNested = (subId: string, type: 'numericalAnswer'|'mcqAnswer', field: string, val: any) => {
+  
+  const handleSubQuestionDragEnd = (event: DragEndEvent) => {
     if (!activeStepId) return;
-    setQuestion(prev => ({
-        ...prev,
-        solutionSteps: prev.solutionSteps.map(s => 
-            s.id === activeStepId ? { ...s, subQuestions: s.subQuestions.map(sq => 
-                sq.id === subId ? { ...sq, [type]: { ...sq[type] as any, [field]: val } } : sq
-            ) } : s
-        )
-    }));
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+        const activeStep = question.solutionSteps.find(s => s.id === activeStepId);
+        if (!activeStep) return;
+
+        const oldIndex = activeStep.subQuestions.findIndex(sq => sq.id === active.id);
+        const newIndex = activeStep.subQuestions.findIndex(sq => sq.id === over.id);
+        const reorderedSubQuestions = arrayMove(activeStep.subQuestions, oldIndex, newIndex);
+        
+        updateActiveStep('subQuestions', reorderedSubQuestions);
+    }
   };
-
-  // --- MCQ ACTIONS ---
-  const addMcqOption = (subId: string) => {
-     if (!activeStepId) return;
-     setQuestion(prev => ({
-       ...prev,
-       solutionSteps: prev.solutionSteps.map(s => s.id === activeStepId ? {
-           ...s, subQuestions: s.subQuestions.map(sq => sq.id === subId && sq.mcqAnswer ? {
-               ...sq, mcqAnswer: { ...sq.mcqAnswer, options: [...sq.mcqAnswer.options, { id: uuidv4(), text: '' }] }
-           } : sq)
-       } : s)
-     }));
-  };
-
-  const deleteMcqOption = (subId: string, optId: string) => {
-    if (!activeStepId) return;
-    setQuestion(prev => ({
-       ...prev,
-       solutionSteps: prev.solutionSteps.map(s => s.id === activeStepId ? {
-           ...s, subQuestions: s.subQuestions.map(sq => sq.id === subId && sq.mcqAnswer ? {
-               ...sq, mcqAnswer: { 
-                   ...sq.mcqAnswer, 
-                   options: sq.mcqAnswer.options.filter(o => o.id !== optId),
-                   correctOptions: sq.mcqAnswer.correctOptions.filter(id => id !== optId)
-               }
-           } : sq)
-       } : s)
-    }));
- };
-
- const updateMcqOption = (subId: string, optId: string, text: string) => {
-    if (!activeStepId) return;
-    setQuestion(prev => ({
-       ...prev,
-       solutionSteps: prev.solutionSteps.map(s => s.id === activeStepId ? {
-           ...s, subQuestions: s.subQuestions.map(sq => sq.id === subId && sq.mcqAnswer ? {
-               ...sq, mcqAnswer: { 
-                   ...sq.mcqAnswer, 
-                   options: sq.mcqAnswer.options.map(o => o.id === optId ? { ...o, text } : o)
-               }
-           } : sq)
-       } : s)
-    }));
- };
-
- const toggleMcqCorrect = (subId: string, optId: string) => {
-    if (!activeStepId) return;
-    setQuestion(prev => ({
-       ...prev,
-       solutionSteps: prev.solutionSteps.map(s => s.id === activeStepId ? {
-           ...s, subQuestions: s.subQuestions.map(sq => {
-               if (sq.id === subId && sq.mcqAnswer) {
-                   const isMulti = sq.mcqAnswer.isMultiCorrect;
-                   let newCorrect = [...sq.mcqAnswer.correctOptions];
-                   if (isMulti) {
-                       newCorrect.includes(optId) ? newCorrect = newCorrect.filter(id => id !== optId) : newCorrect.push(optId);
-                   } else {
-                       newCorrect = [optId];
-                   }
-                   return { ...sq, mcqAnswer: { ...sq.mcqAnswer, correctOptions: newCorrect } };
-               }
-               return sq;
-           })
-       } : s)
-    }));
- };
 
   const activeStep = question.solutionSteps.find(s => s.id === activeStepId);
-
-  // ✅ HELPER to clean HTML text
   const cleanHtml = (html: string) => html.replace(/&nbsp;/g, ' ');
 
   return (
@@ -290,7 +376,6 @@ export function Step2Sequence({
         
         <Card className="p-4 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Main Question</h3>
-            {/* ✅ FIX: Added `break-words` and `whitespace-pre-wrap` for better wrapping */}
             <div
               className="prose dark:prose-invert max-w-none break-words whitespace-pre-wrap"
               dangerouslySetInnerHTML={{ __html: cleanHtml(question.mainQuestionText) || '<p><em>Question text will appear here...</em></p>' }}
@@ -316,7 +401,7 @@ export function Step2Sequence({
             {question.solutionSteps.map((step, index) => (
                 <div 
                     key={step.id}
-                    onClick={() => setActiveStepId(step.id)} // 🛑 This is the Parent Handler
+                    onClick={() => setActiveStepId(step.id)}
                     className={`group relative p-4 rounded-lg border cursor-pointer transition-all bg-white hover:border-violet-300 hover:shadow-md ${
                         activeStepId === step.id ? 'border-violet-500 ring-1 ring-violet-500 shadow-md' : 'border-slate-200 shadow-sm'
                     }`}
@@ -340,7 +425,6 @@ export function Step2Sequence({
                         <div className="flex items-center gap-2">
                             <Button variant="secondary" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">Edit</Button>
                             
-                            {/* ✅ DELETE BUTTON with Propagation Fix */}
                             <button 
                                 type="button"
                                 onClick={(e) => deleteStep(step.id, e)}
@@ -409,108 +493,31 @@ export function Step2Sequence({
                                 </Button>
                             </div>
                         )}
-
-                        {activeStep.subQuestions.map((sub, idx) => {
-                            const isOpen = openSubId === sub.id;
-                            
-                            return (
-                                <div key={sub.id} className="bg-white rounded-lg border shadow-sm transition-all duration-200 overflow-hidden" onClick={() => setOpenSubId(isOpen ? null : sub.id)}>
-                                    <div 
-                                        className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-slate-50 ${isOpen ? 'border-b bg-slate-50/50' : ''}`}
-                                    >
-                                        <div className="text-slate-400" onClick={(e) => e.stopPropagation()}><GripVertical className="w-5 h-5"/></div>
-                                        <div className="flex-1 min-w-0">
-                                            {/* ✅ FIXED: Use getPlainText for preview */}
-                                            <div className={`font-medium truncate ${!sub.questionText || sub.questionText === '<p><br></p>' ? 'text-slate-400 italic' : 'text-slate-700'}`}>
-                                                {getPlainText(sub.questionText) || `Sub-Question ${idx + 1}`}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded border ${
-                                                sub.answerType === 'numerical' ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-orange-100 text-orange-700 border-orange-200'
-                                            }`}>
-                                                {sub.answerType}
-                                            </span>
-                                            <div className="h-4 w-px bg-slate-200"></div>
-                                            <div className="flex items-center text-slate-400">
-                                                <button type="button" onClick={(e) => { e.stopPropagation(); duplicateSubQuestion(sub, e); }} className="p-1.5 hover:bg-slate-100 hover:text-slate-600 rounded" title="Duplicate"><Copy className="w-4 h-4" /></button>
-                                                <button type="button" onClick={(e) => { e.stopPropagation(); deleteSubQuestion(sub.id, e); }} className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button>
-                                            </div>
-                                            <div className="text-slate-400">
-                                                {isOpen ? <ChevronDown className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {isOpen && (
-                                        <div className="p-6 space-y-6 bg-white animate-in slide-in-from-top-1" onClick={(e) => e.stopPropagation()}>
-                                            <CollapsibleEditor 
-                                                label="Question Text"
-                                                value={sub.questionText}
-                                                onChange={(val) => updateSubQuestion(sub.id, 'questionText', val)}
-                                                defaultOpen={true}
-                                            />
-                                            <div className="grid grid-cols-2 gap-6">
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-slate-500 uppercase">Answer Type</Label>
-                                                    <Select value={sub.answerType} onValueChange={(val)=>updateSubQuestion(sub.id,'answerType',val)}>
-                                                        <SelectTrigger className="w-full"><SelectValue/></SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="numerical">Numerical</SelectItem>
-                                                            <SelectItem value="mcq">MCQ</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs font-semibold text-slate-500 uppercase">Marks</Label>
-                                                    <Input type="number" min={1} value={sub.marks} onChange={(e)=>updateSubQuestion(sub.id,'marks',parseInt(e.target.value)||0)}/>
-                                                </div>
-                                            </div>
-                                            
-                                             <div className={`rounded-lg p-5 border ${sub.answerType === 'numerical' ? 'bg-violet-50/50 border-violet-100' : 'bg-orange-50/50 border-orange-100'}`}>
-                                                <h5 className={`text-xs font-bold uppercase mb-4 border-b pb-2 ${sub.answerType === 'numerical' ? 'text-violet-700 border-violet-200' : 'text-orange-700 border-orange-200'}`}>
-                                                    {sub.answerType === 'numerical' ? 'Numerical Answer Settings' : 'MCQ Options & Settings'}
-                                                </h5>
-                                                {sub.answerType === 'numerical' && (
-                                                    <div className="grid grid-cols-3 gap-4">
-                                                        <div className="space-y-1"><Label className="text-xs text-violet-600">Correct Value</Label><Input type="number" value={sub.numericalAnswer?.correctValue ?? 0} onChange={(e)=>updateNested(sub.id,'numericalAnswer','correctValue',parseFloat(e.target.value))} className="bg-white border-violet-200"/></div>
-                                                        <div className="space-y-1"><Label className="text-xs text-violet-600">Tolerance (±)</Label><Input type="number" value={sub.numericalAnswer?.toleranceValue ?? 0} onChange={(e)=>updateNested(sub.id,'numericalAnswer','toleranceValue',parseFloat(e.target.value))} className="bg-white border-violet-200"/></div>
-                                                        <div className="space-y-1"><Label className="text-xs text-violet-600">Base Unit <span className="text-red-400">*</span></Label><Input value={sub.numericalAnswer?.baseUnit || ''} onChange={(e)=>updateNested(sub.id,'numericalAnswer','baseUnit',e.target.value)} placeholder="e.g. N" className="bg-white border-violet-200"/></div>
-                                                    </div>
-                                                )}
-                                                {sub.answerType === 'mcq' && sub.mcqAnswer && (
-                                                    <div className="space-y-5">
-                                                        <div className="flex gap-6 p-3 bg-orange-100/50 rounded-md">
-                                                            <div className="flex items-center gap-2"><Switch checked={sub.mcqAnswer.isMultiCorrect} onCheckedChange={(c) => updateNested(sub.id, 'mcqAnswer', 'isMultiCorrect', c)} /><Label className="text-sm text-orange-800">Multi-Select</Label></div>
-                                                            <div className="flex items-center gap-2"><Switch checked={sub.mcqAnswer.shuffleOptions} onCheckedChange={(c) => updateNested(sub.id, 'mcqAnswer', 'shuffleOptions', c)} /><Label className="text-sm text-orange-800">Shuffle</Label></div>
-                                                        </div>
-                                                        <div className="space-y-3">
-                                                            {sub.mcqAnswer.options.map((opt, optIdx) => {
-                                                                const isCorrect = sub.mcqAnswer!.correctOptions.includes(opt.id);
-                                                                return (
-                                                                    <div key={opt.id} className="flex gap-3 items-center group">
-                                                                        <button type="button" onClick={() => toggleMcqCorrect(sub.id, opt.id)} className={`shrink-0 transition-colors p-1 rounded-full ${isCorrect ? 'text-green-600 bg-green-100' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'}`}>{isCorrect ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}</button>
-                                                                        <Input value={opt.text} onChange={(e) => updateMcqOption(sub.id, opt.id, e.target.value)} className={`bg-white ${isCorrect ? 'border-green-400 ring-1 ring-green-400' : 'border-orange-200'}`} placeholder={`Option ${optIdx + 1}`}/>
-                                                                        <button type="button" onClick={() => deleteMcqOption(sub.id, opt.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-5 h-5" /></button>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                        <Button type="button" onClick={() => addMcqOption(sub.id)} variant="outline" className="w-full border-dashed border-orange-300 text-orange-700 hover:bg-orange-50 mt-2"><Plus className="w-4 h-4 mr-2" /> Add Option</Button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
+                        
+                        <DndContext collisionDetection={closestCenter} onDragEnd={handleSubQuestionDragEnd}>
+                            <SortableContext items={activeStep.subQuestions.map(sq => sq.id)} strategy={verticalListSortingStrategy}>
+                                <div className="space-y-4">
+                                {activeStep.subQuestions.map((sub, idx) => (
+                                    <SortableSubQuestionItem
+                                        key={sub.id}
+                                        subQuestion={sub}
+                                        index={idx}
+                                        openSubId={openSubId}
+                                        setOpenSubId={setOpenSubId}
+                                        updateSubQuestion={updateSubQuestion}
+                                        duplicateSubQuestion={duplicateSubQuestion}
+                                        deleteSubQuestion={deleteSubQuestion}
+                                    />
+                                ))}
                                 </div>
-                            );
-                        })}
+                            </SortableContext>
+                        </DndContext>
+                        
                         {activeStep.subQuestions.length > 0 && (
                             <Button onClick={addSubQuestion} className="w-full py-6 bg-slate-800 hover:bg-slate-900 text-white shadow-md"><Plus className="w-5 h-5 mr-2" /> Add New Sub-Question</Button>
                         )}
                     </div>
                 </div>
-                {/* ✅ FIXED: CALL onEditComplete WHEN CLICKING DONE */}
                 <div className="p-4 border-t bg-slate-50 flex justify-end">
                     <Button 
                         onClick={() => { 
