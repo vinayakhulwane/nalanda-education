@@ -6,10 +6,17 @@ import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
-import { Loader2, BookPlus, ArrowLeft } from 'lucide-react';
+import { Loader2, BookPlus, ArrowLeft, Download } from 'lucide-react';
 import { QuestionBankTable } from '@/components/question-bank/question-bank-table';
 import { QuestionBankFilters } from '@/components/question-bank/question-bank-filters';
 import type { Class, Subject, Unit, Category, Question } from '@/types';
+import * as XLSX from 'xlsx';
+
+// Helper to strip HTML for Excel export
+const getCleanText = (html: string) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || "";
+};
 
 function QuestionBankPageContent() {
   const router = useRouter();
@@ -106,6 +113,23 @@ function QuestionBankPageContent() {
     }
   }
 
+  const handleExport = () => {
+    const dataToExport = filteredQuestions.map(q => ({
+      ID: q.id,
+      Name: q.name,
+      'Question Text': getCleanText(q.mainQuestionText),
+      Unit: units?.find(u => u.id === q.unitId)?.name || 'N/A',
+      Category: categories?.find(c => c.id === q.categoryId)?.name || 'N/A',
+      Status: q.status,
+      'Reward Type': q.currencyType,
+      'Grading Mode': q.gradingMode,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Questions');
+    XLSX.writeFile(workbook, `question_bank_${subject?.name || 'export'}.xlsx`);
+  };
 
   const isLoading = isSubjectLoading || areQuestionsLoading || areUnitsLoading || areCategoriesLoading;
   
@@ -133,10 +157,15 @@ function QuestionBankPageContent() {
         </Button>
       <div className="flex justify-between items-center mb-4">
         <PageHeader title={`Question Bank - ${subject?.name}`} description="Manage your numerical questions for this subject." className="mb-0" />
-        <Button onClick={() => router.push(`/questions/new?classId=${classId}&subjectId=${subjectId}`)}>
-          <BookPlus className="mr-2" />
-          Create New Numerical
-        </Button>
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExport} disabled={filteredQuestions.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Export to Excel
+            </Button>
+            <Button onClick={() => router.push(`/questions/new?classId=${classId}&subjectId=${subjectId}`)}>
+                <BookPlus className="mr-2" />
+                Create New Numerical
+            </Button>
+        </div>
       </div>
 
       <QuestionBankFilters
