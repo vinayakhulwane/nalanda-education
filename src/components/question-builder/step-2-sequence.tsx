@@ -4,11 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { 
-  Plus, Trash2, CheckCircle2, Circle, 
-  ChevronDown, ChevronRight, Copy, ArrowUp, ArrowDown, X, Eye, EyeOff
+  Plus, Trash2, ArrowUp, ArrowDown, X, Eye, EyeOff, Loader2
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Question, SolutionStep, SubQuestion } from "@/types";
@@ -17,6 +14,7 @@ import { Card } from '../ui/card';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableSubQuestionItem } from './sortable-sub-question-item';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // --- HELPER: Collapsible Editor ---
 interface CollapsibleEditorProps {
@@ -28,7 +26,7 @@ interface CollapsibleEditorProps {
 
 function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: CollapsibleEditorProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-
+  
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
@@ -56,18 +54,6 @@ function CollapsibleEditor({ label, value, onChange, defaultOpen = true }: Colla
   );
 }
 
-
-const getPlainText = (htmlString: string) => {
-    if (typeof window !== 'undefined') {
-        if (!htmlString) return '';
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlString;
-        return tempDiv.textContent || tempDiv.innerText || '';
-    }
-    return (htmlString || "").replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
-};
-
-
 // --- MAIN COMPONENT ---
 interface Step2Props {
   question: Question;
@@ -86,13 +72,16 @@ export function Step2Sequence({
 }: Step2Props) {
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [openSubId, setOpenSubId] = useState<string | null>(null);
+  
+  // State for delete confirmation
+  const [isDeleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [stepToDelete, setStepToDelete] = useState<string | null>(null);
 
-  // --- FOCUS LOGIC (FIXED) ---
+
+  // --- FOCUS LOGIC ---
   useEffect(() => {
     if (focusStepId) {
       setActiveStepId(focusStepId);
-      // Optional: scroll into view
-      // document.getElementById(`step-editor-${focusStepId}`)?.scrollIntoView({ behavior: 'smooth' });
       setFocusStepId?.(null); // Reset after focusing
     }
   }, [focusStepId, setFocusStepId]);
@@ -110,19 +99,23 @@ export function Step2Sequence({
     setActiveStepId(newStep.id);
     setOpenSubId(null);
   };
-
-  const deleteStep = (id: string, e: React.MouseEvent) => {
+  
+  const openDeleteConfirmation = (id: string, e: React.MouseEvent) => {
     e.preventDefault(); 
     e.stopPropagation();
-    
-    if (!confirm("Are you sure you want to delete this step?")) return;
-    
+    setStepToDelete(id);
+    setDeleteAlertOpen(true);
+  };
+  
+  const confirmDeleteStep = () => {
+    if (!stepToDelete) return;
     setQuestion(prev => ({ 
         ...prev, 
-        solutionSteps: prev.solutionSteps.filter(s => s.id !== id) 
+        solutionSteps: prev.solutionSteps.filter(s => s.id !== stepToDelete) 
     }));
-    
-    if (activeStepId === id) setActiveStepId(null);
+    if (activeStepId === stepToDelete) setActiveStepId(null);
+    setStepToDelete(null);
+    setDeleteAlertOpen(false);
   };
 
   const moveStep = (idx: number, dir: 'up' | 'down', e: React.MouseEvent) => {
@@ -224,7 +217,6 @@ export function Step2Sequence({
   return (
     <div className="relative min-h-[600px]">
       
-      {/* --- MAIN CONTENT: FULL-WIDTH STEP SEQUENCE LIST --- */}
       <div className="space-y-6 pb-20">
         
         <Card className="p-4 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
@@ -279,7 +271,7 @@ export function Step2Sequence({
                             
                             <button 
                                 type="button"
-                                onClick={(e) => deleteStep(step.id, e)}
+                                onClick={(e) => openDeleteConfirmation(step.id, e)}
                                 className="p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded transition-colors"
                                 title="Delete Step"
                             >
@@ -296,8 +288,23 @@ export function Step2Sequence({
         </div>
       </div>
 
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this step and all its sub-questions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteStep} className="bg-destructive hover:bg-destructive/90">
+              Delete Step
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* --- RIGHT-SIDE EDIT SHEET (MODAL) --- */}
       {activeStepId && activeStep && (
         <div className="fixed inset-0 z-50 overflow-hidden">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setActiveStepId(null)}></div>
