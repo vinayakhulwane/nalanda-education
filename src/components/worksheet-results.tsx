@@ -1,3 +1,4 @@
+
 'use client';
 
 import ReactMarkdown from 'react-markdown';
@@ -723,7 +724,7 @@ export function WorksheetResults({
                             {!isCorrect && (
                               <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900 rounded-lg">
                                 <span className="text-xs font-bold uppercase text-green-600 tracking-wider block mb-1">Correct Answer</span>
-                                <span className="font-medium text-green-800 dark:text-green-300">{getCorrectAnswerText(subQ)}</span>
+                                <div className="font-medium text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: getCorrectAnswerText(subQ) }} />
                               </div>
                             )}
                           </div>

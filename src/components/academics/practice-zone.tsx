@@ -36,30 +36,49 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
             where('authorId', '==', user.uid)
         );
     }, [firestore, user, subjectId]);
-    
+
     const { data: practiceWorksheets, isLoading: areWorksheetsLoading } = useCollection<Worksheet>(practiceWorksheetsQuery);
 
+    // ✅ FIXED: Batch fetching attempts to handle >30 worksheets
     useEffect(() => {
         const fetchAttempts = async () => {
             if (!firestore || !user?.uid || !practiceWorksheets) {
                 setAttemptsLoading(false);
                 return;
             }
+
             const targetIds = practiceWorksheets.map(ws => ws.id);
             if (targetIds.length === 0) {
                 setAttempts([]);
                 setAttemptsLoading(false);
                 return;
             }
+
             try {
-                const attemptsQuery = query(
-                    collection(firestore, 'worksheet_attempts'), 
-                    where('userId', '==', user.uid),
-                    where('worksheetId', 'in', targetIds.slice(0, 30)),
-                    orderBy('attemptedAt', 'desc')
-                );
-                const attemptSnapshots = await getDocs(attemptsQuery);
-                const fetchedAttempts = attemptSnapshots.docs.map(d => ({ id: d.id, ...d.data() })) as WorksheetAttempt[];
+                // Break IDs into chunks of 30 (Firestore 'in' query limit)
+                const chunkSize = 30;
+                const chunks = [];
+                for (let i = 0; i < targetIds.length; i += chunkSize) {
+                    chunks.push(targetIds.slice(i, i + chunkSize));
+                }
+
+                // Fetch attempts for each chunk in parallel
+                const promises = chunks.map(chunk => {
+                    const q = query(
+                        collection(firestore, 'worksheet_attempts'),
+                        where('userId', '==', user.uid),
+                        where('worksheetId', 'in', chunk)
+                    );
+                    return getDocs(q);
+                });
+
+                const snapshots = await Promise.all(promises);
+                
+                // Combine all results into one array
+                const fetchedAttempts = snapshots.flatMap(snap => 
+                    snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                ) as WorksheetAttempt[];
+                
                 setAttempts(fetchedAttempts);
             } catch (error) {
                 console.error("Error fetching attempts:", error);
@@ -73,47 +92,50 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
         }
     }, [firestore, user?.uid, practiceWorksheets]);
 
-
     const { notStarted, history, attemptsByWorksheet, totalPages, paginatedHistory } = useMemo(() => {
         if (!practiceWorksheets) {
             return { notStarted: [], history: [], attemptsByWorksheet: new Map(), totalPages: 1, paginatedHistory: [] };
         }
-        
+
         const attemptsMap = new Map<string, WorksheetAttempt[]>();
         attempts.forEach(attempt => {
             const existing = attemptsMap.get(attempt.worksheetId) || [];
             attemptsMap.set(attempt.worksheetId, [...existing, attempt]);
         });
-    
+
+        // Create a Set of IDs that have AT LEAST one attempt
         const attemptedWorksheetIds = new Set(attempts.map(a => a.worksheetId));
-    
-        const todoList = practiceWorksheets.filter(ws => !attemptedWorksheetIds.has(ws.id));
-        const historyList = practiceWorksheets.filter(ws => attemptedWorksheetIds.has(ws.id));
         
+        // Filter out completed worksheets from the saved list
+        const todoList = practiceWorksheets.filter(ws => !attemptedWorksheetIds.has(ws.id));
+
+        // The history list contains worksheets that HAVE been attempted
+        const historyList = practiceWorksheets.filter(ws => attemptedWorksheetIds.has(ws.id));
+
+        // Sort history by most recent attempt time
         historyList.sort((a, b) => {
             const timeA = attemptsMap.get(a.id)?.[0]?.attemptedAt?.toMillis() || 0;
             const timeB = attemptsMap.get(b.id)?.[0]?.attemptedAt?.toMillis() || 0;
             return timeB - timeA;
         });
-        
+
         const totalP = Math.ceil(historyList.length / itemsPerPage);
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
         const paginatedItems = historyList.slice(startIndex, endIndex);
 
-        return { 
-            history: historyList, 
-            notStarted: todoList, 
+        return {
+            history: historyList,
+            notStarted: todoList,
             attemptsByWorksheet: attemptsMap,
             totalPages: totalP,
             paginatedHistory: paginatedItems,
         };
     }, [practiceWorksheets, attempts, currentPage, itemsPerPage]);
-    
 
     const isLoading = areWorksheetsLoading || areAttemptsLoading;
     const createWorksheetUrl = `/worksheets/new?classId=${classId}&subjectId=${subjectId}&source=practice`;
-    
+
     return (
         <div className="mt-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <Tabs defaultValue="saved" className="w-full">
@@ -123,10 +145,10 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                         <TabsTrigger value="history" className="px-4">Attempt History</TabsTrigger>
                     </TabsList>
                 </div>
-                
+
                 <TabsContent value="saved" className="mt-0">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        <div 
+                        <div
                             className="group flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/20 hover:border-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 transition-all cursor-pointer h-full min-h-[300px]"
                             onClick={() => router.push(createWorksheetUrl)}
                         >
@@ -148,9 +170,9 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                             </div>
                         ) : (
                             notStarted.map(ws => (
-                                <WorksheetDisplayCard 
-                                    key={ws.id} 
-                                    worksheet={ws} 
+                                <WorksheetDisplayCard
+                                    key={ws.id}
+                                    worksheet={ws}
                                     isPractice={true}
                                     view="card"
                                 />
@@ -169,34 +191,34 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
                             <>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                     {paginatedHistory.map(ws => (
-                                        <WorksheetDisplayCard 
-                                            key={ws.id} 
-                                            worksheet={ws} 
+                                        <WorksheetDisplayCard
+                                            key={ws.id}
+                                            worksheet={ws}
                                             isPractice={true}
                                             view="list"
                                             attempts={attemptsByWorksheet.get(ws.id) || []}
                                         />
                                     ))}
                                 </div>
-                                
+
                                 {totalPages > 1 && (
                                     <div className="flex items-center justify-between pt-4 border-t">
                                         <span className="text-sm text-muted-foreground">
                                             Page {currentPage} of {totalPages}
                                         </span>
                                         <div className="flex gap-2">
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
-                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                                 disabled={currentPage === 1}
                                             >
                                                 <ChevronLeft className="h-4 w-4 mr-1" /> Previous
                                             </Button>
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm" 
-                                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                                 disabled={currentPage === totalPages}
                                             >
                                                 Next <ChevronRight className="h-4 w-4 ml-1" />
