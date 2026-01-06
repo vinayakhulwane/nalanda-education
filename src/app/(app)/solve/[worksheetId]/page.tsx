@@ -9,7 +9,7 @@ import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDo
 import type { Worksheet, Question, WorksheetAttempt, ResultState, EconomySettings, CurrencyType, Class, Subject } from '@/types';
 import {
   Loader2, ArrowLeft, ArrowRight, CheckCircle, Timer, X, Sparkles, Award, Clock,
-  AlertCircle, RotateCcw, LayoutDashboard, Trophy, Coins, ChevronDown, ChevronUp, Crown, Gem, BrainCircuit, Printer, Unlock
+  AlertCircle, RotateCcw, LayoutDashboard, Trophy, Coins, ChevronDown, ChevronUp, Crown, Gem, BrainCircuit, Printer, Unlock, Home
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { calculateAttemptRewards } from "@/lib/wallet";
+import { BrandLogo } from '@/components/brand-logo'; // IMPORTED BRAND LOGO
 import confetti from "canvas-confetti";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -109,6 +110,7 @@ const getCorrectAnswerText = (subQ: any): string => {
 
 const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, totalMarks, maxMarks, onClaimReward, calculatedRewards, isClaiming, hasClaimed, userProfile, classData, subjectData, economySettings, onUnlockSolution, unlockedSolutions, loadingSolutions }: any) => {
   const router = useRouter();
+  const { toast } = useToast();
   const percentage = maxMarks > 0 ? Math.round((totalMarks / maxMarks) * 100) : 0;
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -116,15 +118,32 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
   const hasRewards = calculatedRewards && Object.keys(calculatedRewards).length > 0 && Object.values(calculatedRewards).some((v: any) => v > 0);
   const formattedDate = format(new Date(), 'PPP p');
 
+  const handleBack = () => {
+    if (worksheet.classId && worksheet.subjectId) {
+        router.push(`/academics/${worksheet.classId}/${worksheet.subjectId}`);
+    } else {
+        router.back();
+    }
+  };
+
   const handleDownload = async () => {
     setIsDownloading(true);
     const element = document.getElementById('mobile-result-content');
+    const pdfHeader = document.getElementById('pdf-header');
     if (!element) return;
+
     try {
-      // Temporarily expand all for PDF capture
+      // 1. Show PDF Header
+      if (pdfHeader) pdfHeader.classList.remove('hidden');
+
+      // 2. Open ALL Collapsibles
       const triggers = document.querySelectorAll('[data-state="closed"]');
       triggers.forEach((t: any) => t.click());
+
+      // 3. Wait for expansion
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // 4. Capture
       const canvas = await html2canvas(element, { scale: 2, useCORS: true, scrollY: -window.scrollY });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
@@ -143,17 +162,71 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
         heightLeft -= pdfHeight;
       }
       pdf.save(`${worksheet.title}_Report.pdf`);
-    } catch (e) { console.error(e); } finally { setIsDownloading(false); }
+    } catch (e) { 
+        console.error(e); 
+        toast({ title: "PDF Failed", description: "Could not generate PDF", variant: "destructive" });
+    } finally { 
+        setIsDownloading(false);
+        // 5. Hide PDF Header again
+        if (pdfHeader) pdfHeader.classList.add('hidden');
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-24" id="mobile-result-content">
+      
+      {/* --- HIDDEN PDF HEADER (Visible only during capture) --- */}
+      <div id="pdf-header" className="hidden bg-white p-8 border-b-2 border-slate-100 mb-6">
+         <div className="flex justify-between items-start mb-6">
+             <div className="flex items-center gap-4">
+                 {/* BRAND LOGO IMPLEMENTATION */}
+                 <BrandLogo size={60} />
+                 <div>
+                     <h1 className="text-2xl font-black text-slate-900 leading-none">Nalanda</h1>
+                     <p className="text-sm font-bold text-indigo-600 uppercase tracking-widest mt-1">Education</p>
+                 </div>
+             </div>
+             <div className="text-right">
+                 <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-1">Report Generated</p>
+                 <p className="text-sm font-medium text-slate-900">{formattedDate}</p>
+             </div>
+         </div>
+
+         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+             <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-sm">
+                <div>
+                    <p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Student Name</p>
+                    <p className="font-semibold text-slate-900">{userProfile?.name || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Class</p>
+                    <p className="font-semibold text-slate-900">{classData?.name || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Subject</p>
+                    <p className="font-semibold text-slate-900">{subjectData?.name || 'N/A'}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Worksheet</p>
+                    <p className="font-semibold text-slate-900">{worksheet.title}</p>
+                </div>
+             </div>
+         </div>
+      </div>
+
       {/* HEADER WITH DATE & DETAILS */}
-      <div className="bg-white dark:bg-slate-900 pt-8 pb-10 px-4 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800">
-        <div className="text-center space-y-1 mb-6">
+      <div className="bg-white dark:bg-slate-900 pt-4 pb-10 px-4 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800 relative">
+        
+        {/* Top Back Button */}
+        <div className="absolute top-4 left-4">
+            <Button variant="ghost" size="icon" onClick={handleBack} className="text-slate-400 hover:text-slate-700">
+                <ArrowLeft className="h-6 w-6" />
+            </Button>
+        </div>
+
+        <div className="text-center space-y-1 mb-6 mt-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white px-4 leading-tight">{worksheet.title}</h1>
           <p className="text-xs text-slate-500 font-medium">{formattedDate}</p>
-          <div className="hidden print-only text-xs text-slate-400 mt-2">Student: {userProfile?.name} • Class: {classData?.name} • Subject: {subjectData?.name}</div>
         </div>
         
         {/* SCORE CIRCLE */}
@@ -180,7 +253,7 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
       </div>
 
       <div className="p-4 space-y-6">
-        {/* REWARD CARD & ACTION ROW */}
+        {/* REWARD CARD */}
         <div className="animate-in slide-in-from-bottom-4 duration-700 delay-150 space-y-4">
           <Card className="border-none shadow-md bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 overflow-hidden relative">
             <div className="absolute right-0 top-0 opacity-10 pointer-events-none"><Trophy className="h-32 w-32 -mr-8 -mt-8 rotate-12" /></div>
@@ -251,8 +324,17 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                               <div key={subQ.id} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-sm">
                                 <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed"><span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} /></div>
                                 <div className="grid grid-cols-1 gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-800">
-                                  <div className="mt-1"><span className="text-[10px] uppercase text-slate-400 font-bold block mb-0.5">Your Answer</span><div className={cn("text-xs whitespace-pre-wrap break-words font-medium", isSubCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>{userReadableAnswer}</div></div>
-                                  {!isSubCorrect && <div className="mt-1 pt-1"><span className="text-[10px] uppercase text-emerald-600/70 font-bold block mb-0.5">Correct Answer</span><div className="text-xs text-emerald-700 dark:text-emerald-400 whitespace-pre-wrap break-words font-medium">{correctReadableAnswer}</div></div>}
+                                  {/* Answer Wrapper with min-w-0 for flex wrapping */}
+                                  <div className="mt-1 min-w-0">
+                                    <span className="text-[10px] uppercase text-slate-400 font-bold block mb-0.5">Your Answer</span>
+                                    <div className={cn("text-xs whitespace-pre-wrap break-words w-full font-medium", isSubCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>{userReadableAnswer}</div>
+                                  </div>
+                                  {!isSubCorrect && (
+                                    <div className="mt-1 pt-1 min-w-0">
+                                        <span className="text-[10px] uppercase text-emerald-600/70 font-bold block mb-0.5">Correct Answer</span>
+                                        <div className="text-xs text-emerald-700 dark:text-emerald-400 whitespace-pre-wrap break-words w-full font-medium">{correctReadableAnswer}</div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -281,7 +363,18 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
           })}
         </div>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40"><div className="w-full max-w-4xl flex justify-between items-center gap-3 sm:gap-0"><Button variant="outline" onClick={() => router.back()}><LayoutDashboard className="mr-2 h-4 w-4" /> Exit</Button><Button className="flex-1" onClick={() => window.location.reload()}><RotateCcw className="mr-2 h-4 w-4" /> Retry</Button></div></div>
+
+      {/* BOTTOM BACK BUTTON */}
+      <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40">
+        <div className="w-full max-w-md mx-auto flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={handleBack}>
+                <Home className="mr-2 h-4 w-4" /> Back to Subject
+            </Button>
+            <Button className="flex-1" onClick={() => window.location.reload()}>
+                <RotateCcw className="mr-2 h-4 w-4" /> Retry
+            </Button>
+        </div>
+      </div>
     </div>
   );
 };
