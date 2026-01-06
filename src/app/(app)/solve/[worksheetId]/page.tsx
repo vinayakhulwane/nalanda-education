@@ -2,7 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDoc, serverTimestamp, getDocs, limit, orderBy, increment } from 'firebase/firestore';
@@ -303,7 +303,7 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                     {/* UPDATED: flex-1 and min-w-0 ensures text wraps instead of pushing width */}
                     <div className="text-left flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground font-semibold">Question {qIdx + 1}</p>
-                      {/* UPDATED: break-words and whitespace-pre-wrap for full text display */}
+                      {/* UPDATED: Full text, break-words, no truncation */}
                       <div className="text-xs text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap break-words">
                           <span dangerouslySetInnerHTML={{ __html: processedMainQuestionText(q.mainQuestionText) }} />
                       </div>
@@ -325,18 +325,17 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                             const isSubCorrect = result?.isCorrect === true;
                             return (
                               <div key={subQ.id} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-sm">
-                                <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed"><span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} /></div>
+                                <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed break-words w-full"><span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} /></div>
                                 <div className="grid grid-cols-1 gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-800">
-                                  {/* Answer Wrapper with strict wrapping for long strings/UUIDs */}
+                                  {/* Answer Wrapper with strict wrapping */}
                                   <div className="mt-1 min-w-0">
                                     <span className="text-[10px] uppercase text-slate-400 font-bold block mb-0.5">Your Answer</span>
-                                    {/* FIX: break-all forces wrapping even for long unbroken strings like UUIDs */}
-                                    <div className={cn("text-xs whitespace-pre-wrap break-words break-all w-full font-medium", isSubCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>{userReadableAnswer}</div>
+                                    <div className={cn("text-xs whitespace-pre-wrap break-words w-full font-medium", isSubCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>{userReadableAnswer}</div>
                                   </div>
                                   {!isSubCorrect && (
                                     <div className="mt-1 pt-1 min-w-0">
                                         <span className="text-[10px] uppercase text-emerald-600/70 font-bold block mb-0.5">Correct Answer</span>
-                                        <div className="text-xs text-emerald-700 dark:text-emerald-400 whitespace-pre-wrap break-words break-all w-full font-medium">{correctReadableAnswer}</div>
+                                        <div className="text-xs text-emerald-700 dark:text-emerald-400 whitespace-pre-wrap break-words w-full font-medium">{correctReadableAnswer}</div>
                                     </div>
                                   )}
                                 </div>
@@ -604,12 +603,9 @@ export default function SolveWorksheetPage() {
 
     return (
       <>
-        {/* 📱 MOBILE VIEW */}
         <div className="block sm:hidden animate-in fade-in duration-500">
           <MobileResultView worksheet={worksheet} results={results} answers={answers} questions={orderedQuestions} timeTaken={timeTaken} totalMarks={earnedMarks} maxMarks={totalMarks} onClaimReward={handleClaimReward} calculatedRewards={calculatedRewards} isClaiming={isClaiming} hasClaimed={hasClaimed} userProfile={userProfile} classData={classData} subjectData={subjectData} economySettings={settings} onUnlockSolution={handleUnlockSolution} unlockedSolutions={localUnlocked} loadingSolutions={loadingSolutions} />
         </div>
-
-        {/* 💻 DESKTOP VIEW */}
         <div className="hidden sm:block">
           <WorksheetResults worksheet={worksheet} questions={orderedQuestions} answers={answers} results={results} timeTaken={timeTaken} attempt={attempt ?? undefined} />
         </div>
