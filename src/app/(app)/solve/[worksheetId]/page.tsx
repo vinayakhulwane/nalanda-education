@@ -1,4 +1,5 @@
 'use client';
+
 import ReactMarkdown from 'react-markdown';
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -14,10 +15,10 @@ import {
   X, 
   Sparkles, 
   FileImage, 
-  Award,
-  Clock,
-  HelpCircle,
-  AlertCircle
+  Award, 
+  Clock, 
+  HelpCircle, 
+  AlertCircle 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
@@ -63,7 +64,8 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
             <div className="space-y-5">
                 {Object.entries(activeRubric).map(([rawKey, rawWeight], index) => {
                     const criterion = formatCriterionKey(rawKey);
-                    const percentageScore = breakdown[rawKey] ?? breakdown[criterion] ?? 0; 
+                    const percentageScore = breakdown[rawKey] ?? breakdown[criterion] ?? 0;
+                    
                     const weightPct = typeof rawWeight === 'string' ? parseFloat(rawWeight) : (rawWeight as number);
                     
                     const maxCategoryMarks = (weightPct / 100) * maxMarks;
@@ -120,14 +122,14 @@ export default function SolveWorksheetPage() {
   const [results, setResults] = useState<ResultState>({});
   const [timeTaken, setTimeTaken] = useState(0);
   const [attempt, setAttempt] = useState<WorksheetAttempt | null>(null);
-
+  
   const [aiImages, setAiImages] = useState<Record<string, File | null>>({});
   const [isAiGrading, setIsAiGrading] = useState(false);
 
   // Firestore Refs
   const worksheetRef = useMemoFirebase(() => (firestore && worksheetId ? doc(firestore, 'worksheets', worksheetId) : null), [firestore, worksheetId]);
   const { data: worksheet, isLoading: isWorksheetLoading } = useDoc<Worksheet>(worksheetRef);
-
+  
   const questionsQuery = useMemoFirebase(() => {
     if (!firestore || !worksheet?.questions || worksheet.questions.length === 0) return null;
     return query(collection(firestore, 'questions'), where(documentId(), 'in', worksheet.questions.slice(0,30)));
@@ -168,13 +170,13 @@ export default function SolveWorksheetPage() {
     
     let marks = 0;
     let duration = 0;
-
+    
     orderedQuestions.forEach((question) => {
         const qMarks = question.solutionSteps?.reduce((stepSum, step) => stepSum + step.subQuestions.reduce((subSum, sub) => subSum + sub.marks, 0), 0) || 0;
         marks += qMarks;
 
         let qTime = qMarks > 0 ? qMarks * 20 : 60;
-
+        
         if (question.gradingMode === 'ai') {
             qTime += 40;
         }
@@ -187,12 +189,12 @@ export default function SolveWorksheetPage() {
 
   const [timeLeft, setTimeLeft] = useState(totalDuration);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  
+  useEffect(() => {
+      if (totalDuration > 0 && !startTime) setTimeLeft(totalDuration);
+  }, [totalDuration, startTime]);
 
-   useEffect(() => { 
-       if (totalDuration > 0 && !startTime) setTimeLeft(totalDuration); 
-   }, [totalDuration, startTime]);
-
-   useEffect(() => {
+  useEffect(() => {
     if (startTime && !isFinished) {
        if (timeLeft <= 0) { handleFinish(); return; }
        
@@ -241,13 +243,10 @@ export default function SolveWorksheetPage() {
         const rubricToSend = question.aiRubric || { "General Accuracy": "100%" };
         formData.append('rubric', JSON.stringify(rubricToSend));
 
-        // ✅ ADD THIS LINE: Sends the selected patterns (like 'nextSteps') to the backend
-        // This ensures the backend can map these to "How you can improve?" etc.
         formData.append('feedbackPatterns', JSON.stringify(question.aiFeedbackPatterns || []));
 
         const response = await fetch('/api/grade', { method: 'POST', body: formData });
         
-        // Improved error handling to capture the actual backend error message
         if (!response.ok) {
             const errorText = await response.text();
             console.error("Server Response Error:", errorText);
@@ -259,16 +258,16 @@ export default function SolveWorksheetPage() {
         const newResults: ResultState = {};
         const newAnswers: AnswerState = {};
         
-        // Use the totalScore calculated mathematically by the backend for accuracy
         const finalActualMarks = (aiResult.totalScore / 100) * qMaxMarks;
 
         subQuestionIds.forEach(id => {
-            newResults[id] = {
-                isCorrect: aiResult.isCorrect,
+            newResults[id] = { 
+                isCorrect: aiResult.isCorrect, 
                 score: finalActualMarks, 
                 feedback: aiResult.feedback,
-                aiBreakdown: aiResult.breakdown 
-            } as any; 
+                aiBreakdown: aiResult.breakdown
+            } as any;
+            
             newAnswers[id] = { answer: aiResult.driveLink };
         });
 
@@ -286,7 +285,7 @@ export default function SolveWorksheetPage() {
     } finally {
         setIsAiGrading(false);
     }
-};
+  };
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   if (!worksheet || orderedQuestions.length === 0) return (
@@ -305,36 +304,37 @@ export default function SolveWorksheetPage() {
 
   // --- START SCREEN ---
   if (!startTime) return (
-        <div className="flex flex-col h-screen bg-slate-50/50 dark:bg-slate-950/50 items-center justify-center p-4">
+        // ✅ FIX: Use h-[100dvh] for mobile browsers
+        <div className="flex flex-col h-[100dvh] bg-slate-50/50 dark:bg-slate-950/50 items-center justify-center p-4">
              <Card className="w-full max-w-lg shadow-xl border-none">
-                <div className="h-2 w-full bg-gradient-to-r from-primary to-indigo-500 rounded-t-xl" />
-                <CardHeader className="text-center pb-2">
-                    <div className="mx-auto bg-primary/10 p-4 rounded-full mb-4 w-fit">
-                        <Timer className="h-8 w-8 text-primary" />
-                    </div>
-                    <CardTitle className="text-2xl font-bold">{worksheet.title}</CardTitle>
-                    <CardDescription className="text-base">
-                        You are about to start a timed worksheet.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg text-center">
-                            <p className="text-xs text-muted-foreground uppercase font-bold">Duration</p>
-                            <p className="text-xl font-mono font-semibold">{formatTime(totalDuration)}</p>
-                        </div>
-                        <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg text-center">
-                            <p className="text-xs text-muted-foreground uppercase font-bold">Questions</p>
-                            <p className="text-xl font-mono font-semibold">{orderedQuestions.length}</p>
-                        </div>
-                    </div>
-                </CardContent>
-                <CardFooter className="pt-2 pb-8">
-                    <Button size="lg" className="w-full text-lg font-semibold shadow-lg shadow-primary/20" onClick={handleStart}>
-                        Start Attempt <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                </CardFooter>
-            </Card>
+                 <div className="h-2 w-full bg-gradient-to-r from-primary to-indigo-500 rounded-t-xl" />
+                 <CardHeader className="text-center pb-2">
+                     <div className="mx-auto bg-primary/10 p-4 rounded-full mb-4 w-fit">
+                         <Timer className="h-8 w-8 text-primary" />
+                     </div>
+                     <CardTitle className="text-2xl font-bold">{worksheet.title}</CardTitle>
+                     <CardDescription className="text-base">
+                         You are about to start a timed worksheet.
+                     </CardDescription>
+                 </CardHeader>
+                 <CardContent className="space-y-4">
+                     <div className="grid grid-cols-2 gap-4">
+                         <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg text-center">
+                             <p className="text-xs text-muted-foreground uppercase font-bold">Duration</p>
+                             <p className="text-xl font-mono font-semibold">{formatTime(totalDuration)}</p>
+                         </div>
+                         <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg text-center">
+                             <p className="text-xs text-muted-foreground uppercase font-bold">Questions</p>
+                             <p className="text-xl font-mono font-semibold">{orderedQuestions.length}</p>
+                         </div>
+                     </div>
+                 </CardContent>
+                 <CardFooter className="pt-2 pb-8">
+                     <Button size="lg" className="w-full text-lg font-semibold shadow-lg shadow-primary/20" onClick={handleStart}>
+                         Start Attempt <ArrowRight className="ml-2 h-5 w-5" />
+                     </Button>
+                 </CardFooter>
+             </Card>
         </div>
   );
 
@@ -345,9 +345,11 @@ export default function SolveWorksheetPage() {
   const qMaxMarks = activeQuestion.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50/30 dark:bg-slate-950/30">
+    // ✅ FIX: Use h-[100dvh] for full viewport height on mobile
+    <div className="flex flex-col h-[100dvh] bg-slate-50/30 dark:bg-slate-950/30">
+        
         {/* --- MODERN HEADER --- */}
-        <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm">
+        <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm shrink-0">
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => router.back()}>
                     <X className="h-5 w-5" />
@@ -363,8 +365,8 @@ export default function SolveWorksheetPage() {
             </div>
 
             <div className="flex items-center gap-3 sm:gap-6">
-                <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full font-mono font-medium border", timeLeft < 60 ? "bg-red-50 text-red-600 border-red-200 animate-pulse" : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700")}>
-                    <Clock className="h-4 w-4" />
+                <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full font-mono font-medium border text-xs sm:text-sm", timeLeft < 60 ? "bg-red-50 text-red-600 border-red-200 animate-pulse" : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700")}>
+                    <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span>{formatTime(timeLeft)}</span>
                 </div>
                 <Button onClick={handleFinish} variant="destructive" size="sm" className="hidden sm:flex">
@@ -375,11 +377,13 @@ export default function SolveWorksheetPage() {
 
         <main className="flex-grow flex flex-col items-center p-4 sm:p-6 overflow-y-auto">
             <div className="w-full max-w-4xl space-y-6 pb-20">
+                
                 {/* --- QUESTION CARD --- */}
                 <Card className="border-none shadow-md overflow-hidden">
                     <div className="h-1.5 bg-slate-100 dark:bg-slate-800 w-full">
                         <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }} />
                     </div>
+                    
                     <CardHeader className="pb-4">
                         <div className="flex justify-between items-start gap-4">
                             <div className="space-y-1">
@@ -391,20 +395,20 @@ export default function SolveWorksheetPage() {
                                         </Badge>
                                     )}
                                 </div>
-                                <CardTitle className="text-xl leading-tight">
+                                <CardTitle className="text-lg sm:text-xl leading-tight">
                                     Question {currentQuestionIndex + 1}
                                 </CardTitle>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right shrink-0">
                                 <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{qMaxMarks} Marks</span>
                             </div>
                         </div>
                     </CardHeader>
-                    
-                    <CardContent>
-                        {/* ✅ FIX: Added container with overflow-x-auto */}
-                        <div className="overflow-x-auto">
-                            <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-base leading-relaxed bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap break-words min-w-0">
+
+                    {/* ✅ FIX: Mobile Optimized Content Area */}
+                    <CardContent className="p-4 sm:p-6">
+                        <div className="w-full overflow-x-auto">
+                            <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-sm sm:text-base leading-relaxed bg-slate-50/50 dark:bg-slate-900/50 p-4 sm:p-6 rounded-xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap break-words min-w-0">
                                 <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(activeQuestion.mainQuestionText) }} />
                             </div>
                         </div>
@@ -427,7 +431,7 @@ export default function SolveWorksheetPage() {
                                     onImageSelected={(file) => setAiImages(prev => ({ ...prev, [activeQuestion.id]: file }))}
                                     disabled={isQuestionGraded}
                                 />
-                                
+
                                 {isQuestionGraded && (
                                     <div className="animate-in fade-in slide-in-from-bottom-2 space-y-6">
                                         <AIRubricBreakdown 
@@ -435,7 +439,7 @@ export default function SolveWorksheetPage() {
                                             breakdown={(currentResult as any)?.aiBreakdown || {}} 
                                             maxMarks={qMaxMarks}
                                         />
-                                        
+
                                         {currentFeedback && (
                                             <div className="bg-white dark:bg-slate-900 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm overflow-hidden">
                                                 <div className="bg-indigo-50/50 dark:bg-indigo-950/30 px-4 py-3 border-b border-indigo-100 dark:border-indigo-900/50 flex items-center gap-2">
@@ -443,7 +447,7 @@ export default function SolveWorksheetPage() {
                                                     <h4 className="font-semibold text-sm text-indigo-900 dark:text-indigo-200">AI Feedback</h4>
                                                 </div>
                                                 <div className="p-5 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                                                    <ReactMarkdown
+                                                    <ReactMarkdown 
                                                         components={{
                                                             strong: ({node, ...props}) => <span className="font-bold text-indigo-700 dark:text-indigo-400" {...props} />,
                                                             ul: ({node, ...props}) => <ul className="list-disc pl-4 space-y-1 my-2" {...props} />,
@@ -462,9 +466,9 @@ export default function SolveWorksheetPage() {
                                 {!isQuestionGraded && (
                                     <div className="flex justify-end pt-2">
                                         <Button 
-                                            onClick={() => handleAICheck(activeQuestion)} 
+                                            onClick={() => handleAICheck(activeQuestion)}
                                             disabled={isAiGrading}
-                                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/20"
+                                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/20 w-full sm:w-auto"
                                             size="lg"
                                         >
                                             {isAiGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2 h-4 w-4" /> Grade My Answer</>}
@@ -475,7 +479,7 @@ export default function SolveWorksheetPage() {
                         </Card>
                     ) : (
                         <QuestionRunner 
-                            key={activeQuestion.id} 
+                            key={activeQuestion.id}
                             question={activeQuestion}
                             onAnswerSubmit={(subQuestionId, answer) => setAnswers(prev => ({...prev, [subQuestionId]: { answer }}))}
                             onResultCalculated={(subQuestionId, isCorrect) => setResults((prev: ResultState) => ({...prev, [subQuestionId]: { isCorrect }}))}
@@ -487,22 +491,24 @@ export default function SolveWorksheetPage() {
         </main>
 
         {/* --- BOTTOM NAVIGATION BAR --- */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40">
-            <div className="w-full max-w-4xl flex justify-between items-center">
-                <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0} className="w-32">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Previous
-                </Button>
+        {/* ✅ FIX: Mobile Responsive Footer */}
+        <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40">
+            <div className="w-full max-w-4xl flex justify-between items-center gap-3 sm:gap-0">
                 
+                <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0} className="flex-1 sm:flex-none sm:w-32">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> <span className="sr-only sm:not-sr-only">Previous</span> <span className="sm:hidden">Prev</span>
+                </Button>
+
                 <div className="text-xs text-muted-foreground hidden sm:block">
                     {currentQuestionIndex + 1} / {orderedQuestions.length}
                 </div>
 
                 {isLastQuestion ? (
-                    <Button onClick={handleFinish} className="w-32 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20">
+                    <Button onClick={handleFinish} className="flex-1 sm:flex-none sm:w-32 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20">
                         <CheckCircle className="mr-2 h-4 w-4" /> Finish
                     </Button>
                 ) : (
-                    <Button onClick={handleNext} className="w-32 shadow-lg shadow-primary/20">
+                    <Button onClick={handleNext} className="flex-1 sm:flex-none sm:w-32 shadow-lg shadow-primary/20">
                         Next <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                 )}
