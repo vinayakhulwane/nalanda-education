@@ -68,20 +68,25 @@ export default function PracticeZone({ classId, subjectId }: { classId: string, 
             }
         };
 
-        fetchAttempts();
+        if (practiceWorksheets) {
+            fetchAttempts();
+        }
     }, [firestore, user?.uid, practiceWorksheets]);
 
 
     const { notStarted, history, attemptsByWorksheet, totalPages, paginatedHistory } = useMemo(() => {
-        if (!practiceWorksheets) return { notStarted: [], history: [], attemptsByWorksheet: new Map(), totalPages: 1, paginatedHistory: [] };
+        if (!practiceWorksheets) {
+            return { notStarted: [], history: [], attemptsByWorksheet: new Map(), totalPages: 1, paginatedHistory: [] };
+        }
         
         const attemptsMap = new Map<string, WorksheetAttempt[]>();
         attempts.forEach(attempt => {
             const existing = attemptsMap.get(attempt.worksheetId) || [];
             attemptsMap.set(attempt.worksheetId, [...existing, attempt]);
         });
-
+    
         const attemptedWorksheetIds = new Set(attempts.map(a => a.worksheetId));
+    
         const todoList = practiceWorksheets.filter(ws => !attemptedWorksheetIds.has(ws.id));
         const historyList = practiceWorksheets.filter(ws => attemptedWorksheetIds.has(ws.id));
         
