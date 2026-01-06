@@ -55,7 +55,7 @@ export function MobileNav() {
               key={item.href}
               href={item.href} 
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-1.5 py-1 px-2 rounded-lg transition-colors min-w-[70px]",
+                "flex flex-1 flex-col items-center justify-center gap-1 py-1 px-1 rounded-lg transition-colors min-w-[60px]",
                 isActive(item.href) ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
               )}
             >
