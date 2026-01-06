@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
+import { MobileQuestionRunner } from '@/components/solve/mobile-question-runner'; // ✅ NEW IMPORT
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { WorksheetResults, type AnswerState } from '@/components/worksheet-results';
@@ -29,8 +30,6 @@ import { AIAnswerUploader } from '@/components/solve/ai-answer-uploader';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { MobileQuestionRunner } from '@/components/solve/mobile-question-runner';
 
 // Helper Formatters
 function formatTime(seconds: number) {
@@ -117,7 +116,6 @@ export default function SolveWorksheetPage() {
   const firestore = useFirestore();
   const { user, userProfile } = useUser();
   const { toast } = useToast();
-  const isMobile = useIsMobile();
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
@@ -290,15 +288,6 @@ export default function SolveWorksheetPage() {
     }
   };
 
-  const handleMobileSubmit = (subQuestionId: string, answer: any) => {
-    setAnswers(prev => ({ ...prev, [subQuestionId]: { answer } }));
-    onAnswerSubmit(subQuestionId, answer);
-  };
-  
-  const onAnswerSubmit = (subQuestionId: string, answer: any) => {
-    setAnswers(prev => ({ ...prev, [subQuestionId]: { answer } }));
-  };
-
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   if (!worksheet || orderedQuestions.length === 0) return (
         <div className="flex flex-col items-center justify-center h-screen space-y-4">
@@ -314,7 +303,7 @@ export default function SolveWorksheetPage() {
 
   if (isFinished) return <WorksheetResults worksheet={worksheet} questions={orderedQuestions} answers={answers} results={results} timeTaken={timeTaken} attempt={attempt ?? undefined} />;
 
-  // --- START SCREEN ---
+  // --- START SCREEN (Shared/Responsive) ---
   if (!startTime) return (
         <div className="flex flex-col h-[100dvh] bg-slate-50/50 dark:bg-slate-950/50 items-center justify-center p-4">
              <Card className="w-full max-w-lg shadow-xl border-none">
@@ -355,28 +344,27 @@ export default function SolveWorksheetPage() {
   const currentFeedback = currentResult?.feedback;
   const qMaxMarks = activeQuestion.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
 
-  // --- MOBILE VIEW ---
-  if (isMobile) {
-      return (
-          <MobileQuestionRunner
-              question={activeQuestion}
-              currentIndex={currentQuestionIndex}
-              totalQuestions={orderedQuestions.length}
-              timeLeft={timeLeft}
-              onAnswerSubmit={handleMobileSubmit}
-              onResultCalculated={(subId, isCorrect) => setResults(prev => ({...prev, [subId]: { isCorrect }}))}
-              onNext={handleNext}
-              onPrevious={handlePrevious}
-              onFinish={handleFinish}
-              isLastQuestion={isLastQuestion}
-              initialAnswers={answers}
-          />
-      );
-  }
-
-  // --- DESKTOP VIEW ---
   return (
-    <div className="flex flex-col h-[100dvh] bg-slate-50/30 dark:bg-slate-950/30">
+    <>
+      {/* 📱 MOBILE VIEW: Full Screen Overlay */}
+      <div className="block sm:hidden">
+         <MobileQuestionRunner 
+            question={orderedQuestions[currentQuestionIndex]}
+            currentIndex={currentQuestionIndex}
+            totalQuestions={orderedQuestions.length}
+            timeLeft={timeLeft}
+            initialAnswers={answers}
+            onAnswerSubmit={(subId, ans) => setAnswers(prev => ({...prev, [subId]: { answer: ans }}))}
+            onResultCalculated={(subId, correct) => setResults(prev => ({...prev, [subId]: { isCorrect: correct }}))}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onFinish={handleFinish}
+            isLastQuestion={isLastQuestion}
+         />
+      </div>
+
+      {/* 💻 DESKTOP VIEW: Existing Layout (Hidden on Mobile) */}
+      <div className="hidden sm:flex flex-col h-screen bg-slate-50/30 dark:bg-slate-950/30">
         
         {/* --- MODERN HEADER --- */}
         <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm shrink-0">
@@ -510,7 +498,7 @@ export default function SolveWorksheetPage() {
                         <QuestionRunner 
                             key={activeQuestion.id}
                             question={activeQuestion}
-                            onAnswerSubmit={onAnswerSubmit}
+                            onAnswerSubmit={(subQuestionId, answer) => setAnswers(prev => ({...prev, [subQuestionId]: { answer }}))}
                             onResultCalculated={(subQuestionId, isCorrect) => setResults((prev: ResultState) => ({...prev, [subQuestionId]: { isCorrect }}))}
                             initialAnswers={answers}
                         />
@@ -542,6 +530,7 @@ export default function SolveWorksheetPage() {
                 )}
             </div>
         </div>
-    </div>
+      </div>
+    </>
   );
 }
