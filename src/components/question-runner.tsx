@@ -13,7 +13,7 @@ import { Separator } from './ui/separator';
 import { CompletedSubQuestionSummary } from './question-runner/completed-summary';
 import './question-runner/runner.css';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { cn } from '@/lib/utils'; // Ensure you have this helper or use a class string
+import { cn } from '@/lib/utils';
 
 type AnswerState = {
   [subQuestionId: string]: {
@@ -214,72 +214,7 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
     }
   };
 
-  // 2. MOBILE INPUT RENDERER (Modern Tiles)
-  const renderAnswerInputMobile = (subQ: SubQuestion) => {
-    const valueToDisplay = currentAnswer;
-
-    switch (subQ.answerType) {
-        case 'numerical':
-        case 'text':
-            return (
-                <Input 
-                    type={subQ.answerType === 'numerical' ? 'number' : 'text'}
-                    inputMode={subQ.answerType === 'numerical' ? 'decimal' : 'text'}
-                    placeholder="Type your answer here..."
-                    value={valueToDisplay ?? ''}
-                    onChange={(e) => setCurrentAnswer(e.target.value)}
-                    className="w-full h-12 text-lg px-4 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
-                />
-            );
-        case 'mcq':
-            const options = subQ.mcqAnswer?.options || [];
-            const isMulti = subQ.mcqAnswer?.isMultiCorrect;
-            const currentSelected = isMulti ? (valueToDisplay as string[] || []) : [valueToDisplay];
-
-            return (
-                <div className="space-y-3 w-full">
-                    {options.map(opt => {
-                        const isSelected = currentSelected.includes(opt.id);
-                        return (
-                            <div 
-                                key={opt.id}
-                                onClick={() => {
-                                    if(isMulti) {
-                                        const newAnswer = isSelected 
-                                            ? currentSelected.filter(id => id !== opt.id) 
-                                            : [...currentSelected, opt.id];
-                                        setCurrentAnswer(newAnswer);
-                                    } else {
-                                        setCurrentAnswer(opt.id);
-                                    }
-                                }}
-                                className={cn(
-                                    "flex items-center gap-4 p-4 rounded-xl border-2 transition-all cursor-pointer",
-                                    isSelected 
-                                        ? "border-primary bg-primary/5 shadow-sm" 
-                                        : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
-                                )}
-                            >
-                                <div className={cn(
-                                    "h-6 w-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-                                    isSelected 
-                                        ? "border-primary bg-primary text-primary-foreground" 
-                                        : "border-slate-300 dark:border-slate-600"
-                                )}>
-                                    {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-white" />}
-                                </div>
-                                <span className={cn("text-base font-medium", isSelected ? "text-primary" : "text-slate-700 dark:text-slate-300")}>
-                                    {opt.text}
-                                </span>
-                            </div>
-                        )
-                    })}
-                </div>
-            );
-        default: return null;
-    }
-  }
-
+  
   const processedMainQuestionText = useMemo(() => {
     if (!question?.mainQuestionText) return '';
     return question.mainQuestionText.replace(/&nbsp;/g, ' ');
@@ -303,136 +238,80 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
   }
 
   return (
-    <>
-        {/* ============================================== */}
-        {/* 📱 MOBILE VIEW (Visible only on small screens) */}
-        {/* ============================================== */}
-        <div className="block sm:hidden h-full flex flex-col">
+    <div className="border rounded-lg bg-card text-card-foreground break-words space-y-6 overflow-hidden">
+        {/* Main Question Text Block */}
+        <div className="p-4 sm:p-6 bg-muted/30">
+            <div className="w-full overflow-x-auto">
+                <div className="prose dark:prose-invert max-w-none min-w-0" dangerouslySetInnerHTML={{ __html: processedMainQuestionText }} />
+            </div>
+        </div>
+
+        <div className="px-4 sm:px-6 pb-6">
             {!hasStarted ? (
-                <div className="flex flex-col items-center justify-center py-10">
-                    <Button onClick={handleStart} size="lg" className="w-full text-lg h-12 shadow-lg">Start Solving Question</Button>
+                <div className="flex justify-center pt-4">
+                    <Button onClick={handleStart} size="lg" className="w-full sm:w-auto">Start Solving</Button>
                 </div>
             ) : (
-                <>
-                    {/* Top: Scrollable Question Area */}
-                    <div className="flex-1 space-y-4">
-                        {/* Step Header */}
-                        {isNewStep && (
-                            <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-100 dark:border-blue-900/50 mb-2">
-                                <h4 className="text-sm font-bold text-blue-800 dark:text-blue-200 uppercase tracking-wide">
-                                    Step {currentStepNumber}: {activeSubQuestion.stepTitle}
-                                </h4>
-                                {activeSubQuestion.stepObjective && (
-                                    <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">{activeSubQuestion.stepObjective}</p>
-                                )}
+                <div className="space-y-6">
+                    {/* Completed Questions Summaries */}
+                    {uniqueStepIds.map((stepId, index) => {
+                        const stepData = completedQuestionsByStep[stepId];
+                        if (!stepData) return null;
+                        return (
+                            <div key={stepId} className="space-y-3">
+                                <h4 className="font-semibold text-base sm:text-lg font-headline">Step {index + 1}. {stepData.title}</h4>
+                                {stepData.subQuestions.map((subQ) => {
+                                    const globalIndex = allSubQuestions.findIndex(q => q.id === subQ.id);
+                                    return (
+                                        <Collapsible key={subQ.id}>
+                                            <CollapsibleTrigger asChild>
+                                                <div className="cursor-pointer">
+                                                    <CompletedSubQuestionSummary subQuestion={subQ} answer={answers[subQ.id]?.answer} index={globalIndex} />
+                                                </div>
+                                            </CollapsibleTrigger>
+                                            <CollapsibleContent>
+                                                <div className="p-4 border border-t-0 rounded-b-lg -mt-1 bg-slate-50/50 dark:bg-slate-900/50">
+                                                    <div className="w-full overflow-x-auto mb-4">
+                                                        <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm" dangerouslySetInnerHTML={{ __html: subQ.questionText }} />
+                                                    </div>
+                                                    {renderAnswerInputDesktop(subQ, true)}
+                                                </div>
+                                            </CollapsibleContent>
+                                        </Collapsible>
+                                    )
+                                })}
                             </div>
-                        )}
+                        )
+                    })}
 
-                        {/* Question Text */}
-                        <div className="w-full overflow-x-auto bg-white dark:bg-slate-900 p-4 rounded-xl border shadow-sm">
-                            <div 
-                                className="prose prose-sm dark:prose-invert max-w-none"
-                                dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }} 
-                            />
-                        </div>
-                    </div>
+                    {/* Active Question Card */}
+                    {activeSubQuestion && (
+                        <Card key={activeSubQuestion.id} className="bg-muted/30 runner-active-card border-l-4 border-l-primary">
+                            {isNewStep && (
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-base sm:text-lg font-headline">Step {currentStepNumber}: {activeSubQuestion.stepTitle}</CardTitle>
+                                    {activeSubQuestion.stepObjective && <CardDescription>{activeSubQuestion.stepObjective}</CardDescription>}
+                                </CardHeader>
+                            )}
+                            <CardContent className={isNewStep ? 'pt-2' : 'pt-6'}>
+                                <div className="p-4 sm:p-5 border rounded-lg bg-card shadow-sm">
+                                    <div className="w-full overflow-x-auto mb-5">
+                                        <div className="prose dark:prose-invert max-w-none text-base" dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }} />
+                                    </div>
+                                    {renderAnswerInputDesktop(activeSubQuestion, false)}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
-                    {/* Bottom: Fixed Input Area */}
-                    <div className="mt-4 pt-4 border-t bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm -mx-4 px-4 pb-4 sticky bottom-0 z-10">
-                        <div className="mb-4">
-                            {renderAnswerInputMobile(activeSubQuestion)}
+                    {!isFinished && (
+                        <div className="flex justify-end mt-4">
+                            <Button onClick={handleSubmit} size="lg" className="w-full sm:w-auto">Submit Answer</Button>
                         </div>
-                        <Button 
-                            onClick={handleSubmit} 
-                            size="lg" 
-                            className="w-full h-14 text-lg font-bold shadow-xl shadow-primary/20 rounded-xl"
-                        >
-                            Submit Answer
-                        </Button>
-                    </div>
-                </>
+                    )}
+                </div>
             )}
         </div>
-
-
-        {/* ============================================== */}
-        {/* 💻 DESKTOP VIEW (Visible only on md+ screens)  */}
-        {/* ============================================== */}
-        <div className="hidden sm:block border rounded-lg bg-card text-card-foreground break-words space-y-6 overflow-hidden">
-            {/* Main Question Text Block */}
-            <div className="p-4 sm:p-6 bg-muted/30">
-                <div className="w-full overflow-x-auto">
-                    <div className="prose dark:prose-invert max-w-none min-w-0" dangerouslySetInnerHTML={{ __html: processedMainQuestionText }} />
-                </div>
-            </div>
-
-            <div className="px-4 sm:px-6 pb-6">
-                {!hasStarted ? (
-                    <div className="flex justify-center pt-4">
-                        <Button onClick={handleStart} size="lg" className="w-full sm:w-auto">Start Solving</Button>
-                    </div>
-                ) : (
-                    <div className="space-y-6">
-                        {/* Completed Questions Summaries */}
-                        {uniqueStepIds.map((stepId, index) => {
-                            const stepData = completedQuestionsByStep[stepId];
-                            if (!stepData) return null;
-                            return (
-                                <div key={stepId} className="space-y-3">
-                                    <h4 className="font-semibold text-base sm:text-lg font-headline">Step {index + 1}. {stepData.title}</h4>
-                                    {stepData.subQuestions.map((subQ) => {
-                                        const globalIndex = allSubQuestions.findIndex(q => q.id === subQ.id);
-                                        return (
-                                            <Collapsible key={subQ.id}>
-                                                <CollapsibleTrigger asChild>
-                                                    <div className="cursor-pointer">
-                                                        <CompletedSubQuestionSummary subQuestion={subQ} answer={answers[subQ.id]?.answer} index={globalIndex} />
-                                                    </div>
-                                                </CollapsibleTrigger>
-                                                <CollapsibleContent>
-                                                    <div className="p-4 border border-t-0 rounded-b-lg -mt-1 bg-slate-50/50 dark:bg-slate-900/50">
-                                                        <div className="w-full overflow-x-auto mb-4">
-                                                            <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm" dangerouslySetInnerHTML={{ __html: subQ.questionText }} />
-                                                        </div>
-                                                        {renderAnswerInputDesktop(subQ, true)}
-                                                    </div>
-                                                </CollapsibleContent>
-                                            </Collapsible>
-                                        )
-                                    })}
-                                </div>
-                            )
-                        })}
-
-                        {/* Active Question Card */}
-                        {activeSubQuestion && (
-                            <Card key={activeSubQuestion.id} className="bg-muted/30 runner-active-card border-l-4 border-l-primary">
-                                {isNewStep && (
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-base sm:text-lg font-headline">Step {currentStepNumber}: {activeSubQuestion.stepTitle}</CardTitle>
-                                        {activeSubQuestion.stepObjective && <CardDescription>{activeSubQuestion.stepObjective}</CardDescription>}
-                                    </CardHeader>
-                                )}
-                                <CardContent className={isNewStep ? 'pt-2' : 'pt-6'}>
-                                    <div className="p-4 sm:p-5 border rounded-lg bg-card shadow-sm">
-                                        <div className="w-full overflow-x-auto mb-5">
-                                            <div className="prose dark:prose-invert max-w-none text-base" dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }} />
-                                        </div>
-                                        {renderAnswerInputDesktop(activeSubQuestion, false)}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {!isFinished && (
-                            <div className="flex justify-end mt-4">
-                                <Button onClick={handleSubmit} size="lg" className="w-full sm:w-auto">Submit Answer</Button>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    </>
+    </div>
   );
 }

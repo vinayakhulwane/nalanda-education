@@ -29,6 +29,8 @@ import { AIAnswerUploader } from '@/components/solve/ai-answer-uploader';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileQuestionRunner } from '@/components/solve/mobile-question-runner';
 
 // Helper Formatters
 function formatTime(seconds: number) {
@@ -115,6 +117,7 @@ export default function SolveWorksheetPage() {
   const firestore = useFirestore();
   const { user, userProfile } = useUser();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
@@ -287,6 +290,15 @@ export default function SolveWorksheetPage() {
     }
   };
 
+  const handleMobileSubmit = (subQuestionId: string, answer: any) => {
+    setAnswers(prev => ({ ...prev, [subQuestionId]: { answer } }));
+    onAnswerSubmit(subQuestionId, answer);
+  };
+  
+  const onAnswerSubmit = (subQuestionId: string, answer: any) => {
+    setAnswers(prev => ({ ...prev, [subQuestionId]: { answer } }));
+  };
+
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   if (!worksheet || orderedQuestions.length === 0) return (
         <div className="flex flex-col items-center justify-center h-screen space-y-4">
@@ -304,7 +316,6 @@ export default function SolveWorksheetPage() {
 
   // --- START SCREEN ---
   if (!startTime) return (
-        // ✅ FIX: Use h-[100dvh] for mobile browsers
         <div className="flex flex-col h-[100dvh] bg-slate-50/50 dark:bg-slate-950/50 items-center justify-center p-4">
              <Card className="w-full max-w-lg shadow-xl border-none">
                  <div className="h-2 w-full bg-gradient-to-r from-primary to-indigo-500 rounded-t-xl" />
@@ -344,8 +355,27 @@ export default function SolveWorksheetPage() {
   const currentFeedback = currentResult?.feedback;
   const qMaxMarks = activeQuestion.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
 
+  // --- MOBILE VIEW ---
+  if (isMobile) {
+      return (
+          <MobileQuestionRunner
+              question={activeQuestion}
+              currentIndex={currentQuestionIndex}
+              totalQuestions={orderedQuestions.length}
+              timeLeft={timeLeft}
+              onAnswerSubmit={handleMobileSubmit}
+              onResultCalculated={(subId, isCorrect) => setResults(prev => ({...prev, [subId]: { isCorrect }}))}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+              onFinish={handleFinish}
+              isLastQuestion={isLastQuestion}
+              initialAnswers={answers}
+          />
+      );
+  }
+
+  // --- DESKTOP VIEW ---
   return (
-    // ✅ FIX: Use h-[100dvh] for full viewport height on mobile
     <div className="flex flex-col h-[100dvh] bg-slate-50/30 dark:bg-slate-950/30">
         
         {/* --- MODERN HEADER --- */}
@@ -405,7 +435,6 @@ export default function SolveWorksheetPage() {
                         </div>
                     </CardHeader>
 
-                    {/* ✅ FIX: Mobile Optimized Content Area */}
                     <CardContent className="p-4 sm:p-6">
                         <div className="w-full overflow-x-auto">
                             <div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-sm sm:text-base leading-relaxed bg-slate-50/50 dark:bg-slate-900/50 p-4 sm:p-6 rounded-xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap break-words min-w-0">
@@ -481,7 +510,7 @@ export default function SolveWorksheetPage() {
                         <QuestionRunner 
                             key={activeQuestion.id}
                             question={activeQuestion}
-                            onAnswerSubmit={(subQuestionId, answer) => setAnswers(prev => ({...prev, [subQuestionId]: { answer }}))}
+                            onAnswerSubmit={onAnswerSubmit}
                             onResultCalculated={(subQuestionId, isCorrect) => setResults((prev: ResultState) => ({...prev, [subQuestionId]: { isCorrect }}))}
                             initialAnswers={answers}
                         />
@@ -491,7 +520,6 @@ export default function SolveWorksheetPage() {
         </main>
 
         {/* --- BOTTOM NAVIGATION BAR --- */}
-        {/* ✅ FIX: Mobile Responsive Footer */}
         <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40">
             <div className="w-full max-w-4xl flex justify-between items-center gap-3 sm:gap-0">
                 
