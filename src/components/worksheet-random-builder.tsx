@@ -137,22 +137,6 @@ export function WorksheetRandomBuilder({
         });
     }, [availableQuestions, filters]);
 
-    const questionsByUnit = useMemo(() => {
-        return filteredQuestions.reduce((acc, q) => {
-            const unitName = unitMap.get(q.unitId) || q.unitId;
-            acc[unitName] = (acc[unitName] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-    }, [filteredQuestions, unitMap]);
-
-    const questionsByCategory = useMemo(() => {
-        return filteredQuestions.reduce((acc, q) => {
-            const categoryName = categoryMap.get(q.categoryId) || q.categoryId;
-            acc[categoryName] = (acc[categoryName] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-    }, [filteredQuestions, categoryMap]);
-
     const questionsByCurrency = useMemo(() => {
         return availableQuestions.reduce((acc, q) => {
             acc[q.currencyType] = (acc[q.currencyType] || 0) + 1;
@@ -260,18 +244,6 @@ export function WorksheetRandomBuilder({
                     </div>
                     <p className="text-xs text-indigo-200/80 mt-1">Matches your current filters</p>
                 </div>
-            </div>
-
-            {/* BREAKDOWNS */}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                <Card className="shadow-sm border-slate-200 dark:border-slate-800 rounded-2xl hidden md:flex flex-col">
-                    <CardHeader className="pb-3 pt-5 px-5"><CardTitle className="text-base text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-2"><Filter className="h-4 w-4" /> Breakdown by Unit</CardTitle></CardHeader>
-                    <CardContent className="px-5 pb-5"><div className="space-y-2 overflow-y-auto max-h-[180px] pr-2 custom-scrollbar">{Object.entries(questionsByUnit).map(([unitName, count]) => (<div key={unitName} className="flex justify-between items-center text-sm p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800"><span className="font-medium truncate mr-2 text-slate-700 dark:text-slate-300">{unitName}</span><Badge variant="secondary" className="h-6 px-2.5 rounded-md bg-white dark:bg-slate-800 shadow-sm">{count}</Badge></div>))}{Object.keys(questionsByUnit).length === 0 && <p className="text-sm text-center text-muted-foreground py-8 italic">No data available.</p>}</div></CardContent>
-                </Card>
-                <Card className="shadow-sm border-slate-200 dark:border-slate-800 rounded-2xl hidden md:flex flex-col">
-                    <CardHeader className="pb-3 pt-5 px-5"><CardTitle className="text-base text-slate-700 dark:text-slate-300 font-semibold flex items-center gap-2"><Filter className="h-4 w-4" /> Breakdown by Category</CardTitle></CardHeader>
-                    <CardContent className="px-5 pb-5 flex-grow"><div className="space-y-2 overflow-y-auto max-h-[180px] pr-2 custom-scrollbar h-full">{Object.entries(questionsByCategory).map(([catName, count]) => (<div key={catName} className="flex justify-between items-center text-sm p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800"><span className="font-medium truncate mr-2 text-slate-700 dark:text-slate-300">{catName}</span><Badge variant="secondary" className="h-6 px-2.5 rounded-md bg-white dark:bg-slate-800 shadow-sm">{count}</Badge></div>))}{Object.keys(questionsByCategory).length === 0 && <p className="text-sm text-center text-muted-foreground py-8 italic">No data available.</p>}</div></CardContent>
-                </Card>
             </div>
 
             {/* QUICK ADD CARDS */}
