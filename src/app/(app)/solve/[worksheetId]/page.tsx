@@ -300,9 +300,13 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                     <div className={cn("h-8 w-8 rounded-full flex items-center justify-center shrink-0 border", isCorrect ? "bg-emerald-100 border-emerald-200 text-emerald-600" : "bg-red-100 border-red-200 text-red-600")}>
                       {isCorrect ? <CheckCircle className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     </div>
-                    <div className="text-left">
+                    {/* UPDATED: flex-1 and min-w-0 ensures text wraps instead of pushing width */}
+                    <div className="text-left flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground font-semibold">Question {qIdx + 1}</p>
-                      <div className="text-xs text-slate-700 dark:text-slate-300 line-clamp-1 max-w-[180px] font-medium"><span dangerouslySetInnerHTML={{ __html: processedMainQuestionText(q.mainQuestionText).substring(0, 50) + "..." }} /></div>
+                      {/* UPDATED: break-words and whitespace-pre-wrap for full text display */}
+                      <div className="text-xs text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap break-words">
+                          <span dangerouslySetInnerHTML={{ __html: processedMainQuestionText(q.mainQuestionText) }} />
+                      </div>
                     </div>
                   </div>
                   {openQuestionId === q.id ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
