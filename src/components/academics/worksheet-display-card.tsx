@@ -3,7 +3,7 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, BookOpen, Repeat } from "lucide-react";
+import { FileQuestion, Trophy, Clock, ArrowRight, CheckCircle2, PlayCircle, Sparkles, BookOpen, Repeat, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { Worksheet, WorksheetAttempt } from "@/types";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,9 @@ export function WorksheetDisplayCard({
 
     const totalMarks = questionCount * 10;
     const estimatedTime = Math.ceil(totalMarks * 0.5);
+
+    // New state for reward claim status
+    const isRewardClaimed = latestAttempt?.rewardsClaimed === true;
 
     const handleStart = () => {
         router.push(`/solve/${worksheet.id}`);
@@ -154,11 +157,6 @@ export function WorksheetDisplayCard({
                     )}>
                         {isPractice ? 'Practice Zone' : 'Classroom'}
                     </Badge>
-                    {isCompletedOrAttempted && (
-                        <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded-full">
-                            <CheckCircle2 className="h-3 w-3" /> Done
-                        </div>
-                    )}
                 </div>
                 <h3 className="font-bold text-lg leading-tight line-clamp-2 min-h-[3rem]">
                     {worksheet.title}
@@ -183,12 +181,17 @@ export function WorksheetDisplayCard({
                     </div>
                 </div>
 
-                {!isCompletedOrAttempted && (
-                    <div className="flex items-center gap-1.5 mt-4 text-xs font-medium text-amber-600 dark:text-amber-400">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>Earn {questionCount * 5} XP</span>
+                {isRewardClaimed ? (
+                    <div className="flex items-center gap-2 mt-4 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>Completed</span>
                     </div>
-                )}
+                ) : !isCompletedOrAttempted ? (
+                    <div className="flex items-center gap-2 mt-4 text-xs font-bold text-slate-500 dark:text-slate-400">
+                        <Pencil className="h-4 w-4" />
+                        <span>Solve It</span>
+                    </div>
+                ) : null}
             </CardContent>
 
             <CardFooter className="pt-2 pb-6">
