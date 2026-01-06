@@ -16,6 +16,8 @@ import { doc } from 'firebase/firestore';
 import { useToast } from "@/components/ui/use-toast";
 import { WorksheetReviewSheet } from './worksheet-random-builder/review-sheet';
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Label } from './ui/label';
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
 
@@ -191,11 +193,12 @@ export function WorksheetRandomBuilder({
     }
 
     const activeFilterCount = filters.units.length + filters.categories.length + filters.currencies.length;
+    const isFilterActive = activeFilterCount > 0;
     
     return (
         <div className="space-y-6 pb-24 md:pb-0">
             {/* HEADER SECTION WITH FILTER */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm">
                 <div className="flex items-center gap-4">
                     <div className="bg-primary/10 p-3 rounded-xl shrink-0">
                         <Wand2 className="h-6 w-6 text-primary" />
@@ -222,11 +225,40 @@ export function WorksheetRandomBuilder({
                                 <SheetTitle>Filter Questions</SheetTitle>
                                 <SheetDescription>Refine the available question pool.</SheetDescription>
                             </SheetHeader>
-                            {/* Filter content remains the same */}
+                            <Tabs defaultValue="unit" className="w-full">
+                                <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 dark:bg-slate-800 m-2 rounded-md">
+                                    <TabsTrigger value="unit" className="rounded-sm">Unit</TabsTrigger>
+                                    <TabsTrigger value="category" className="rounded-sm" disabled={filters.units.length > 0 && availableCategories.length === 0}>Category</TabsTrigger>
+                                    <TabsTrigger value="currency" className="rounded-sm">Type</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="unit" className="mt-0">
+                                    <div className="px-3 pt-2 pb-3 border-b">
+                                        <div className="relative"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search units..." className="pl-8 h-9" value={filterSearch.unit} onChange={(e) => setFilterSearch(prev => ({ ...prev, unit: e.target.value }))} /></div>
+                                    </div>
+                                    <div className="max-h-[240px] overflow-y-auto py-1 px-1">
+                                        {filteredUnitsList.map(unit => (
+                                            <div key={unit.id} className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Checkbox id={`random-filter-unit-${unit.id}`} checked={filters.units.includes(unit.id)} onCheckedChange={(checked) => handleFilterChange('units', unit.id, !!checked)} /><Label htmlFor={`random-filter-unit-${unit.id}`} className="capitalize flex-grow cursor-pointer">{unit.name}</Label></div>
+                                        ))}
+                                    </div>
+                                </TabsContent>
+                                <TabsContent value="category" className="mt-0"><div className="px-3 pt-2 pb-3 border-b"><div className="relative"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search categories..." className="pl-8 h-9" value={filterSearch.category} onChange={(e) => setFilterSearch(prev => ({ ...prev, category: e.target.value }))} /></div></div><div className="max-h-[240px] overflow-y-auto py-1 px-1">{filteredCategoriesList.map(cat => (<div key={cat.id} className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Checkbox id={`random-filter-cat-${cat.id}`} checked={filters.categories.includes(cat.id)} onCheckedChange={(checked) => handleFilterChange('categories', cat.id, !!checked)} /><Label htmlFor={`random-filter-cat-${cat.id}`} className="capitalize flex-grow cursor-pointer">{cat.name}</Label></div>))}</div></TabsContent>
+                                <TabsContent value="currency" className="mt-0"><div className="px-3 pt-2 pb-3 border-b"><div className="relative"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search types..." className="pl-8 h-9" value={filterSearch.currency} onChange={(e) => setFilterSearch(prev => ({ ...prev, currency: e.target.value }))} /></div></div><div className="max-h-[240px] overflow-y-auto py-1 px-1">{filteredCurrenciesList.map(currency => (<div key={currency} className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Checkbox id={`random-filter-currency-${currency}`} checked={filters.currencies.includes(currency)} onCheckedChange={(checked) => handleFilterChange('currencies', currency, !!checked)} /><Label htmlFor={`random-filter-currency-${currency}`} className="capitalize flex-grow cursor-pointer">{currency}</Label></div>))}</div></TabsContent>
+                                {(filters.units.length > 0 || filters.categories.length > 0 || filters.currencies.length > 0) && (<div className="p-2 border-t bg-slate-50 dark:bg-slate-900/50"><Button variant="ghost" size="sm" className="w-full h-8 font-normal text-muted-foreground hover:text-foreground" onClick={() => setFilters({ units: [], categories: [], currencies: [] })}>Clear all filters</Button></div>)}
+                            </Tabs>
                         </SheetContent>
                     </Sheet>
                 </div>
             </div>
+            
+            {isFilterActive && (
+                <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
+                    <span className="text-xs font-semibold text-muted-foreground ml-1 mr-1">Active:</span>
+                    {filters.units.map(id => (<Badge key={id} variant="secondary" className="pl-2 pr-1 h-6 capitalize gap-1 hover:bg-slate-200 cursor-pointer rounded-md font-normal" onClick={() => handleFilterChange('units', id, false)}>{unitMap.get(id) || id}<X className="h-3 w-3 text-muted-foreground" /></Badge>))}
+                    {filters.categories.map(id => (<Badge key={id} variant="secondary" className="pl-2 pr-1 h-6 capitalize gap-1 hover:bg-slate-200 cursor-pointer rounded-md font-normal" onClick={() => handleFilterChange('categories', id, false)}>{categoryMap.get(id) || id}<X className="h-3 w-3 text-muted-foreground" /></Badge>))}
+                    {filters.currencies.map(c => (<Badge key={c} variant="secondary" className="pl-2 pr-1 h-6 capitalize gap-1 hover:bg-slate-200 cursor-pointer rounded-md font-normal" onClick={() => handleFilterChange('currencies', c, false)}>{c}<X className="h-3 w-3 text-muted-foreground" /></Badge>))}
+                </div>
+            )}
+
 
             {/* AVAILABLE POOL BANNER */}
             <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl p-5 shadow-lg relative overflow-hidden">
