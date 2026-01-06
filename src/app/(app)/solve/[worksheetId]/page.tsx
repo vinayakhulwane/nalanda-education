@@ -1,4 +1,3 @@
-
 'use client';
 
 import ReactMarkdown from 'react-markdown';
@@ -24,14 +23,12 @@ import {
   Trophy,
   Coins,
   ChevronDown,
-  ChevronUp,
-  Eye
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
 import { MobileQuestionRunner } from '@/components/solve/mobile-question-runner';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { WorksheetResults, type AnswerState } from '@/components/worksheet-results';
 import { AIAnswerUploader } from '@/components/solve/ai-answer-uploader';
 import { useToast } from '@/components/ui/use-toast';
@@ -113,309 +110,282 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
   );
 };
 
-// --- HELPER: Get Readable User Answer (Updated for Arrays/Multi-select) ---
-// Added ': string' return type to fix recursion error
+// --- HELPER: Get Readable User Answer (FIXED FOR UUID STRINGS) ---
 const getUserAnswerText = (subQ: any, answerVal: any): string => {
-    if (answerVal === undefined || answerVal === null) return "Not Attempted";
-  
-    // 1. Handle Arrays (Multi-select questions)
-    // Recursively get text for each item in the array
-    if (Array.isArray(answerVal)) {
-      if (answerVal.length === 0) return "Not Attempted";
-      const textAnswers = answerVal
-        .map((val) => {
-            const matchedOption = subQ.options?.find((opt: any) => opt.id === val);
-            return matchedOption?.text || String(val);
-        })
-        .join(', ');
-      return textAnswers;
+  if (answerVal === undefined || answerVal === null) return "Not Attempted";
+
+  // 1. Handle comma-separated strings (e.g., "uuid1,uuid2") from DB
+  if (typeof answerVal === 'string' && answerVal.includes(',')) {
+    // Split by comma, trim spaces, and process each ID recursively
+    return answerVal.split(',').map(val => getUserAnswerText(subQ, val.trim())).join(", ");
+  }
+
+  // 2. Handle Arrays (Multi-select questions in memory)
+  if (Array.isArray(answerVal)) {
+    return answerVal.map((val) => getUserAnswerText(subQ, val)).join(", ");
+  }
+
+  // 3. If question has options (MCQ), try to find the text for this Answer ID
+  if (subQ.options && Array.isArray(subQ.options)) {
+    // Try finding by ID (e.g. UUID match)
+    const matchedOption = subQ.options.find((opt: any) => opt.id === answerVal);
+    if (matchedOption) return matchedOption.text || matchedOption.label || String(answerVal);
+
+    // Try finding by Index (if answer is 0, 1, 2...)
+    if (typeof answerVal === 'number' && subQ.options[answerVal]) {
+      const opt = subQ.options[answerVal];
+      return typeof opt === 'string' ? opt : opt.text;
     }
-  
-    // 2. If question has options (MCQ), try to find the text for this Answer ID
-    if (subQ.options && Array.isArray(subQ.options)) {
-      // Try finding by ID
-      const matchedOption = subQ.options.find((opt: any) => opt.id === answerVal);
-      if (matchedOption) return matchedOption.text || matchedOption.label || String(answerVal);
-  
-      // Try finding by Index (if answer is 0, 1, 2...)
-      if (typeof answerVal === 'number' && subQ.options[answerVal]) {
-         const opt = subQ.options[answerVal];
-         return typeof opt === 'string' ? opt : opt.text;
-      }
+  }
+
+  // 4. Fallback for text inputs or unmatched IDs
+  return String(answerVal);
+};
+
+// --- HELPER: Get Readable Correct Answer ---
+const getCorrectAnswerText = (subQ: any) => {
+  if (subQ.correctAnswerText) return subQ.correctAnswerText;
+
+  if (subQ.options && Array.isArray(subQ.options)) {
+    if (subQ.correctOption !== undefined && subQ.options[subQ.correctOption]) {
+      const opt = subQ.options[subQ.correctOption];
+      return typeof opt === 'string' ? opt : opt.text;
     }
-  
-    // 3. Fallback for text inputs
-    return String(answerVal);
-  };
-  
-  // --- HELPER: Get Readable Correct Answer ---
-  const getCorrectAnswerText = (subQ: any) => {
-     // If explicit text is provided
-     if (subQ.correctAnswerText) return subQ.correctAnswerText;
-  
-     // If options exist, find the correct one
-     if (subQ.options && Array.isArray(subQ.options)) {
-        // Check via correctOption index
-        if (subQ.correctOption !== undefined && subQ.options[subQ.correctOption]) {
-           const opt = subQ.options[subQ.correctOption];
-           return typeof opt === 'string' ? opt : opt.text;
-        }
-        
-        // Check via correctAnswer ID lookup
-        if (subQ.correctAnswer) {
-            const matched = subQ.options.find((o: any) => o.id === subQ.correctAnswer);
-            if (matched) return matched.text;
-        }
-     }
-     
-     return subQ.correctAnswer || "See Solution";
+    if (subQ.correctAnswer) {
+      const matched = subQ.options.find((o: any) => o.id === subQ.correctAnswer);
+      if (matched) return matched.text;
+    }
+  }
+  return subQ.correctAnswer || "See Solution";
+};
+
+// --- MOBILE RESULT COMPONENT ---
+const MobileResultView = ({
+  worksheet,
+  results,
+  answers,
+  questions,
+  timeTaken,
+  totalMarks,
+  maxMarks,
+  onClaimReward
+}: {
+  worksheet: Worksheet,
+  results: ResultState,
+  answers: AnswerState,
+  questions: Question[],
+  timeTaken: number,
+  totalMarks: number,
+  maxMarks: number,
+  onClaimReward: () => void
+}) => {
+  const router = useRouter();
+  const percentage = maxMarks > 0 ? Math.round((totalMarks / maxMarks) * 100) : 0;
+  const [rewardClaimed, setRewardClaimed] = useState(false);
+  const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
+
+  const handleClaim = () => {
+    setRewardClaimed(true);
+    onClaimReward();
   };
 
-  const MobileResultView = ({
-    worksheet,
-    results,
-    answers,
-    questions,
-    timeTaken,
-    totalMarks,
-    maxMarks,
-    onClaimReward
-  }: {
-    worksheet: Worksheet,
-    results: ResultState,
-    answers: AnswerState,
-    questions: Question[],
-    timeTaken: number,
-    totalMarks: number,
-    maxMarks: number,
-    onClaimReward: () => void
-  }) => {
-    const router = useRouter();
-    const percentage = maxMarks > 0 ? Math.round((totalMarks / maxMarks) * 100) : 0;
-    
-    const [rewardClaimed, setRewardClaimed] = useState(false);
-    const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
-  
-    const handleClaim = () => {
-      setRewardClaimed(true);
-      onClaimReward();
-    };
-  
-    const coinsEarned = Math.round(percentage * 0.5); 
-  
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-24">
-        {/* HEADER SECTION */}
-        <div className="bg-white dark:bg-slate-900 pt-8 pb-10 px-4 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800">
-          <div className="text-center space-y-2 mb-8">
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white px-8 leading-tight">{worksheet.title}</h1>
-            <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Result Summary</p>
-          </div>
-  
-          <div className="flex flex-col items-center justify-center">
-            <div className="relative h-44 w-44 flex items-center justify-center mb-6">
-              <div className={cn(
-                "h-full w-full rounded-full border-[14px] flex items-center justify-center shadow-lg transform transition-all",
-                percentage >= 70 ? "border-emerald-500 bg-emerald-50/30" :
-                  percentage >= 40 ? "border-amber-500 bg-amber-50/30" :
-                    "border-red-500 bg-red-50/30"
-              )}>
-                <div className="text-center">
-                  <span className="text-5xl font-black text-slate-800 dark:text-slate-100 tracking-tighter">{percentage}%</span>
-                  <p className="text-xs font-semibold text-slate-400 mt-1">ACCURACY</p>
-                </div>
-              </div>
-            </div>
-  
-            <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-center border border-slate-100 dark:border-slate-700">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Score</p>
-                <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">
-                  {totalMarks.toFixed(1)}<span className="text-xs text-slate-400 font-normal">/{maxMarks}</span>
-                </p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-center border border-slate-100 dark:border-slate-700">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Time</p>
-                <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">{formatTime(timeTaken)}</p>
+  const coinsEarned = Math.round(percentage * 0.5);
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-24">
+      {/* HEADER SECTION */}
+      <div className="bg-white dark:bg-slate-900 pt-8 pb-10 px-4 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800">
+        <div className="text-center space-y-2 mb-8">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white px-8 leading-tight">{worksheet.title}</h1>
+          <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Result Summary</p>
+        </div>
+
+        <div className="flex flex-col items-center justify-center">
+          <div className="relative h-44 w-44 flex items-center justify-center mb-6">
+            <div className={cn(
+              "h-full w-full rounded-full border-[14px] flex items-center justify-center shadow-lg transform transition-all",
+              percentage >= 70 ? "border-emerald-500 bg-emerald-50/30" :
+                percentage >= 40 ? "border-amber-500 bg-amber-50/30" :
+                  "border-red-500 bg-red-50/30"
+            )}>
+              <div className="text-center">
+                <span className="text-5xl font-black text-slate-800 dark:text-slate-100 tracking-tighter">{percentage}%</span>
+                <p className="text-xs font-semibold text-slate-400 mt-1">ACCURACY</p>
               </div>
             </div>
           </div>
-        </div>
-  
-        <div className="p-4 space-y-6">
-          {/* REWARD CARD */}
-          <div className="animate-in slide-in-from-bottom-4 duration-700 delay-150">
-             <Card className="border-none shadow-md bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 overflow-hidden relative">
-                <div className="absolute right-0 top-0 opacity-10 pointer-events-none">
-                   <Trophy className="h-32 w-32 -mr-8 -mt-8 rotate-12" />
-                </div>
-                <CardContent className="p-5 flex items-center justify-between relative z-10">
-                   <div>
-                      <p className="text-amber-800 dark:text-amber-200 font-bold text-sm uppercase tracking-wide">Rewards Earned</p>
-                      <div className="flex items-center gap-2 mt-1">
-                         <Coins className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                         <span className="text-3xl font-black text-amber-900 dark:text-amber-100">{coinsEarned}</span>
-                      </div>
-                   </div>
-                   <Button 
-                      onClick={handleClaim} 
-                      disabled={rewardClaimed}
-                      className={cn(
-                         "rounded-full font-bold shadow-sm transition-all",
-                         rewardClaimed 
-                         ? "bg-amber-200 text-amber-800 hover:bg-amber-200 cursor-default" 
-                         : "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30 shadow-lg"
-                      )}
-                   >
-                      {rewardClaimed ? "Claimed" : "Claim"}
-                   </Button>
-                </CardContent>
-             </Card>
-          </div>
-  
-          {/* DETAILED ANALYSIS */}
-          <div className="space-y-3 animate-in slide-in-from-bottom-4 duration-700 delay-300">
-             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider pl-1">Detailed Analysis</h3>
-             
-             {questions.map((q, qIdx) => {
-                const allSubQuestions = q.solutionSteps.flatMap(s => s.subQuestions);
-                
-                // Calculate correct count based on strict score > 0 check to avoid false positives
-                const correctCount = allSubQuestions.filter(sq => {
-                   const r = results[sq.id];
-                   // STRICT CHECK: Must be marked correct AND (if marks exist) score must be > 0
-                   return r?.isCorrect === true && (sq.marks === 0 || (r.score && r.score > 0)); 
-                }).length;
-  
-                const isFullyCorrect = correctCount === allSubQuestions.length;
-                const isPartiallyCorrect = correctCount > 0 && !isFullyCorrect;
-                const isAttempted = allSubQuestions.some(sq => results[sq.id] !== undefined);
-  
-                return (
-                   <Collapsible 
-                      key={q.id} 
-                      open={openQuestionId === q.id} 
-                      onOpenChange={(open) => setOpenQuestionId(open ? q.id : null)}
-                      className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
-                   >
-                      <CollapsibleTrigger className="w-full flex items-center justify-between p-4 bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                         <div className="flex items-center gap-3">
-                            <div className={cn(
-                               "h-8 w-8 rounded-full flex items-center justify-center shrink-0 border",
-                               !isAttempted ? "bg-slate-100 border-slate-200 text-slate-400" :
-                               isFullyCorrect ? "bg-emerald-100 border-emerald-200 text-emerald-600" :
-                               isPartiallyCorrect ? "bg-amber-100 border-amber-200 text-amber-600" :
-                               "bg-red-100 border-red-200 text-red-600"
-                            )}>
-                               {!isAttempted ? <span className="text-[10px] font-bold">NA</span> : 
-                                isFullyCorrect ? <CheckCircle className="h-4 w-4" /> : 
-                                isPartiallyCorrect ? <AlertCircle className="h-4 w-4" /> :
-                                <X className="h-4 w-4" />}
-                            </div>
-                            
-                            <div className="text-left">
-                               <p className="text-xs text-muted-foreground font-semibold">Question {qIdx + 1}</p>
-                               <div className="text-xs text-slate-700 dark:text-slate-300 line-clamp-1 max-w-[180px] font-medium">
-                                  <span dangerouslySetInnerHTML={{ __html: processedMainQuestionText(q.mainQuestionText).substring(0, 50) + "..." }} />
-                               </div>
-                            </div>
-                         </div>
-                         {openQuestionId === q.id ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-                      </CollapsibleTrigger>
-                      
-                      <CollapsibleContent className="bg-slate-50/50 dark:bg-slate-950/30 border-t border-slate-100 dark:border-slate-800">
-                         <div className="p-4 space-y-6">
-                            {q.solutionSteps.map((step, sIdx) => (
-                               <div key={sIdx} className="space-y-3">
-                                  {/* Step Header */}
-                                  {(step as any).instructionText && (
-                                     <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-white">Step {sIdx + 1}</Badge>
-                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400" dangerouslySetInnerHTML={{__html: (step as any).instructionText}} />
-                                     </div>
-                                  )}
-  
-                                  <div className="space-y-3 pl-2 border-l-2 border-slate-200 dark:border-slate-800 ml-2">
-                                     {step.subQuestions.map((subQ) => {
-                                        const result = results[subQ.id];
-                                        
-                                        // Get Readable User Answer (Fixes UUID issue)
-                                        const rawUserAnswer = answers[subQ.id]?.answer;
-                                        const userReadableAnswer = getUserAnswerText(subQ, rawUserAnswer);
-                                        
-                                        // Get Readable Correct Answer
-                                        const correctReadableAnswer = getCorrectAnswerText(subQ);
-  
-                                        // Strict Correctness Check (Marks must match)
-                                        const userScore = result?.score || 0;
-                                        const isCorrect = result?.isCorrect === true && (subQ.marks === 0 || userScore > 0);
-  
-                                        return (
-                                           <div key={subQ.id} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-sm">
-                                              <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed">
-                                                 <span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} />
-                                              </div>
-  
-                                              <div className="grid grid-cols-1 gap-2 bg-slate-50 dark:bg-slate-950 p-2 rounded border border-slate-100 dark:border-slate-800">
-                                                 <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-200 dark:border-slate-700">
-                                                    <div className={cn(
-                                                       "flex items-center gap-1.5 text-xs font-bold",
-                                                       isCorrect ? "text-emerald-600" : "text-red-500"
-                                                    )}>
-                                                       {isCorrect ? <CheckCircle className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                                                       {isCorrect ? "Correct" : "Incorrect"}
-                                                    </div>
-                                                    <span className="text-[10px] font-mono text-slate-400">
-                                                       {userScore}/{subQ.marks} Marks
-                                                    </span>
-                                                 </div>
-  
-                                                 <div className="mt-1">
-                                                    <span className="text-[10px] uppercase text-slate-400 font-bold block mb-0.5">Your Answer</span>
-                                                    <span className={cn(
-                                                       "font-mono text-xs break-all",
-                                                       isCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
-                                                    )}>
-                                                       {userReadableAnswer}
-                                                    </span>
-                                                 </div>
-  
-                                                 {!isCorrect && (
-                                                    <div className="mt-1 pt-1">
-                                                       <span className="text-[10px] uppercase text-emerald-600/70 font-bold block mb-0.5">Correct Answer</span>
-                                                       <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400 break-all">
-                                                          {correctReadableAnswer}
-                                                       </span>
-                                                    </div>
-                                                 )}
-                                              </div>
-                                           </div>
-                                        );
-                                     })}
-                                  </div>
-                               </div>
-                            ))}
-                         </div>
-                      </CollapsibleContent>
-                   </Collapsible>
-                );
-             })}
-          </div>
-        </div>
-  
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md p-4 border-t border-slate-100 dark:border-slate-800 z-50">
-          <div className="flex gap-3 max-w-md mx-auto">
-             <Button variant="outline" className="flex-1" onClick={() => router.back()}>
-                <LayoutDashboard className="mr-2 h-4 w-4" /> Exit
-             </Button>
-             <Button className="flex-1" onClick={() => window.location.reload()}>
-                <RotateCcw className="mr-2 h-4 w-4" /> Retry
-             </Button>
+
+          <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
+            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-center border border-slate-100 dark:border-slate-700">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Score</p>
+              <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">
+                {totalMarks.toFixed(1)}<span className="text-xs text-slate-400 font-normal">/{maxMarks}</span>
+              </p>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl text-center border border-slate-100 dark:border-slate-700">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Time</p>
+              <p className="text-lg font-mono font-bold text-slate-900 dark:text-white">{formatTime(timeTaken)}</p>
+            </div>
           </div>
         </div>
       </div>
-    );
-  };
+
+      <div className="p-4 space-y-6">
+        {/* REWARD CARD */}
+        <div className="animate-in slide-in-from-bottom-4 duration-700 delay-150">
+          <Card className="border-none shadow-md bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 overflow-hidden relative">
+            <div className="absolute right-0 top-0 opacity-10 pointer-events-none">
+              <Trophy className="h-32 w-32 -mr-8 -mt-8 rotate-12" />
+            </div>
+            <CardContent className="p-5 flex items-center justify-between relative z-10">
+              <div>
+                <p className="text-amber-800 dark:text-amber-200 font-bold text-sm uppercase tracking-wide">Rewards Earned</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Coins className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                  <span className="text-3xl font-black text-amber-900 dark:text-amber-100">{coinsEarned}</span>
+                </div>
+              </div>
+              <Button
+                onClick={handleClaim}
+                disabled={rewardClaimed}
+                className={cn(
+                  "rounded-full font-bold shadow-sm transition-all",
+                  rewardClaimed
+                    ? "bg-amber-200 text-amber-800 hover:bg-amber-200 cursor-default"
+                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30 shadow-lg"
+                )}
+              >
+                {rewardClaimed ? "Claimed" : "Claim"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* DETAILED ANALYSIS */}
+        <div className="space-y-3 animate-in slide-in-from-bottom-4 duration-700 delay-300">
+          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider pl-1">Detailed Analysis</h3>
+
+          {questions.map((q, qIdx) => {
+            const allSubQuestions = q.solutionSteps.flatMap(s => s.subQuestions);
+
+            const correctCount = allSubQuestions.filter(sq => {
+              const r = results[sq.id];
+              return r?.isCorrect === true && (sq.marks === 0 || (r.score && r.score > 0));
+            }).length;
+
+            const isFullyCorrect = correctCount === allSubQuestions.length;
+            const isPartiallyCorrect = correctCount > 0 && !isFullyCorrect;
+            const isAttempted = allSubQuestions.some(sq => results[sq.id] !== undefined);
+
+            return (
+              <Collapsible
+                key={q.id}
+                open={openQuestionId === q.id}
+                onOpenChange={(open) => setOpenQuestionId(open ? q.id : null)}
+                className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden"
+              >
+                <CollapsibleTrigger className="w-full flex items-center justify-between p-4 bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "h-8 w-8 rounded-full flex items-center justify-center shrink-0 border",
+                      !isAttempted ? "bg-slate-100 border-slate-200 text-slate-400" :
+                        isFullyCorrect ? "bg-emerald-100 border-emerald-200 text-emerald-600" :
+                          isPartiallyCorrect ? "bg-amber-100 border-amber-200 text-amber-600" :
+                            "bg-red-100 border-red-200 text-red-600"
+                    )}>
+                      {!isAttempted ? <span className="text-[10px] font-bold">NA</span> :
+                        isFullyCorrect ? <CheckCircle className="h-4 w-4" /> :
+                          isPartiallyCorrect ? <AlertCircle className="h-4 w-4" /> :
+                            <X className="h-4 w-4" />}
+                    </div>
+
+                    <div className="text-left">
+                      <p className="text-xs text-muted-foreground font-semibold">Question {qIdx + 1}</p>
+                      <div className="text-xs text-slate-700 dark:text-slate-300 line-clamp-1 max-w-[180px] font-medium">
+                        <span dangerouslySetInnerHTML={{ __html: processedMainQuestionText(q.mainQuestionText).substring(0, 50) + "..." }} />
+                      </div>
+                    </div>
+                  </div>
+                  {openQuestionId === q.id ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                </CollapsibleTrigger>
+
+                <CollapsibleContent className="bg-slate-50/50 dark:bg-slate-950/30 border-t border-slate-100 dark:border-slate-800">
+                  <div className="p-4 space-y-6">
+                    {q.solutionSteps.map((step, sIdx) => (
+                      <div key={sIdx} className="space-y-3">
+                        {(step as any).instructionText && (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-white">Step {sIdx + 1}</Badge>
+                            <span className="text-xs font-medium text-slate-600 dark:text-slate-400" dangerouslySetInnerHTML={{ __html: (step as any).instructionText }} />
+                          </div>
+                        )}
+
+                        <div className="space-y-3 pl-2 border-l-2 border-slate-200 dark:border-slate-800 ml-2">
+                          {step.subQuestions.map((subQ) => {
+                            const result = results[subQ.id];
+                            const rawUserAnswer = answers[subQ.id]?.answer;
+                            const userReadableAnswer = getUserAnswerText(subQ, rawUserAnswer);
+                            const correctReadableAnswer = getCorrectAnswerText(subQ);
+                            const userScore = result?.score || 0;
+                            const isCorrect = result?.isCorrect === true && (subQ.marks === 0 || userScore > 0);
+
+                            return (
+                              <div key={subQ.id} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-sm">
+                                <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed">
+                                  <span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} />
+                                </div>
+                                <div className="grid grid-cols-1 gap-2 bg-slate-50 dark:bg-slate-950 p-2 rounded border border-slate-100 dark:border-slate-800">
+                                  <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-200 dark:border-slate-700">
+                                    <div className={cn(
+                                      "flex items-center gap-1.5 text-xs font-bold",
+                                      isCorrect ? "text-emerald-600" : "text-red-500"
+                                    )}>
+                                      {isCorrect ? <CheckCircle className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                                      {isCorrect ? "Correct" : "Incorrect"}
+                                    </div>
+                                    <span className="text-[10px] font-mono text-slate-400">{userScore}/{subQ.marks} Marks</span>
+                                  </div>
+                                  <div className="mt-1">
+                                    <span className="text-[10px] uppercase text-slate-400 font-bold block mb-0.5">Your Answer</span>
+                                    <span className={cn(
+                                      "font-mono text-xs break-all",
+                                      isCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                                    )}>{userReadableAnswer}</span>
+                                  </div>
+                                  {!isCorrect && (
+                                    <div className="mt-1 pt-1">
+                                      <span className="text-[10px] uppercase text-emerald-600/70 font-bold block mb-0.5">Correct Answer</span>
+                                      <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400 break-all">{correctReadableAnswer}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md p-4 border-t border-slate-100 dark:border-slate-800 z-50">
+        <div className="flex gap-3 max-w-md mx-auto">
+          <Button variant="outline" className="flex-1" onClick={() => router.back()}>
+            <LayoutDashboard className="mr-2 h-4 w-4" /> Exit
+          </Button>
+          <Button className="flex-1" onClick={() => window.location.reload()}>
+            <RotateCcw className="mr-2 h-4 w-4" /> Retry
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // --- MAIN PAGE COMPONENT ---
 export default function SolveWorksheetPage() {
@@ -530,15 +500,14 @@ export default function SolveWorksheetPage() {
       setAttempt({ ...attemptData, id: attemptRef.id, attemptedAt: new Date() } as any);
     }
   }
-  
+
   const handleClaimReward = async () => {
-      // Logic to save reward claim to DB can go here
-      if(user && firestore && attempt) {
-          try {
-             await updateDoc(doc(firestore, 'worksheet_attempts', attempt.id), { rewardsClaimed: true });
-             toast({ title: "Rewards Claimed!", description: "Coins added to your profile." });
-          } catch(e) { console.error("Error claiming", e); }
-      }
+    if (user && firestore && attempt) {
+      try {
+        await updateDoc(doc(firestore, 'worksheet_attempts', attempt.id), { rewardsClaimed: true });
+        toast({ title: "Rewards Claimed!", description: "Coins added to your profile." });
+      } catch (e) { console.error("Error claiming", e); }
+    }
   };
 
   const handleAICheck = async (question: Question) => {
@@ -615,27 +584,22 @@ export default function SolveWorksheetPage() {
   const progressPercentage = ((currentQuestionIndex + 1) / orderedQuestions.length) * 100;
   const isLastQuestion = currentQuestionIndex === orderedQuestions.length - 1;
 
-  // --- RETURN LOGIC ---
   if (isFinished) {
-    // CORRECTED SCORE CALCULATION
     const earnedMarks = orderedQuestions.reduce((acc, q) => {
-        const qMarks = q.solutionSteps?.reduce((stepAcc, step) => {
-            return stepAcc + step.subQuestions.reduce((subAcc, sub) => {
-                const res = results[sub.id];
-                if (!res) return subAcc;
-                // If it has a specific score (AI), use it
-                if (typeof res.score === 'number') return subAcc + res.score;
-                // If standard boolean correct, add full marks
-                if (res.isCorrect) return subAcc + sub.marks;
-                return subAcc;
-            }, 0);
-        }, 0) || 0;
-        return acc + qMarks;
+      const qMarks = q.solutionSteps?.reduce((stepAcc, step) => {
+        return stepAcc + step.subQuestions.reduce((subAcc, sub) => {
+          const res = results[sub.id];
+          if (!res) return subAcc;
+          if (typeof res.score === 'number') return subAcc + res.score;
+          if (res.isCorrect) return subAcc + sub.marks;
+          return subAcc;
+        }, 0);
+      }, 0) || 0;
+      return acc + qMarks;
     }, 0);
 
     return (
       <>
-        {/* 📱 MOBILE VIEW */}
         <div className="block sm:hidden animate-in fade-in duration-500">
           <MobileResultView
             worksheet={worksheet}
@@ -648,8 +612,6 @@ export default function SolveWorksheetPage() {
             onClaimReward={handleClaimReward}
           />
         </div>
-
-        {/* 💻 DESKTOP VIEW */}
         <div className="hidden sm:block">
           <WorksheetResults
             worksheet={worksheet}
@@ -664,7 +626,6 @@ export default function SolveWorksheetPage() {
     );
   }
 
-  // --- START SCREEN (Shared/Responsive) ---
   if (!startTime) return (
     <div className="flex flex-col h-[100dvh] bg-slate-50/50 dark:bg-slate-950/50 items-center justify-center p-4">
       <Card className="w-full max-w-lg shadow-xl border-none">
@@ -707,7 +668,6 @@ export default function SolveWorksheetPage() {
 
   return (
     <>
-      {/* 📱 MOBILE VIEW: Full Screen Overlay */}
       <div className="block sm:hidden">
         <MobileQuestionRunner
           question={orderedQuestions[currentQuestionIndex]}
@@ -724,9 +684,7 @@ export default function SolveWorksheetPage() {
         />
       </div>
 
-      {/* 💻 DESKTOP VIEW: Existing Layout (Hidden on Mobile) */}
       <div className="hidden sm:flex flex-col h-screen bg-slate-50/30 dark:bg-slate-950/30">
-        {/* --- MODERN HEADER --- */}
         <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm shrink-0">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => router.back()}>
@@ -754,7 +712,6 @@ export default function SolveWorksheetPage() {
 
         <main className="flex-grow flex flex-col items-center p-4 sm:p-6 overflow-y-auto">
           <div className="w-full max-w-4xl space-y-6 pb-20">
-            {/* --- QUESTION CARD --- */}
             <Card className="border-none shadow-md overflow-hidden">
               <div className="h-1.5 bg-slate-100 dark:bg-slate-800 w-full">
                 <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }} />
@@ -788,7 +745,6 @@ export default function SolveWorksheetPage() {
               </CardContent>
             </Card>
 
-            {/* --- ANSWER SECTION --- */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {isAIGradingMode ? (
                 <Card className="border-none shadow-md">
@@ -863,7 +819,6 @@ export default function SolveWorksheetPage() {
           </div>
         </main>
 
-        {/* --- BOTTOM NAVIGATION BAR --- */}
         <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40">
           <div className="w-full max-w-4xl flex justify-between items-center gap-3 sm:gap-0">
             <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0} className="flex-1 sm:flex-none sm:w-32">
