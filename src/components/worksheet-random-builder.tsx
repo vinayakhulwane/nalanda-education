@@ -5,16 +5,17 @@ import type { Question, CurrencyType, Unit, Category, EconomySettings } from '@/
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { ShoppingCart, PlusCircle, Filter, Bot, Coins, Gem, Crown, Sparkles, Wand2, PieChart, Search, BrainCircuit, X } from 'lucide-react';
+import { ShoppingCart, PlusCircle, Filter, Bot, Coins, Gem, Crown, Sparkles, Wand2, PieChart, Search, BrainCircuit, X, Eye } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Checkbox } from './ui/checkbox';
-import { Sheet, SheetTrigger } from './ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from './ui/sheet';
 import { Input } from './ui/input';
 import { cn } from '@/lib/utils';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { useToast } from "@/components/ui/use-toast";
 import { WorksheetReviewSheet } from './worksheet-random-builder/review-sheet';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 type QuestionWithSource = Question & { source?: 'manual' | 'random' };
 
@@ -210,56 +211,54 @@ export function WorksheetRandomBuilder({
     return (
         <div className="space-y-6 pb-24 md:pb-0">
             {/* HEADER SECTION WITH FILTER */}
-            <div className="flex flex-col gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="bg-primary/10 p-3 rounded-xl shrink-0">
-                            <Wand2 className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">Random Generator</h3>
-                            <p className="text-sm text-muted-foreground">Automatically pick questions based on type.</p>
-                        </div>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="bg-primary/10 p-3 rounded-xl shrink-0">
+                        <Wand2 className="h-6 w-6 text-primary" />
                     </div>
-                    
-                    <div className="w-full md:w-auto">
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <Button variant="outline" className={cn("gap-2 w-full md:w-auto justify-between md:justify-center rounded-xl h-10 border-slate-200 dark:border-slate-800", activeFilterCount > 0 && "border-primary/50 text-primary bg-primary/5")}>
-                                    <span className="flex items-center gap-2">
-                                        <Filter className="h-4 w-4" />
-                                        Filter Pool
-                                    </span>
-                                    {activeFilterCount > 0 && <Badge variant="secondary" className="rounded-full px-1.5 h-5 min-w-[1.25rem] bg-slate-100 text-slate-700">{activeFilterCount}</Badge>}
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 md:h-full md:w-[400px] md:rounded-none md:side-right">
-                                <SheetHeader className="p-6 border-b">
-                                    <SheetTitle>Filter Questions</SheetTitle>
-                                    <SheetDescription>Refine the available question pool.</SheetDescription>
-                                </SheetHeader>
-                                {/* Filter content remains the same */}
-                            </SheetContent>
-                        </Sheet>
+                    <div>
+                        <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">Random Generator</h3>
+                        <p className="text-sm text-muted-foreground">Automatically pick questions based on type.</p>
                     </div>
                 </div>
+                
+                <div className="w-full md:w-auto">
+                    <Sheet>
+                        <SheetTrigger asChild>
+                            <Button variant="outline" className={cn("gap-2 w-full md:w-auto justify-between md:justify-center rounded-xl h-10 border-slate-200 dark:border-slate-800", activeFilterCount > 0 && "border-primary/50 text-primary bg-primary/5")}>
+                                <span className="flex items-center gap-2">
+                                    <Filter className="h-4 w-4" />
+                                    Filter Pool
+                                </span>
+                                {activeFilterCount > 0 && <Badge variant="secondary" className="rounded-full px-1.5 h-5 min-w-[1.25rem] bg-slate-100 text-slate-700">{activeFilterCount}</Badge>}
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0 md:h-full md:w-[400px] md:rounded-none md:side-right">
+                            <SheetHeader className="p-6 border-b">
+                                <SheetTitle>Filter Questions</SheetTitle>
+                                <SheetDescription>Refine the available question pool.</SheetDescription>
+                            </SheetHeader>
+                            {/* Filter content remains the same */}
+                        </SheetContent>
+                    </Sheet>
+                </div>
+            </div>
 
-                {/* AVAILABLE POOL BANNER */}
-                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl p-5 shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <PieChart className="h-32 w-32" />
+            {/* AVAILABLE POOL BANNER */}
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl p-5 shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <PieChart className="h-32 w-32" />
+                </div>
+                <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-1 text-indigo-100">
+                        <PieChart className="h-4 w-4" />
+                        <span className="font-medium text-sm">Available Pool</span>
                     </div>
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-1 text-indigo-100">
-                            <PieChart className="h-4 w-4" />
-                            <span className="font-medium text-sm">Available Pool</span>
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-4xl md:text-5xl font-extrabold tracking-tight">{filteredQuestions.length}</span>
-                            <span className="text-lg text-indigo-200">Questions</span>
-                        </div>
-                        <p className="text-xs text-indigo-200/80 mt-1">Matches your current filters</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl md:text-5xl font-extrabold tracking-tight">{filteredQuestions.length}</span>
+                        <span className="text-lg text-indigo-200">Questions</span>
                     </div>
+                    <p className="text-xs text-indigo-200/80 mt-1">Matches your current filters</p>
                 </div>
             </div>
 
