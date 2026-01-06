@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Question, WalletTransaction, ResultState, Worksheet, EconomySettings } from '@/types';
@@ -66,7 +67,7 @@ export function calculateWorksheetCost(
 
 /**
  * Calculates Rewards. 
- * ✅ UPDATED: Robust Number Conversion for Settings
+ * ✅ UPDATED: Robust Number Conversion for Settings & Corrected Multiplier Logic
  */
 export function calculateAttemptRewards(
     worksheet: Worksheet,
@@ -81,18 +82,15 @@ export function calculateAttemptRewards(
 
     const rewardTotals: Record<string, number> = { coin: 0, gold: 0, diamond: 0 };
 
-    // 1. Determine Multiplier
-    let multiplier = 0;
+    // 1. Determine Multiplier (✅ FIXED LOGIC)
+    let multiplier = 0; // Default to 0
     if (worksheet.worksheetType === 'practice') {
         multiplier = getSafeNumber(activeSettings.rewardPractice, 1.0);
     } else if (worksheet.worksheetType === 'classroom') {
         multiplier = getSafeNumber(activeSettings.rewardClassroom, 0.5);
-    } else if (worksheet.authorId === userId) {
-        multiplier = getSafeNumber(activeSettings.rewardPractice, 1.0);
-    } else if (worksheet.authorId !== userId) {
-        multiplier = getSafeNumber(activeSettings.rewardClassroom, 0.5);
     }
-  
+    
+    // Override for sample sheets
     if (worksheet.worksheetType === 'sample' || worksheet.title?.toLowerCase().includes('sample')) {
         multiplier = 0;
     }
@@ -120,6 +118,7 @@ export function calculateAttemptRewards(
                 if (Object.keys(breakdown).length > 0 && Object.keys(rubric).length > 0) {
                     Object.entries(rubric).forEach(([key, weight]) => {
                         const cleanKey = formatCriterionKey(key);
+                        // @ts-ignore
                         const scoreVal = breakdown[key] ?? breakdown[cleanKey] ?? 0;
                         const weightVal = typeof weight === 'string' ? parseFloat(weight) : (weight as number);
                         calculatedSum += (scoreVal / 100) * (weightVal / 100) * qTotalMarks;
@@ -127,7 +126,7 @@ export function calculateAttemptRewards(
                     obtainedMarksForQuestion += calculatedSum;
                 } else {
                     let val = Number(res.score || 0);
-                    if (val > qTotalMarks) {
+                    if (val > qTotalMarks && qTotalMarks > 0) { // Check for percentage score
                         val = (val / 100) * qTotalMarks;
                     }
                     obtainedMarksForQuestion += val;

@@ -44,6 +44,105 @@ function formatTime(seconds: number) {
 // --- HELPER: Process HTML ---
 const processedHtml = (html: string) => html ? html.replace(/&nbsp;/g, ' ') : '';
 
+// --- HELPER: UNIT CONVERSION LOGIC ---
+const SI_PREFIXES: Record<string, number> = {
+  'k': 1000,      // kilo
+  'm': 0.001,     // milli
+  'c': 0.01,      // centi
+  'M': 1000000,   // Mega
+  'G': 1000000000,// Giga
+  'u': 0.000001,  // micro (using 'u' for ease)
+  'µ': 0.000001,  // micro (symbol)
+  'n': 1e-9,      // nano
+};
+
+const parseQuantity = (input: string | number) => {
+  const str = String(input).trim().toLowerCase();
+  // Regex to separate number and unit (e.g., "100 kg" -> ["100", "kg"])
+  const match = str.match(/^([-+]?[0-9]*\.?[0-9]+)\s*([a-zµ]*)$/i);
+  
+  if (!match) return { value: parseFloat(str), unit: '' };
+  
+  return {
+    value: parseFloat(match[1]),
+    unit: match[2].toLowerCase()
+  };
+};
+
+// --- HELPER: Validate Answer Correctness ---
+const checkIsCorrect = (subQ: SubQuestionWithStepInfo, answer: any): boolean => {
+  // 1. If no answer, it's definitely wrong
+  if (answer === null || answer === undefined || answer === '') return false;
+  if (Array.isArray(answer) && answer.length === 0) return false;
+
+  // 2. Numerical Check (With Unit Conversion)
+  if (subQ.answerType === 'numerical') {
+    const correctVal = Number(subQ.numericalAnswer?.correctValue);
+    // @ts-ignore - Assuming baseUnit exists in your type, if not it falls back to empty
+    const baseUnit = (subQ.numericalAnswer?.baseUnit || '').toLowerCase().trim();
+    
+    // Parse User Answer
+    const userQ = parseQuantity(answer);
+    
+    if (isNaN(userQ.value)) return false;
+
+    // Tolerance for floating point math
+    const tolerance = 0.01; 
+
+    // CASE A: Exact Value Match (Ignoring unit text entirely if baseUnit is empty or match is direct)
+    // This handles "300n" vs 300 if we just strip the 'n'
+    if (Math.abs(userQ.value - correctVal) < tolerance && (!userQ.unit || userQ.unit === baseUnit)) {
+      return true;
+    }
+
+    // CASE B: Unit Conversion (e.g. 1 kN vs 1000 N)
+    if (baseUnit && userQ.unit) {
+      // Check if user unit is just the base unit (e.g. 'n' == 'n')
+      if (userQ.unit === baseUnit) {
+         return Math.abs(userQ.value - correctVal) < tolerance;
+      }
+
+      // Check for Prefix
+      // Example: User="kn", Base="n". Prefix="k".
+      if (userQ.unit.endsWith(baseUnit)) {
+        const prefix = userQ.unit.slice(0, -baseUnit.length);
+        const multiplier = SI_PREFIXES[prefix];
+        
+        if (multiplier) {
+          const convertedValue = userQ.value * multiplier;
+          return Math.abs(convertedValue - correctVal) < tolerance;
+        }
+      }
+    }
+    
+    // Final Fallback: just check the number value regardless of text attached
+    // This solves your specific "300n" vs "300" issue immediately
+    return Math.abs(userQ.value - correctVal) < tolerance;
+  }
+
+  // 3. MCQ Check
+  if (subQ.answerType === 'mcq') {
+    const correctIds = subQ.mcqAnswer?.correctOptions || [];
+
+    if (subQ.mcqAnswer?.isMultiCorrect) {
+      if (!Array.isArray(answer)) return false;
+      if (answer.length !== correctIds.length) return false;
+      return answer.every((ansId: any) => correctIds.some(cId => String(cId) === String(ansId)));
+    } else {
+      return correctIds.some(cId => String(cId) === String(answer));
+    }
+  }
+
+  // 4. Text Check
+  if (subQ.answerType === 'text') {
+    const keywords = subQ.textAnswerKeywords || [];
+    if (keywords.length === 0) return true; 
+    return keywords.some(k => String(answer).toLowerCase().includes(k.toLowerCase()));
+  }
+
+  return false;
+};
+
 export function MobileQuestionRunner({
   question,
   currentIndex,
@@ -116,18 +215,18 @@ export function MobileQuestionRunner({
     const activeSubQuestion = subQuestions[activeSubIndex];
     if (!activeSubQuestion) return;
 
-    // 1. Submit the current answer (even if empty)
-    onAnswerSubmit(activeSubQuestion.id, currentAnswer);
-    onResultCalculated(activeSubQuestion.id, true);
+    // 1. CALCULATE CORRECTNESS LOCALLY (Using new smart check)
+    const isCorrect = checkIsCorrect(activeSubQuestion, currentAnswer);
 
-    // 2. Logic: Move to next step OR Finish OR Next Question
+    // 2. Submit Answer & Result
+    onAnswerSubmit(activeSubQuestion.id, currentAnswer);
+    onResultCalculated(activeSubQuestion.id, isCorrect);
+
+    // 3. Navigation Logic
     if (activeSubIndex < subQuestions.length - 1) {
-      // Still steps remaining in THIS question
       setActiveSubIndex(prev => prev + 1);
     } else {
-      // Last step of this question
       if (isLastQuestion) {
-        // IMPORTANT: Call finish directly
         onFinish();
       } else {
         onNext();
@@ -147,7 +246,6 @@ export function MobileQuestionRunner({
 
     if (subQ.answerType === 'mcq') {
       const options = subQ.mcqAnswer?.options || [];
-      // Handle array or comma-separated string for multi-select
       if (Array.isArray(answer)) {
         displayAnswer = options
           .filter((o: any) => answer.includes(o.id))
@@ -158,7 +256,6 @@ export function MobileQuestionRunner({
           .filter((o: any) => ids.includes(o.id))
           .map((o: any) => o.text).join(', ');
       } else {
-        // String conversion for safe matching
         const opt = options.find((o: any) => String(o.id) === String(answer));
         displayAnswer = opt ? opt.text : answer;
       }
@@ -182,7 +279,7 @@ export function MobileQuestionRunner({
   const currentStepStartIndex = subQuestions.findIndex(sq => sq.stepId === activeSubQuestion?.stepId);
   const indexInStep = activeSubIndex - currentStepStartIndex;
 
-  // Check if user has entered anything (used for styling only, not validation)
+  // Check if user has entered anything (used for styling only)
   const hasInput = currentAnswer !== null && currentAnswer !== '' &&
     !(Array.isArray(currentAnswer) && currentAnswer.length === 0);
 
@@ -288,7 +385,6 @@ export function MobileQuestionRunner({
                       {activeSubQuestion.mcqAnswer?.options.map((opt: any) => {
                         const isMulti = activeSubQuestion.mcqAnswer?.isMultiCorrect;
                         let isSelected = false;
-                        // Loose comparison String(a) == String(b) to fix ID mismatch
                         if (isMulti) {
                           isSelected = Array.isArray(currentAnswer) && currentAnswer.some((val: any) => String(val) === String(opt.id));
                         } else {
@@ -306,7 +402,6 @@ export function MobileQuestionRunner({
                                   : [...curr, opt.id];
                                 setCurrentAnswer(newVal);
                               } else {
-                                // Toggle: Unselect if clicked again, else select
                                 setCurrentAnswer(isSelected ? null : opt.id);
                               }
                             }}
@@ -357,15 +452,13 @@ export function MobileQuestionRunner({
                     : "bg-slate-200 hover:bg-slate-300 text-slate-500 shadow-none" // Gray for Skip
                 )}
                 onClick={handleNextStep}
-                disabled={false} // ALWAYS ENABLED TO ALLOW SKIPPING
+                disabled={false}
               >
                 <span>
-                  {/* Dynamic Text: Skip vs Next */}
                   {!hasInput ? (activeSubIndex < subQuestions.length - 1 ? "Skip Step" : "Skip Question") :
                     (activeSubIndex < subQuestions.length - 1 ? "Next Step" : isLastQuestion ? "Finish Workbook" : "Next Question")}
                 </span>
 
-                {/* Dynamic Icon */}
                 {activeSubIndex < subQuestions.length - 1 ? (
                   hasInput ? <ArrowRight className="ml-2 h-6 w-6 opacity-80" /> : <SkipForward className="ml-2 h-6 w-6 opacity-80" />
                 ) : isLastQuestion ? (

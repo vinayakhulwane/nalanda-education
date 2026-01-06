@@ -1,11 +1,11 @@
 'use client';
 
 import ReactMarkdown from 'react-markdown';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDoc, serverTimestamp, getDocs, limit, orderBy } from 'firebase/firestore';
-import type { Worksheet, Question, WorksheetAttempt, ResultState } from '@/types';
+import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDoc, serverTimestamp, getDocs, limit, orderBy, increment } from 'firebase/firestore';
+import type { Worksheet, Question, WorksheetAttempt, ResultState, EconomySettings, CurrencyType, SubQuestion } from '@/types';
 import {
   Loader2,
   ArrowLeft,
@@ -23,7 +23,10 @@ import {
   Trophy,
   Coins,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Crown,
+  Gem,
+  BrainCircuit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QuestionRunner } from '@/components/question-runner';
@@ -35,6 +38,33 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { calculateAttemptRewards } from "@/lib/wallet"; // Import Wallet Logic
+import confetti from "canvas-confetti"; // Import Confetti
+
+// --- CONSTANTS FOR CURRENCY ---
+const currencyIcons: Record<string, React.ElementType> = {
+  coin: Coins,
+  gold: Crown,
+  diamond: Gem,
+  spark: Sparkles,
+  aiCredits: BrainCircuit,
+};
+
+const currencyColors: Record<string, string> = {
+  spark: 'text-slate-500',
+  coin: 'text-yellow-600 dark:text-yellow-400',
+  gold: 'text-amber-600 dark:text-amber-400',
+  diamond: 'text-blue-600 dark:text-blue-400',
+  aiCredits: 'text-indigo-600 dark:text-indigo-400',
+};
+
+const currencyBg: Record<string, string> = {
+  coin: 'bg-yellow-100 dark:bg-yellow-900/30',
+  gold: 'bg-amber-100 dark:bg-amber-900/30',
+  diamond: 'bg-blue-100 dark:bg-blue-900/30',
+  spark: 'bg-slate-100 dark:bg-slate-800',
+  aiCredits: 'bg-indigo-100 dark:bg-indigo-900/30',
+};
 
 // Helper Formatters
 function formatTime(seconds: number) {
@@ -110,53 +140,70 @@ const AIRubricBreakdown = ({ rubric, breakdown, maxMarks = 8 }: { rubric: Record
   );
 };
 
-// --- HELPER: Get Readable User Answer (FIXED FOR UUID STRINGS) ---
+// --- HELPER: Get Readable User Answer (Strict String Return) ---
 const getUserAnswerText = (subQ: any, answerVal: any): string => {
-  if (answerVal === undefined || answerVal === null) return "Not Attempted";
+  if (answerVal === null || answerVal === undefined || answerVal === '') return 'Not Attempted';
 
-  // 1. Handle comma-separated strings (e.g., "uuid1,uuid2") from DB
-  if (typeof answerVal === 'string' && answerVal.includes(',')) {
-    // Split by comma, trim spaces, and process each ID recursively
-    return answerVal.split(',').map(val => getUserAnswerText(subQ, val.trim())).join(", ");
+  // 1. Handle Numerical / Text types directly
+  if (subQ.answerType === 'numerical' || subQ.answerType === 'text') {
+    return String(answerVal);
   }
 
-  // 2. Handle Arrays (Multi-select questions in memory)
-  if (Array.isArray(answerVal)) {
-    return answerVal.map((val) => getUserAnswerText(subQ, val)).join(", ");
-  }
+  // 2. Handle MCQ
+  const options = subQ.mcqAnswer?.options || subQ.options;
 
-  // 3. If question has options (MCQ), try to find the text for this Answer ID
-  if (subQ.options && Array.isArray(subQ.options)) {
-    // Try finding by ID (e.g. UUID match)
-    const matchedOption = subQ.options.find((opt: any) => opt.id === answerVal);
-    if (matchedOption) return matchedOption.text || matchedOption.label || String(answerVal);
+  if (subQ.answerType === 'mcq' && Array.isArray(options)) {
+    // Create map for easy lookup
+    const optionMap = new Map(options.map((o: any) => [String(o.id), o.text ? String(o.text) : String(o.id)]));
 
-    // Try finding by Index (if answer is 0, 1, 2...)
-    if (typeof answerVal === 'number' && subQ.options[answerVal]) {
-      const opt = subQ.options[answerVal];
-      return typeof opt === 'string' ? opt : opt.text;
+    // Handle Arrays (Multi-Select)
+    if (Array.isArray(answerVal)) {
+      if (answerVal.length === 0) return 'Not Answered';
+      return answerVal.map((id: any) => optionMap.get(String(id)) || String(id)).join(', ');
     }
+
+    // Handle Comma-Separated Strings
+    if (typeof answerVal === 'string' && answerVal.includes(',')) {
+      return answerVal.split(',').map((id) => {
+        const trimmed = id.trim();
+        return optionMap.get(trimmed) || trimmed;
+      }).join(', ');
+    }
+
+    // Single Value
+    return optionMap.get(String(answerVal)) || String(answerVal);
   }
 
-  // 4. Fallback for text inputs or unmatched IDs
   return String(answerVal);
 };
 
 // --- HELPER: Get Readable Correct Answer ---
-const getCorrectAnswerText = (subQ: any) => {
-  if (subQ.correctAnswerText) return subQ.correctAnswerText;
+const getCorrectAnswerText = (subQ: any): string => {
+  switch (subQ.answerType) {
+    case 'numerical':
+      const numAns = subQ.numericalAnswer || {};
+      const { correctValue, baseUnit } = numAns;
+      if (!baseUnit || baseUnit.toLowerCase() === 'unitless') return `${correctValue ?? 'N/A'}`;
+      return `${correctValue ?? 'N/A'}${baseUnit ? ` ${baseUnit}` : ''}`;
 
-  if (subQ.options && Array.isArray(subQ.options)) {
-    if (subQ.correctOption !== undefined && subQ.options[subQ.correctOption]) {
-      const opt = subQ.options[subQ.correctOption];
-      return typeof opt === 'string' ? opt : opt.text;
-    }
-    if (subQ.correctAnswer) {
-      const matched = subQ.options.find((o: any) => o.id === subQ.correctAnswer);
-      if (matched) return matched.text;
-    }
+    case 'text':
+      return subQ.textAnswerKeywords?.join(', ') || 'N/A';
+
+    case 'mcq':
+      const options = subQ.mcqAnswer?.options || subQ.options || [];
+      const correctOptions = subQ.mcqAnswer?.correctOptions || (subQ.correctAnswer ? [subQ.correctAnswer] : []);
+      
+      if (Array.isArray(options) && options.length > 0) {
+         const texts = options
+            .filter((opt: any) => correctOptions.includes(opt.id) || String(opt.id) === String(subQ.correctAnswer))
+            .map((opt: any) => opt.text ? String(opt.text) : String(opt.id));
+            
+         if (texts.length > 0) return texts.join(', ');
+      }
+      return 'See Solution';
+
+    default: return 'N/A';
   }
-  return subQ.correctAnswer || "See Solution";
 };
 
 // --- MOBILE RESULT COMPONENT ---
@@ -168,7 +215,10 @@ const MobileResultView = ({
   timeTaken,
   totalMarks,
   maxMarks,
-  onClaimReward
+  onClaimReward,
+  calculatedRewards,
+  isClaiming,
+  hasClaimed
 }: {
   worksheet: Worksheet,
   results: ResultState,
@@ -177,19 +227,16 @@ const MobileResultView = ({
   timeTaken: number,
   totalMarks: number,
   maxMarks: number,
-  onClaimReward: () => void
+  onClaimReward: () => void,
+  calculatedRewards: Record<string, number>,
+  isClaiming: boolean,
+  hasClaimed: boolean
 }) => {
   const router = useRouter();
   const percentage = maxMarks > 0 ? Math.round((totalMarks / maxMarks) * 100) : 0;
-  const [rewardClaimed, setRewardClaimed] = useState(false);
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
 
-  const handleClaim = () => {
-    setRewardClaimed(true);
-    onClaimReward();
-  };
-
-  const coinsEarned = Math.round(percentage * 0.5);
+  const hasRewards = calculatedRewards && Object.keys(calculatedRewards).length > 0 && Object.values(calculatedRewards).some(v => v > 0);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-24">
@@ -231,31 +278,49 @@ const MobileResultView = ({
       </div>
 
       <div className="p-4 space-y-6">
-        {/* REWARD CARD */}
+        {/* REWARD CARD (DYNAMIC) */}
         <div className="animate-in slide-in-from-bottom-4 duration-700 delay-150">
           <Card className="border-none shadow-md bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 overflow-hidden relative">
             <div className="absolute right-0 top-0 opacity-10 pointer-events-none">
               <Trophy className="h-32 w-32 -mr-8 -mt-8 rotate-12" />
             </div>
-            <CardContent className="p-5 flex items-center justify-between relative z-10">
+            <CardContent className="p-5 flex flex-col gap-4 relative z-10">
               <div>
-                <p className="text-amber-800 dark:text-amber-200 font-bold text-sm uppercase tracking-wide">Rewards Earned</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Coins className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                  <span className="text-3xl font-black text-amber-900 dark:text-amber-100">{coinsEarned}</span>
+                <p className="text-amber-800 dark:text-amber-200 font-bold text-sm uppercase tracking-wide mb-2">Rewards Earned</p>
+                <div className="flex flex-wrap gap-2">
+                  {hasRewards ? (
+                    Object.entries(calculatedRewards).map(([currency, amount]) => {
+                      if (!amount || amount === 0) return null;
+                      const Icon = currencyIcons[currency] || Coins;
+                      const colorClass = currencyColors[currency] || 'text-slate-600';
+                      const bgClass = currencyBg[currency] || 'bg-white/50';
+                      
+                      return (
+                        <div key={currency} className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-200/50 shadow-sm", bgClass)}>
+                          <Icon className={cn("h-5 w-5", colorClass)} />
+                          <span className={cn("font-black text-xl", colorClass)}>{amount}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-amber-900/50 font-medium text-sm italic">No rewards this time.</div>
+                  )}
                 </div>
               </div>
+              
               <Button
-                onClick={handleClaim}
-                disabled={rewardClaimed}
+                onClick={onClaimReward}
+                disabled={isClaiming || hasClaimed || !hasRewards}
                 className={cn(
-                  "rounded-full font-bold shadow-sm transition-all",
-                  rewardClaimed
-                    ? "bg-amber-200 text-amber-800 hover:bg-amber-200 cursor-default"
-                    : "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/30 shadow-lg"
+                  "w-full rounded-full font-bold shadow-sm transition-all h-12 text-base",
+                  hasClaimed
+                    ? "bg-amber-200 text-amber-800 hover:bg-amber-200 cursor-default opacity-80"
+                    : "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-amber-500/30 shadow-lg"
                 )}
               >
-                {rewardClaimed ? "Claimed" : "Claim"}
+                {isClaiming ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Claiming...</> : 
+                 hasClaimed ? <><CheckCircle className="mr-2 h-5 w-5" /> Claimed</> : 
+                 "Claim Rewards"}
               </Button>
             </CardContent>
           </Card>
@@ -270,7 +335,7 @@ const MobileResultView = ({
 
             const correctCount = allSubQuestions.filter(sq => {
               const r = results[sq.id];
-              return r?.isCorrect === true && (sq.marks === 0 || (r.score && r.score > 0));
+              return r?.isCorrect === true;
             }).length;
 
             const isFullyCorrect = correctCount === allSubQuestions.length;
@@ -327,14 +392,14 @@ const MobileResultView = ({
                             const userReadableAnswer = getUserAnswerText(subQ, rawUserAnswer);
                             const correctReadableAnswer = getCorrectAnswerText(subQ);
                             const userScore = result?.score || 0;
-                            const isCorrect = result?.isCorrect === true && (subQ.marks === 0 || userScore > 0);
+                            const isCorrect = result?.isCorrect === true;
 
                             return (
                               <div key={subQ.id} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-sm">
                                 <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed">
                                   <span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} />
                                 </div>
-                                <div className="grid grid-cols-1 gap-2 bg-slate-50 dark:bg-slate-950 p-2 rounded border border-slate-100 dark:border-slate-800">
+                                <div className="grid grid-cols-1 gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-800">
                                   <div className="flex justify-between items-center pb-2 border-b border-dashed border-slate-200 dark:border-slate-700">
                                     <div className={cn(
                                       "flex items-center gap-1.5 text-xs font-bold",
@@ -345,17 +410,23 @@ const MobileResultView = ({
                                     </div>
                                     <span className="text-[10px] font-mono text-slate-400">{userScore}/{subQ.marks} Marks</span>
                                   </div>
+                                  
+                                  {/* User Answer */}
                                   <div className="mt-1">
                                     <span className="text-[10px] uppercase text-slate-400 font-bold block mb-0.5">Your Answer</span>
-                                    <span className={cn(
-                                      "font-mono text-xs break-all",
+                                    <div className={cn(
+                                      "text-xs whitespace-pre-wrap break-words font-medium",
                                       isCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
-                                    )}>{userReadableAnswer}</span>
+                                    )}>{userReadableAnswer}</div>
                                   </div>
+
+                                  {/* Correct Answer */}
                                   {!isCorrect && (
                                     <div className="mt-1 pt-1">
                                       <span className="text-[10px] uppercase text-emerald-600/70 font-bold block mb-0.5">Correct Answer</span>
-                                      <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400 break-all">{correctReadableAnswer}</span>
+                                      <div className="text-xs text-emerald-700 dark:text-emerald-400 whitespace-pre-wrap break-words font-medium">
+                                        {correctReadableAnswer}
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -373,7 +444,7 @@ const MobileResultView = ({
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md p-4 border-t border-slate-100 dark:border-slate-800 z-50">
+      <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40">
         <div className="flex gap-3 max-w-md mx-auto">
           <Button variant="outline" className="flex-1" onClick={() => router.back()}>
             <LayoutDashboard className="mr-2 h-4 w-4" /> Exit
@@ -406,9 +477,17 @@ export default function SolveWorksheetPage() {
   const [aiImages, setAiImages] = useState<Record<string, File | null>>({});
   const [isAiGrading, setIsAiGrading] = useState(false);
 
+  // New State for Reward Logic
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [hasClaimed, setHasClaimed] = useState(false);
+
   // Firestore Refs
   const worksheetRef = useMemoFirebase(() => (firestore && worksheetId ? doc(firestore, 'worksheets', worksheetId) : null), [firestore, worksheetId]);
   const { data: worksheet, isLoading: isWorksheetLoading } = useDoc<Worksheet>(worksheetRef);
+
+  // Fetch Economy Settings for Rewards
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'economy') : null, [firestore]);
+  const { data: settings } = useDoc<EconomySettings>(settingsRef);
 
   const questionsQuery = useMemoFirebase(() => {
     if (!firestore || !worksheet?.questions || worksheet.questions.length === 0) return null;
@@ -429,6 +508,7 @@ export default function SolveWorksheetPage() {
             setResults(lastAttempt.results);
             setTimeTaken(lastAttempt.timeTaken);
             setAttempt(lastAttempt);
+            setHasClaimed(lastAttempt.rewardsClaimed || false);
             setIsFinished(true);
           }
         } catch (error) { console.error("Error fetching past attempt:", error); }
@@ -464,6 +544,12 @@ export default function SolveWorksheetPage() {
 
     return { totalMarks: marks, totalDuration: duration };
   }, [orderedQuestions]);
+
+  // CALCULATE REWARDS (Exact Mirror of Desktop Logic)
+  const calculatedRewards = useMemo(() => {
+    if (!worksheet || !questions || !results || !user?.uid) return {};
+    return calculateAttemptRewards(worksheet, questions, results, user.uid, settings ?? undefined);
+  }, [worksheet, questions, results, user?.uid, settings]);
 
   const [timeLeft, setTimeLeft] = useState(totalDuration);
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -501,12 +587,51 @@ export default function SolveWorksheetPage() {
     }
   }
 
+  // --- CLAIM REWARDS FUNCTION (Mirrors Desktop Logic) ---
   const handleClaimReward = async () => {
-    if (user && firestore && attempt) {
-      try {
-        await updateDoc(doc(firestore, 'worksheet_attempts', attempt.id), { rewardsClaimed: true });
-        toast({ title: "Rewards Claimed!", description: "Coins added to your profile." });
-      } catch (e) { console.error("Error claiming", e); }
+    if (!user || !firestore || hasClaimed || isClaiming || !attempt?.id || !calculatedRewards) return;
+    
+    setIsClaiming(true);
+    const userRef = doc(firestore, 'users', user.uid);
+    const attemptRef = doc(firestore, 'worksheet_attempts', attempt.id);
+    const transactionsColRef = collection(firestore, 'transactions');
+    const transactionPromises: Promise<any>[] = [];
+
+    try {
+      const updatePayload: Record<string, any> = {};
+      
+      for (const key in calculatedRewards) {
+        const currency = key as CurrencyType;
+        const amount = calculatedRewards[key as keyof typeof calculatedRewards];
+        
+        if (amount && amount > 0) {
+          const fieldMap: Record<string, string> = { coin: 'coins', gold: 'gold', diamond: 'diamonds' };
+          if (fieldMap[currency]) updatePayload[fieldMap[currency]] = increment(amount);
+          
+          transactionPromises.push(addDoc(transactionsColRef, {
+            userId: user.uid, 
+            type: 'earned', 
+            description: `Reward from worksheet: ${worksheet?.title}`,
+            amount: amount, 
+            currency: currency, 
+            createdAt: serverTimestamp()
+          }));
+        }
+      }
+
+      if (Object.keys(updatePayload).length > 0) await updateDoc(userRef, updatePayload);
+      await updateDoc(attemptRef, { rewardsClaimed: true });
+      await Promise.all(transactionPromises);
+      
+      confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });
+      toast({ title: "Rewards Claimed!", description: "Your wallet has been updated." });
+      setHasClaimed(true);
+
+    } catch (error) {
+      console.error("Error claiming rewards:", error);
+      toast({ variant: "destructive", title: "Claim Failed", description: "Could not update your wallet." });
+    } finally {
+      setIsClaiming(false);
     }
   };
 
@@ -584,13 +709,17 @@ export default function SolveWorksheetPage() {
   const progressPercentage = ((currentQuestionIndex + 1) / orderedQuestions.length) * 100;
   const isLastQuestion = currentQuestionIndex === orderedQuestions.length - 1;
 
+  // --- RETURN LOGIC ---
   if (isFinished) {
+    // CORRECTED SCORE CALCULATION
     const earnedMarks = orderedQuestions.reduce((acc, q) => {
       const qMarks = q.solutionSteps?.reduce((stepAcc, step) => {
         return stepAcc + step.subQuestions.reduce((subAcc, sub) => {
           const res = results[sub.id];
           if (!res) return subAcc;
+          // If it has a specific score (AI), use it
           if (typeof res.score === 'number') return subAcc + res.score;
+          // If standard boolean correct, add full marks
           if (res.isCorrect) return subAcc + sub.marks;
           return subAcc;
         }, 0);
@@ -600,6 +729,7 @@ export default function SolveWorksheetPage() {
 
     return (
       <>
+        {/* 📱 MOBILE VIEW */}
         <div className="block sm:hidden animate-in fade-in duration-500">
           <MobileResultView
             worksheet={worksheet}
@@ -610,8 +740,13 @@ export default function SolveWorksheetPage() {
             totalMarks={earnedMarks}
             maxMarks={totalMarks}
             onClaimReward={handleClaimReward}
+            calculatedRewards={calculatedRewards}
+            isClaiming={isClaiming}
+            hasClaimed={hasClaimed}
           />
         </div>
+
+        {/* 💻 DESKTOP VIEW */}
         <div className="hidden sm:block">
           <WorksheetResults
             worksheet={worksheet}
@@ -626,6 +761,7 @@ export default function SolveWorksheetPage() {
     );
   }
 
+  // --- START SCREEN (Shared/Responsive) ---
   if (!startTime) return (
     <div className="flex flex-col h-[100dvh] bg-slate-50/50 dark:bg-slate-950/50 items-center justify-center p-4">
       <Card className="w-full max-w-lg shadow-xl border-none">
@@ -668,6 +804,7 @@ export default function SolveWorksheetPage() {
 
   return (
     <>
+      {/* 📱 MOBILE VIEW: Full Screen Overlay */}
       <div className="block sm:hidden">
         <MobileQuestionRunner
           question={orderedQuestions[currentQuestionIndex]}
@@ -684,7 +821,9 @@ export default function SolveWorksheetPage() {
         />
       </div>
 
+      {/* 💻 DESKTOP VIEW: Existing Layout (Hidden on Mobile) */}
       <div className="hidden sm:flex flex-col h-screen bg-slate-50/30 dark:bg-slate-950/30">
+        {/* --- MODERN HEADER --- */}
         <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm shrink-0">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => router.back()}>
@@ -712,6 +851,7 @@ export default function SolveWorksheetPage() {
 
         <main className="flex-grow flex flex-col items-center p-4 sm:p-6 overflow-y-auto">
           <div className="w-full max-w-4xl space-y-6 pb-20">
+            {/* --- QUESTION CARD --- */}
             <Card className="border-none shadow-md overflow-hidden">
               <div className="h-1.5 bg-slate-100 dark:bg-slate-800 w-full">
                 <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }} />
@@ -745,6 +885,7 @@ export default function SolveWorksheetPage() {
               </CardContent>
             </Card>
 
+            {/* --- ANSWER SECTION --- */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {isAIGradingMode ? (
                 <Card className="border-none shadow-md">
@@ -819,6 +960,7 @@ export default function SolveWorksheetPage() {
           </div>
         </main>
 
+        {/* --- BOTTOM NAVIGATION BAR --- */}
         <div className="fixed bottom-0 left-0 right-0 p-3 sm:p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t flex justify-center z-40">
           <div className="w-full max-w-4xl flex justify-between items-center gap-3 sm:gap-0">
             <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0} className="flex-1 sm:flex-none sm:w-32">
