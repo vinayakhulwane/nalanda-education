@@ -177,14 +177,14 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
   };
 
   // --- RENDER HELPERS ---
-
-  // 1. DESKTOP INPUT RENDERER (Classic)
-  const renderAnswerInputDesktop = (subQ: SubQuestion, isSubmitted: boolean) => {
+// 1. DESKTOP INPUT RENDERER (Classic)
+const renderAnswerInputDesktop = (subQ: SubQuestion, isSubmitted: boolean) => {
     const valueToDisplay = isSubmitted ? answers[subQ.id]?.answer : currentAnswer;
 
     switch (subQ.answerType) {
       case 'numerical':
-        return <Input type="number" inputMode="decimal" value={valueToDisplay ?? ''} onChange={(e) => setCurrentAnswer(e.target.value)} disabled={isSubmitted} className="w-full sm:w-1/2" />;
+        // FIX: Changed type="number" to type="text" to allow units (e.g., "50 kg")
+        return <Input type="text" value={valueToDisplay ?? ''} onChange={(e) => setCurrentAnswer(e.target.value)} disabled={isSubmitted} className="w-full sm:w-1/2" />;
       case 'text':
         return <Input type="text" value={valueToDisplay ?? ''} onChange={(e) => setCurrentAnswer(e.target.value)} disabled={isSubmitted} className="w-full sm:w-1/2" />;
       case 'mcq':
@@ -212,8 +212,7 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
         );
       default: return null;
     }
-  };
-
+  }
   
   const processedMainQuestionText = useMemo(() => {
     if (!question?.mainQuestionText) return '';
