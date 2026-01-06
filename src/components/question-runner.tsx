@@ -8,11 +8,12 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Separator } from './ui/separator';
 import { CompletedSubQuestionSummary } from './question-runner/completed-summary';
 import './question-runner/runner.css';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { cn } from '@/lib/utils'; // Ensure you have this helper or use a class string
 
 type AnswerState = {
   [subQuestionId: string]: {
@@ -32,7 +33,7 @@ type SubQuestionWithStep = SubQuestion & {
     stepObjective: string;
 }
 
-// --- Unit Conversion Utilities ---
+// --- Unit Conversion Utilities (Keep existing logic) ---
 const unitPrefixes: Record<string, number> = {
     'g': 1e9, 'm': 1e6, 'k': 1e3,
     'd': 1e-1, 'c': 1e-2, 'µ': 1e-6, 'u': 1e-6, 'n': 1e-9,
@@ -40,57 +41,30 @@ const unitPrefixes: Record<string, number> = {
 
 function parseUnitAndValue(input: string): { value: number, unit: string } | null {
     if (!input || typeof input !== 'string') return null;
-    
-    // Normalize input: trim whitespace
     const trimmedInput = input.trim();
-    
-    // Regex to separate the initial number from the rest of the string (the unit)
     const match = trimmedInput.match(/^(-?[\d.eE+-]+)\s*(.*)$/);
     if (!match) return null;
-    
     const value = parseFloat(match[1]);
     const unit = match[2]?.trim() || '';
-    
     if(isNaN(value)) return null;
-    
     return { value, unit };
 }
 
 function convertToBase(value: number, unit: string, baseUnit: string): number {
-    // 1. Normalize inputs: trim, lowercase, and map % to "percent"
     let nUnit = unit.toLowerCase().trim();
     let nBase = baseUnit.toLowerCase().trim();
-    
     if (nUnit === '%') nUnit = 'percent';
     if (nBase === '%') nBase = 'percent';
-    
-    // 2. "The Same" Rule: Allow empty units for 'unitless' OR 'percent'
-    // This allows a student to just type "50" instead of "50%" or "50 percent"
-    if (nUnit === '' && (nBase === '' || nBase === 'unitless' || nBase === 'percent')) {
-        return value;
-    }
-    
-    // 3. Direct Match (handles percent === percent or N === N)
+    if (nUnit === '' && (nBase === '' || nBase === 'unitless' || nBase === 'percent')) return value;
     if (nUnit === nBase) return value;
-    
-    // 4. Prefix Logic (e.g., kN to N)
-    // Ensure we don't try to prefix match empty strings or percentages
     if (nBase !== '' && nBase !== 'percent' && nUnit.endsWith(nBase)) {
       const prefix = nUnit.replace(nBase, '');
-      if (prefix && unitPrefixes[prefix]) {
-        return value * unitPrefixes[prefix];
-      }
+      if (prefix && unitPrefixes[prefix]) return value * unitPrefixes[prefix];
     }
-    
-    
-    // If we have a base unit like 'kN' and student provides 'N'
     if (nUnit !== '' && nBase.endsWith(nUnit)) {
        const prefix = nBase.replace(nUnit, '');
-       if (prefix && unitPrefixes[prefix]) {
-          return value / unitPrefixes[prefix];
-       }
+       if (prefix && unitPrefixes[prefix]) return value / unitPrefixes[prefix];
     }
-    
     return NaN;
 }
 
@@ -119,8 +93,6 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
   }, [question.solutionSteps]);
 
   useEffect(() => {
-    // When the question changes (i.e., we move to the next question in the worksheet),
-    // reset the state for this runner instance.
     setHasStarted(false);
     setAnswers({});
     setCurrentSubQuestionIndex(0);
@@ -131,7 +103,6 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
     const stepIds = new Set(question.solutionSteps.map(s => s.id));
     return Array.from(stepIds);
   }, [question.solutionSteps]);
-
 
   const completedQuestionsByStep = useMemo(() => {
     const completed = allSubQuestions.slice(0, currentSubQuestionIndex);
@@ -148,13 +119,11 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
     }, {} as Record<string, { title: string, objective: string, subQuestions: SubQuestionWithStep[] }>);
   }, [allSubQuestions, currentSubQuestionIndex]);
 
-
   const isFinished = currentSubQuestionIndex >= allSubQuestions.length;
 
   const handleStart = () => {
     setHasStarted(true);
   };
-
 
   const calculateResult = (subQ: SubQuestion, studentAnswer: any) => {
       let isCorrect = false;
@@ -162,18 +131,9 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
           case 'numerical':
               const parsed = parseUnitAndValue(studentAnswer);
               const { baseUnit, correctValue, toleranceValue } = subQ.numericalAnswer || {};
-              
               if (parsed && correctValue !== undefined) {
-                  // Tolerance is often a percentage (e.g., 1%)
                   const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
-                  
-                  // Pass the raw baseUnit to our new convertToBase
-                  const studentValueInBase = convertToBase(
-                      parsed.value, 
-                      parsed.unit, 
-                      baseUnit || 'unitless'
-                  );
-                  
+                  const studentValueInBase = convertToBase(parsed.value, parsed.unit, baseUnit || 'unitless');
                   if (!isNaN(studentValueInBase)) {
                       isCorrect = Math.abs(studentValueInBase - correctValue) <= tolerance;
                   }
@@ -189,8 +149,6 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
               }
               break;
           case 'text':
-              // ✅ FIXED: Cast subQ to any to access potentially missing 'textAnswer' property
-              // and explicitly typed 'k' as string
               const keywords = (subQ as any).textAnswer?.keywords || [];
               const studentText = (studentAnswer as string || '').toLowerCase();
               isCorrect = keywords.some((k: string) => studentText.includes(k.toLowerCase()));
@@ -213,86 +171,114 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
     const isCorrect = calculateResult(activeSubQuestion, currentAnswer);
     onResultCalculated(activeSubQuestion.id, isCorrect);
     
-    setCurrentAnswer(null); // Reset for next question
-
+    setCurrentAnswer(null);
     const nextIndex = currentSubQuestionIndex + 1;
     setCurrentSubQuestionIndex(nextIndex);
   };
 
-  const renderAnswerInput = (subQ: SubQuestion, isSubmitted: boolean) => {
+  // --- RENDER HELPERS ---
+
+  // 1. DESKTOP INPUT RENDERER (Classic)
+  const renderAnswerInputDesktop = (subQ: SubQuestion, isSubmitted: boolean) => {
     const valueToDisplay = isSubmitted ? answers[subQ.id]?.answer : currentAnswer;
 
     switch (subQ.answerType) {
       case 'numerical':
-        return (
-          <Input
-            type="number"
-            inputMode="decimal"
-            value={valueToDisplay ?? ''}
-            onChange={(e) => setCurrentAnswer(e.target.value)}
-            disabled={isSubmitted}
-            // ✅ FIX: Mobile responsive width
-            className="w-full sm:w-1/2" 
-          />
-        );
+        return <Input type="number" inputMode="decimal" value={valueToDisplay ?? ''} onChange={(e) => setCurrentAnswer(e.target.value)} disabled={isSubmitted} className="w-full sm:w-1/2" />;
+      case 'text':
+        return <Input type="text" value={valueToDisplay ?? ''} onChange={(e) => setCurrentAnswer(e.target.value)} disabled={isSubmitted} className="w-full sm:w-1/2" />;
       case 'mcq':
         if(subQ.mcqAnswer?.isMultiCorrect) {
             return (
-                <div className="space-y-3"> {/* Increased gap for mobile touch targets */}
+                <div className="space-y-3">
                     {(subQ.mcqAnswer?.options || []).map(opt => (
-                        <div key={opt.id} className="flex items-start space-x-3"> {/* items-start aligns check with first line of text */}
-                            <Checkbox
-                                id={opt.id}
-                                checked={(valueToDisplay as string[] || []).includes(opt.id)}
-                                onCheckedChange={(checked) => {
-                                    if(isSubmitted) return;
-                                    const current = (currentAnswer as string[] || []);
-                                    const newAnswer = checked ? [...current, opt.id] : current.filter(id => id !== opt.id);
-                                    setCurrentAnswer(newAnswer);
-                                }}
-                                disabled={isSubmitted}
-                                className="mt-1" // Align checkbox with text
-                            />
-                            <Label htmlFor={opt.id} className={`text-sm leading-relaxed ${isSubmitted ? 'text-muted-foreground' : ''}`}>
-                                {opt.text}
-                            </Label>
+                        <div key={opt.id} className="flex items-start space-x-3">
+                            <Checkbox id={opt.id} checked={(valueToDisplay as string[] || []).includes(opt.id)} onCheckedChange={(checked) => { if(isSubmitted) return; const current = (currentAnswer as string[] || []); const newAnswer = checked ? [...current, opt.id] : current.filter(id => id !== opt.id); setCurrentAnswer(newAnswer); }} disabled={isSubmitted} className="mt-1" />
+                            <Label htmlFor={opt.id} className={`text-sm leading-relaxed ${isSubmitted ? 'text-muted-foreground' : ''}`}>{opt.text}</Label>
                         </div>
                     ))}
                 </div>
             )
         }
         return (
-          <RadioGroup
-            value={valueToDisplay}
-            onValueChange={setCurrentAnswer}
-            disabled={isSubmitted}
-            className="space-y-3"
-          >
+          <RadioGroup value={valueToDisplay} onValueChange={setCurrentAnswer} disabled={isSubmitted} className="space-y-3">
             {(subQ.mcqAnswer?.options || []).map(opt => (
               <div key={opt.id} className="flex items-start space-x-3">
                 <RadioGroupItem value={opt.id} id={opt.id} className="mt-1" />
-                <Label htmlFor={opt.id} className={`text-sm leading-relaxed ${isSubmitted ? 'text-muted-foreground' : ''}`}>
-                    {opt.text}
-                </Label>
+                <Label htmlFor={opt.id} className={`text-sm leading-relaxed ${isSubmitted ? 'text-muted-foreground' : ''}`}>{opt.text}</Label>
               </div>
             ))}
           </RadioGroup>
         );
-      case 'text':
-        return (
-          <Input
-            type="text"
-            value={valueToDisplay ?? ''}
-            onChange={(e) => setCurrentAnswer(e.target.value)}
-            disabled={isSubmitted}
-            // ✅ FIX: Mobile responsive width
-            className="w-full sm:w-1/2" 
-          />
-        );
-      default:
-        return null;
+      default: return null;
     }
   };
+
+  // 2. MOBILE INPUT RENDERER (Modern Tiles)
+  const renderAnswerInputMobile = (subQ: SubQuestion) => {
+    const valueToDisplay = currentAnswer;
+
+    switch (subQ.answerType) {
+        case 'numerical':
+        case 'text':
+            return (
+                <Input 
+                    type={subQ.answerType === 'numerical' ? 'number' : 'text'}
+                    inputMode={subQ.answerType === 'numerical' ? 'decimal' : 'text'}
+                    placeholder="Type your answer here..."
+                    value={valueToDisplay ?? ''}
+                    onChange={(e) => setCurrentAnswer(e.target.value)}
+                    className="w-full h-12 text-lg px-4 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                />
+            );
+        case 'mcq':
+            const options = subQ.mcqAnswer?.options || [];
+            const isMulti = subQ.mcqAnswer?.isMultiCorrect;
+            const currentSelected = isMulti ? (valueToDisplay as string[] || []) : [valueToDisplay];
+
+            return (
+                <div className="space-y-3 w-full">
+                    {options.map(opt => {
+                        const isSelected = currentSelected.includes(opt.id);
+                        return (
+                            <div 
+                                key={opt.id}
+                                onClick={() => {
+                                    if(isMulti) {
+                                        const newAnswer = isSelected 
+                                            ? currentSelected.filter(id => id !== opt.id) 
+                                            : [...currentSelected, opt.id];
+                                        setCurrentAnswer(newAnswer);
+                                    } else {
+                                        setCurrentAnswer(opt.id);
+                                    }
+                                }}
+                                className={cn(
+                                    "flex items-center gap-4 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                                    isSelected 
+                                        ? "border-primary bg-primary/5 shadow-sm" 
+                                        : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                                )}
+                            >
+                                <div className={cn(
+                                    "h-6 w-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+                                    isSelected 
+                                        ? "border-primary bg-primary text-primary-foreground" 
+                                        : "border-slate-300 dark:border-slate-600"
+                                )}>
+                                    {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-white" />}
+                                </div>
+                                <span className={cn("text-base font-medium", isSelected ? "text-primary" : "text-slate-700 dark:text-slate-300")}>
+                                    {opt.text}
+                                </span>
+                            </div>
+                        )
+                    })}
+                </div>
+            );
+        default: return null;
+    }
+  }
 
   const processedMainQuestionText = useMemo(() => {
     if (!question?.mainQuestionText) return '';
@@ -303,7 +289,6 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
   const lastStepId = currentSubQuestionIndex > 0 ? allSubQuestions[currentSubQuestionIndex - 1].stepId : null;
   const isNewStep = activeSubQuestion && activeSubQuestion.stepId !== lastStepId;
   const currentStepNumber = activeSubQuestion ? uniqueStepIds.indexOf(activeSubQuestion.stepId) + 1 : 0;
-
 
   if (isFinished) {
       return (
@@ -318,101 +303,136 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
   }
 
   return (
-    <div className="border rounded-lg bg-card text-card-foreground break-words space-y-6 overflow-hidden">
-       {/* Main Question Text Block */}
-       <div className="p-4 sm:p-6 bg-muted/30">
-            {/* ✅ FIX: Added overflow container for content */}
-            <div className="w-full overflow-x-auto">
-                <div 
-                    className="prose dark:prose-invert max-w-none min-w-0"
-                    dangerouslySetInnerHTML={{ __html: processedMainQuestionText }} 
-                />
-            </div>
-       </div>
-
-       <div className="px-4 sm:px-6 pb-6">
+    <>
+        {/* ============================================== */}
+        {/* 📱 MOBILE VIEW (Visible only on small screens) */}
+        {/* ============================================== */}
+        <div className="block sm:hidden h-full flex flex-col">
             {!hasStarted ? (
-                <div className="flex justify-center pt-4">
-                    <Button onClick={handleStart} size="lg" className="w-full sm:w-auto">Start Solving</Button>
+                <div className="flex flex-col items-center justify-center py-10">
+                    <Button onClick={handleStart} size="lg" className="w-full text-lg h-12 shadow-lg">Start Solving Question</Button>
                 </div>
             ) : (
-                <div className="space-y-6">
-                    {/* Completed Questions Summaries */}
-                    {uniqueStepIds.map((stepId, index) => {
-                        const stepData = completedQuestionsByStep[stepId];
-                        if (!stepData) return null;
-                        
-                        return (
-                            <div key={stepId} className="space-y-3">
-                                <h4 className="font-semibold text-base sm:text-lg font-headline">Step {index + 1}. {stepData.title}</h4>
-                                {stepData.subQuestions.map((subQ) => {
-                                    const globalIndex = allSubQuestions.findIndex(q => q.id === subQ.id);
-                                    return (
-                                        <Collapsible key={subQ.id}>
-                                            <CollapsibleTrigger asChild>
-                                                <div className="cursor-pointer">
-                                                    <CompletedSubQuestionSummary 
-                                                        subQuestion={subQ}
-                                                        answer={answers[subQ.id]?.answer}
-                                                        index={globalIndex}
-                                                    />
-                                                </div>
-                                            </CollapsibleTrigger>
-                                            <CollapsibleContent>
-                                                <div className="p-4 border border-t-0 rounded-b-lg -mt-1 bg-slate-50/50 dark:bg-slate-900/50">
-                                                    {/* ✅ FIX: Added overflow container */}
-                                                    <div className="w-full overflow-x-auto mb-4">
-                                                        <div 
-                                                            className="prose dark:prose-invert max-w-none text-muted-foreground text-sm"
-                                                            dangerouslySetInnerHTML={{ __html: subQ.questionText }} 
-                                                        />
-                                                    </div>
-                                                    {renderAnswerInput(subQ, true)}
-                                                </div>
-                                            </CollapsibleContent>
-                                        </Collapsible>
-                                    )
-                                })}
+                <>
+                    {/* Top: Scrollable Question Area */}
+                    <div className="flex-1 space-y-4">
+                        {/* Step Header */}
+                        {isNewStep && (
+                            <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-100 dark:border-blue-900/50 mb-2">
+                                <h4 className="text-sm font-bold text-blue-800 dark:text-blue-200 uppercase tracking-wide">
+                                    Step {currentStepNumber}: {activeSubQuestion.stepTitle}
+                                </h4>
+                                {activeSubQuestion.stepObjective && (
+                                    <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">{activeSubQuestion.stepObjective}</p>
+                                )}
                             </div>
-                        )
-                    })}
+                        )}
 
-                    {/* Active Question Card */}
-                    {activeSubQuestion && (
-                        <Card key={activeSubQuestion.id} className="bg-muted/30 runner-active-card border-l-4 border-l-primary">
-                            {isNewStep && (
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base sm:text-lg font-headline">
-                                        Step {currentStepNumber}: {activeSubQuestion.stepTitle}
-                                    </CardTitle>
-                                    {activeSubQuestion.stepObjective && (
-                                        <CardDescription>{activeSubQuestion.stepObjective}</CardDescription>
-                                    )}
-                                </CardHeader>
-                            )}
-                            <CardContent className={isNewStep ? 'pt-2' : 'pt-6'}>
-                                <div className="p-4 sm:p-5 border rounded-lg bg-card shadow-sm">
-                                    {/* ✅ FIX: Added overflow container */}
-                                    <div className="w-full overflow-x-auto mb-5">
-                                        <div 
-                                            className="prose dark:prose-invert max-w-none text-base"
-                                            dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }} 
-                                        />
-                                    </div>
-                                    {renderAnswerInput(activeSubQuestion, false)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {!isFinished && (
-                        <div className="flex justify-end mt-4">
-                            <Button onClick={handleSubmit} size="lg" className="w-full sm:w-auto">Submit Answer</Button>
+                        {/* Question Text */}
+                        <div className="w-full overflow-x-auto bg-white dark:bg-slate-900 p-4 rounded-xl border shadow-sm">
+                            <div 
+                                className="prose prose-sm dark:prose-invert max-w-none"
+                                dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }} 
+                            />
                         </div>
-                    )}
-                </div>
+                    </div>
+
+                    {/* Bottom: Fixed Input Area */}
+                    <div className="mt-4 pt-4 border-t bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm -mx-4 px-4 pb-4 sticky bottom-0 z-10">
+                        <div className="mb-4">
+                            {renderAnswerInputMobile(activeSubQuestion)}
+                        </div>
+                        <Button 
+                            onClick={handleSubmit} 
+                            size="lg" 
+                            className="w-full h-14 text-lg font-bold shadow-xl shadow-primary/20 rounded-xl"
+                        >
+                            Submit Answer
+                        </Button>
+                    </div>
+                </>
             )}
-       </div>
-    </div>
+        </div>
+
+
+        {/* ============================================== */}
+        {/* 💻 DESKTOP VIEW (Visible only on md+ screens)  */}
+        {/* ============================================== */}
+        <div className="hidden sm:block border rounded-lg bg-card text-card-foreground break-words space-y-6 overflow-hidden">
+            {/* Main Question Text Block */}
+            <div className="p-4 sm:p-6 bg-muted/30">
+                <div className="w-full overflow-x-auto">
+                    <div className="prose dark:prose-invert max-w-none min-w-0" dangerouslySetInnerHTML={{ __html: processedMainQuestionText }} />
+                </div>
+            </div>
+
+            <div className="px-4 sm:px-6 pb-6">
+                {!hasStarted ? (
+                    <div className="flex justify-center pt-4">
+                        <Button onClick={handleStart} size="lg" className="w-full sm:w-auto">Start Solving</Button>
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {/* Completed Questions Summaries */}
+                        {uniqueStepIds.map((stepId, index) => {
+                            const stepData = completedQuestionsByStep[stepId];
+                            if (!stepData) return null;
+                            return (
+                                <div key={stepId} className="space-y-3">
+                                    <h4 className="font-semibold text-base sm:text-lg font-headline">Step {index + 1}. {stepData.title}</h4>
+                                    {stepData.subQuestions.map((subQ) => {
+                                        const globalIndex = allSubQuestions.findIndex(q => q.id === subQ.id);
+                                        return (
+                                            <Collapsible key={subQ.id}>
+                                                <CollapsibleTrigger asChild>
+                                                    <div className="cursor-pointer">
+                                                        <CompletedSubQuestionSummary subQuestion={subQ} answer={answers[subQ.id]?.answer} index={globalIndex} />
+                                                    </div>
+                                                </CollapsibleTrigger>
+                                                <CollapsibleContent>
+                                                    <div className="p-4 border border-t-0 rounded-b-lg -mt-1 bg-slate-50/50 dark:bg-slate-900/50">
+                                                        <div className="w-full overflow-x-auto mb-4">
+                                                            <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm" dangerouslySetInnerHTML={{ __html: subQ.questionText }} />
+                                                        </div>
+                                                        {renderAnswerInputDesktop(subQ, true)}
+                                                    </div>
+                                                </CollapsibleContent>
+                                            </Collapsible>
+                                        )
+                                    })}
+                                </div>
+                            )
+                        })}
+
+                        {/* Active Question Card */}
+                        {activeSubQuestion && (
+                            <Card key={activeSubQuestion.id} className="bg-muted/30 runner-active-card border-l-4 border-l-primary">
+                                {isNewStep && (
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-base sm:text-lg font-headline">Step {currentStepNumber}: {activeSubQuestion.stepTitle}</CardTitle>
+                                        {activeSubQuestion.stepObjective && <CardDescription>{activeSubQuestion.stepObjective}</CardDescription>}
+                                    </CardHeader>
+                                )}
+                                <CardContent className={isNewStep ? 'pt-2' : 'pt-6'}>
+                                    <div className="p-4 sm:p-5 border rounded-lg bg-card shadow-sm">
+                                        <div className="w-full overflow-x-auto mb-5">
+                                            <div className="prose dark:prose-invert max-w-none text-base" dangerouslySetInnerHTML={{ __html: activeSubQuestion.questionText }} />
+                                        </div>
+                                        {renderAnswerInputDesktop(activeSubQuestion, false)}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {!isFinished && (
+                            <div className="flex justify-end mt-4">
+                                <Button onClick={handleSubmit} size="lg" className="w-full sm:w-auto">Submit Answer</Button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    </>
   );
 }
