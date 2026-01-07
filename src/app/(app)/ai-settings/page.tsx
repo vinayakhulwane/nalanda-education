@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, Trash2, Plus, BrainCircuit, Wand2, Settings2 } from 'lucide-react';
+import { Loader2, Trash2, Plus, BrainCircuit, Wand2, Settings2, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
+import AiUsagePage from '@/app/(app)/ai-usage/page';
 
 interface AIProviderConfig {
   id?: string;
@@ -306,6 +307,21 @@ export default function AiSettingsPage() {
             </p>
           </CardFooter>
         </Card>
+        
+        {/* --- AI USAGE MODAL --- */}
+        <div className="mt-6 flex justify-center">
+            <Dialog>
+                <DialogTrigger asChild>
+                    <Button variant="outline">
+                        <BarChart3 className="mr-2 h-4 w-4" /> AI Usage Analytics
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
+                    <AiUsagePage />
+                </DialogContent>
+            </Dialog>
+        </div>
+
       </div>
     </div>
   );
