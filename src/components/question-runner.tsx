@@ -28,44 +28,44 @@ type ResultState = {
 }
 
 type SubQuestionWithStep = SubQuestion & {
-    stepId: string;
-    stepTitle: string;
-    stepObjective: string;
+  stepId: string;
+  stepTitle: string;
+  stepObjective: string;
 }
 
 // --- Unit Conversion Utilities (Keep existing logic) ---
 const unitPrefixes: Record<string, number> = {
-    'g': 1e9, 'm': 1e6, 'k': 1e3,
-    'd': 1e-1, 'c': 1e-2, 'µ': 1e-6, 'u': 1e-6, 'n': 1e-9,
+  'g': 1e9, 'm': 1e6, 'k': 1e3,
+  'd': 1e-1, 'c': 1e-2, 'µ': 1e-6, 'u': 1e-6, 'n': 1e-9,
 };
 
 function parseUnitAndValue(input: string): { value: number, unit: string } | null {
-    if (!input || typeof input !== 'string') return null;
-    const trimmedInput = input.trim();
-    const match = trimmedInput.match(/^(-?[\d.eE+-]+)\s*(.*)$/);
-    if (!match) return null;
-    const value = parseFloat(match[1]);
-    const unit = match[2]?.trim() || '';
-    if(isNaN(value)) return null;
-    return { value, unit };
+  if (!input || typeof input !== 'string') return null;
+  const trimmedInput = input.trim();
+  const match = trimmedInput.match(/^(-?[\d.eE+-]+)\s*(.*)$/);
+  if (!match) return null;
+  const value = parseFloat(match[1]);
+  const unit = match[2]?.trim() || '';
+  if(isNaN(value)) return null;
+  return { value, unit };
 }
 
 function convertToBase(value: number, unit: string, baseUnit: string): number {
-    let nUnit = unit.toLowerCase().trim();
-    let nBase = baseUnit.toLowerCase().trim();
-    if (nUnit === '%') nUnit = 'percent';
-    if (nBase === '%') nBase = 'percent';
-    if (nUnit === '' && (nBase === '' || nBase === 'unitless' || nBase === 'percent')) return value;
-    if (nUnit === nBase) return value;
-    if (nBase !== '' && nBase !== 'percent' && nUnit.endsWith(nBase)) {
-      const prefix = nUnit.replace(nBase, '');
-      if (prefix && unitPrefixes[prefix]) return value * unitPrefixes[prefix];
-    }
-    if (nUnit !== '' && nBase.endsWith(nUnit)) {
-       const prefix = nBase.replace(nUnit, '');
-       if (prefix && unitPrefixes[prefix]) return value / unitPrefixes[prefix];
-    }
-    return NaN;
+  let nUnit = unit.toLowerCase().trim();
+  let nBase = baseUnit.toLowerCase().trim();
+  if (nUnit === '%') nUnit = 'percent';
+  if (nBase === '%') nBase = 'percent';
+  if (nUnit === '' && (nBase === '' || nBase === 'unitless' || nBase === 'percent')) return value;
+  if (nUnit === nBase) return value;
+  if (nBase !== '' && nBase !== 'percent' && nUnit.endsWith(nBase)) {
+    const prefix = nUnit.replace(nBase, '');
+    if (prefix && unitPrefixes[prefix]) return value * unitPrefixes[prefix];
+  }
+  if (nUnit !== '' && nBase.endsWith(nUnit)) {
+    const prefix = nBase.replace(nUnit, '');
+    if (prefix && unitPrefixes[prefix]) return value / unitPrefixes[prefix];
+  }
+  return NaN;
 }
 
 interface QuestionRunnerProps {
@@ -82,13 +82,13 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
   const [currentAnswer, setCurrentAnswer] = useState<any>(null);
 
   const allSubQuestions = useMemo((): SubQuestionWithStep[] => {
-    return question.solutionSteps.flatMap(step => 
-        step.subQuestions.map(subQ => ({
-            ...subQ,
-            stepId: step.id,
-            stepTitle: step.title,
-            stepObjective: step.stepQuestion,
-        }))
+    return question.solutionSteps.flatMap(step =>
+      step.subQuestions.map(subQ => ({
+        ...subQ,
+        stepId: step.id,
+        stepTitle: step.title,
+        stepObjective: step.stepQuestion,
+      }))
     );
   }, [question.solutionSteps]);
 
@@ -107,15 +107,15 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
   const completedQuestionsByStep = useMemo(() => {
     const completed = allSubQuestions.slice(0, currentSubQuestionIndex);
     return completed.reduce((acc, subQ) => {
-        if (!acc[subQ.stepId]) {
-            acc[subQ.stepId] = {
-                title: subQ.stepTitle,
-                objective: subQ.stepObjective,
-                subQuestions: []
-            };
-        }
-        acc[subQ.stepId].subQuestions.push(subQ);
-        return acc;
+      if (!acc[subQ.stepId]) {
+        acc[subQ.stepId] = {
+          title: subQ.stepTitle,
+          objective: subQ.stepObjective,
+          subQuestions: []
+        };
+      }
+      acc[subQ.stepId].subQuestions.push(subQ);
+      return acc;
     }, {} as Record<string, { title: string, objective: string, subQuestions: SubQuestionWithStep[] }>);
   }, [allSubQuestions, currentSubQuestionIndex]);
 
@@ -126,35 +126,35 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
   };
 
   const calculateResult = (subQ: SubQuestion, studentAnswer: any) => {
-      let isCorrect = false;
-      switch (subQ.answerType) {
-          case 'numerical':
-              const parsed = parseUnitAndValue(studentAnswer);
-              const { baseUnit, correctValue, toleranceValue } = subQ.numericalAnswer || {};
-              if (parsed && correctValue !== undefined) {
-                  const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
-                  const studentValueInBase = convertToBase(parsed.value, parsed.unit, baseUnit || 'unitless');
-                  if (!isNaN(studentValueInBase)) {
-                      isCorrect = Math.abs(studentValueInBase - correctValue) <= tolerance;
-                  }
-              }
-              break;
-          case 'mcq':
-              const correctOptions = subQ.mcqAnswer?.correctOptions || [];
-              if(subQ.mcqAnswer?.isMultiCorrect) {
-                  const studentAnswers = studentAnswer as string[] || [];
-                  isCorrect = studentAnswers.length === correctOptions.length && studentAnswers.every(id => correctOptions.includes(id));
-              } else {
-                  isCorrect = studentAnswer === correctOptions[0];
-              }
-              break;
-          case 'text':
-              const keywords = (subQ as any).textAnswer?.keywords || [];
-              const studentText = (studentAnswer as string || '').toLowerCase();
-              isCorrect = keywords.some((k: string) => studentText.includes(k.toLowerCase()));
-              break;
-      }
-      return isCorrect;
+    let isCorrect = false;
+    switch (subQ.answerType) {
+      case 'numerical':
+        const parsed = parseUnitAndValue(studentAnswer);
+        const { baseUnit, correctValue, toleranceValue } = subQ.numericalAnswer || {};
+        if (parsed && correctValue !== undefined) {
+          const tolerance = (toleranceValue ?? 0) / 100 * correctValue;
+          const studentValueInBase = convertToBase(parsed.value, parsed.unit, baseUnit || 'unitless');
+          if (!isNaN(studentValueInBase)) {
+            isCorrect = Math.abs(studentValueInBase - correctValue) <= tolerance;
+          }
+        }
+        break;
+      case 'mcq':
+        const correctOptions = subQ.mcqAnswer?.correctOptions || [];
+        if(subQ.mcqAnswer?.isMultiCorrect) {
+          const studentAnswers = studentAnswer as string[] || [];
+          isCorrect = studentAnswers.length === correctOptions.length && studentAnswers.every(id => correctOptions.includes(id));
+        } else {
+          isCorrect = studentAnswer === correctOptions[0];
+        }
+        break;
+      case 'text':
+        const keywords = (subQ as any).textAnswer?.keywords || [];
+        const studentText = (studentAnswer as string || '').toLowerCase();
+        isCorrect = keywords.some((k: string) => studentText.includes(k.toLowerCase()));
+        break;
+    }
+    return isCorrect;
   }
 
   const handleSubmit = () => {
@@ -162,23 +162,23 @@ export function QuestionRunner({ question, onAnswerSubmit, onResultCalculated, i
     if (!activeSubQuestion) return;
 
     const newAnswers = {
-        ...answers,
-        [activeSubQuestion.id]: { answer: currentAnswer },
+      ...answers,
+      [activeSubQuestion.id]: { answer: currentAnswer },
     }
     setAnswers(newAnswers);
     onAnswerSubmit(activeSubQuestion.id, currentAnswer);
 
     const isCorrect = calculateResult(activeSubQuestion, currentAnswer);
     onResultCalculated(activeSubQuestion.id, isCorrect);
-    
+
     setCurrentAnswer(null);
     const nextIndex = currentSubQuestionIndex + 1;
     setCurrentSubQuestionIndex(nextIndex);
   };
 
   // --- RENDER HELPERS ---
-// 1. DESKTOP INPUT RENDERER (Classic)
-const renderAnswerInputDesktop = (subQ: SubQuestion, isSubmitted: boolean) => {
+  // 1. DESKTOP INPUT RENDERER (Classic)
+  const renderAnswerInputDesktop = (subQ: SubQuestion, isSubmitted: boolean) => {
     const valueToDisplay = isSubmitted ? answers[subQ.id]?.answer : currentAnswer;
 
     switch (subQ.answerType) {
@@ -213,7 +213,7 @@ const renderAnswerInputDesktop = (subQ: SubQuestion, isSubmitted: boolean) => {
       default: return null;
     }
   }
-  
+
   const processedMainQuestionText = useMemo(() => {
     if (!question?.mainQuestionText) return '';
     return question.mainQuestionText.replace(/&nbsp;/g, ' ');
@@ -264,8 +264,13 @@ const renderAnswerInputDesktop = (subQ: SubQuestion, isSubmitted: boolean) => {
                                     return (
                                         <Collapsible key={subQ.id}>
                                             <CollapsibleTrigger asChild>
-                                                <div className="cursor-pointer">
-                                                    <CompletedSubQuestionSummary subQuestion={subQ} answer={answers[subQ.id]?.answer} index={globalIndex} />
+                                                {/* FIXED: Added w-full, min-w-0, and text-left to handle overflow correctly */}
+                                                <div className="cursor-pointer w-full min-w-0 text-left">
+                                                    <CompletedSubQuestionSummary
+                                                        subQuestion={subQ}
+                                                        answer={answers[subQ.id]?.answer}
+                                                        index={globalIndex}
+                                                    />
                                                 </div>
                                             </CollapsibleTrigger>
                                             <CollapsibleContent>
