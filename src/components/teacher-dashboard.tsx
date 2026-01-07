@@ -24,7 +24,7 @@ export function TeacherDashboard({ user }: TeacherDashboardProps) {
     }
     
     return (
-        <div>
+        <div className="p-4 md:p-6">
             <PageHeader
                 title={`Welcome, ${user.name}!`}
                 description="Manage your classes, worksheets, and students."
