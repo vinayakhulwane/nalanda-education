@@ -293,6 +293,14 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
             const isCorrect = allSubQuestions.every(sq => results[sq.id]?.isCorrect === true);
             const unlockedSolution = unlockedSolutions?.[q.id];
             
+            // For AI questions, get the result from the first sub-question
+            const isAiGraded = q.gradingMode === 'ai';
+            const firstSubId = q.solutionSteps[0]?.subQuestions[0]?.id;
+            const aiResult = isAiGraded ? results[firstSubId] : null;
+            // @ts-ignore
+            const aiBreakdown = aiResult?.aiBreakdown || {};
+            const qMaxMarks = q.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
+
             return (
               <Collapsible key={q.id} open={openQuestionId === q.id} onOpenChange={(open) => setOpenQuestionId(open ? q.id : null)} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <CollapsibleTrigger className="w-full flex items-center justify-between p-4 bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
@@ -313,7 +321,18 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                 </CollapsibleTrigger>
                 <CollapsibleContent className="bg-slate-50/50 dark:bg-slate-950/30 border-t border-slate-100 dark:border-slate-800 w-full overflow-hidden">
                   <div className="p-4 space-y-6">
-                    {q.solutionSteps.map((step, sIdx) => (
+                    
+                    {/* 1. Show AI Rubric Breakdown if AI Graded */}
+                    {isAiGraded && (
+                        <AIRubricBreakdown 
+                            rubric={q.aiRubric || {}} 
+                            breakdown={aiBreakdown} 
+                            maxMarks={qMaxMarks} 
+                        />
+                    )}
+
+                    {/* 2. Show Sub-questions ONLY if NOT AI Graded */}
+                    {!isAiGraded && q.solutionSteps.map((step, sIdx) => (
                       <div key={sIdx} className="space-y-3">
                         {(step as any).instructionText && <div className="flex items-center gap-2"><Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-white">Step {sIdx + 1}</Badge><span className="text-xs font-medium text-slate-600 dark:text-slate-400" dangerouslySetInnerHTML={{ __html: (step as any).instructionText }} /></div>}
                         <div className="space-y-3 pl-2 border-l-2 border-slate-200 dark:border-slate-800 ml-2">
@@ -327,10 +346,9 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                               <div key={subQ.id} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-sm">
                                 <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed break-words w-full"><span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} /></div>
                                 <div className="grid grid-cols-1 gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-800">
-                                  {/* Answer Wrapper with strict wrapping for long strings/UUIDs */}
+                                  {/* Answer Wrapper with strict wrapping */}
                                   <div className="mt-1 min-w-0">
                                     <span className="text-[10px] uppercase text-slate-400 font-bold block mb-0.5">Your Answer</span>
-                                    {/* FIX: break-all forces wrapping even for long unbroken strings like UUIDs */}
                                     <div className={cn("text-xs whitespace-pre-wrap break-words break-all w-full font-medium", isSubCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>{userReadableAnswer}</div>
                                   </div>
                                   {!isSubCorrect && (
@@ -346,7 +364,23 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                         </div>
                       </div>
                     ))}
-                    {/* AI SOLUTION BUTTON */}
+
+                    {/* 3. AI Feedback Text */}
+                    {isAiGraded && aiResult?.feedback && (
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm overflow-hidden">
+                            <div className="bg-indigo-50/50 dark:bg-indigo-950/30 px-4 py-3 border-b border-indigo-100 dark:border-indigo-900/50 flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-indigo-600" />
+                                <h4 className="font-semibold text-sm text-indigo-900 dark:text-indigo-200">AI Feedback</h4>
+                            </div>
+                            <div className="p-5 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                                <ReactMarkdown components={{ strong: ({ node, ...props }) => <span className="font-bold text-indigo-700 dark:text-indigo-400" {...props} />, ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1 my-2" {...props} />, li: ({ node, ...props }) => <li className="pl-1" {...props} />, p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} /> }}>
+                                    {aiResult.feedback}
+                                </ReactMarkdown>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 4. AI SOLUTION BUTTON (Visible for ALL types) */}
                     <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
                         {unlockedSolution ? (
                             <div className="bg-indigo-50 dark:bg-indigo-950/30 p-3 rounded-lg border border-indigo-100">
@@ -637,18 +671,7 @@ export default function SolveWorksheetPage() {
   return (
     <>
       <div className="block sm:hidden">
-        <MobileQuestionRunner 
-            question={orderedQuestions[currentQuestionIndex]} 
-            currentIndex={currentQuestionIndex} 
-            totalQuestions={orderedQuestions.length} 
-            timeLeft={timeLeft} 
-            initialAnswers={answers} 
-            onAnswerSubmit={(subId, ans) => setAnswers(prev => ({ ...prev, [subId]: { answer: ans } }))} 
-            onResultCalculated={(subId, correct) => setResults(prev => ({ ...prev, [subId]: { isCorrect: correct } }))} 
-            onNext={handleNext} 
-            onPrevious={handlePrevious} 
-            onFinish={handleFinish} 
-            isLastQuestion={isLastQuestion} 
+        <MobileQuestionRunner question={orderedQuestions[currentQuestionIndex]} currentIndex={currentQuestionIndex} totalQuestions={orderedQuestions.length} timeLeft={timeLeft} initialAnswers={answers} onAnswerSubmit={(subId, ans) => setAnswers(prev => ({ ...prev, [subId]: { answer: ans } }))} onResultCalculated={(subId, correct) => setResults(prev => ({ ...prev, [subId]: { isCorrect: correct } }))} onNext={handleNext} onPrevious={handlePrevious} onFinish={handleFinish} isLastQuestion={isLastQuestion} 
             // AI Props
             aiImage={aiImages[activeQuestion.id]}
             onAiImageSelect={(file) => setAiImages(prev => ({ ...prev, [activeQuestion.id]: file }))}
