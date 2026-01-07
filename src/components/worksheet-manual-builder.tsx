@@ -60,7 +60,7 @@ const getCleanText = (html: string | undefined) => {
     return text.replace(/\s+/g, ' ').trim();
 };
 
-export function WorksheetManualBuilder({
+export default function WorksheetManualBuilder({
     availableQuestions,
     selectedQuestions,
     addQuestion,
@@ -311,61 +311,144 @@ export function WorksheetManualBuilder({
                     <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none shadow-xl overflow-hidden relative rounded-2xl">
                         <div className="absolute top-0 right-0 p-8 opacity-5"><FileText className="w-32 h-32" /></div>
                         <CardHeader className="pb-2 relative z-10"><CardTitle className="flex items-center gap-2 text-lg font-medium text-slate-200"><ShoppingCart className="h-5 w-5" /> Current Draft</CardTitle></CardHeader>
-                        <CardContent className="relative z-10"><div className="space-y-6"><div><div className="flex justify-between items-baseline mb-2"><span className="text-4xl font-bold tracking-tight">{selectedQuestions.length}</span><span className="text-sm font-medium text-slate-400 uppercase tracking-wide">Questions</span></div><Progress value={(selectedQuestions.length / 15) * 100} className="h-2 bg-slate-700" /></div><div className="grid grid-cols-2 gap-4 pt-2"><div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5"><p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Total Marks</p><p className="text-xl font-bold">{totalMarks}</p></div><div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5"><p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Est. Time</p><p className="text-xl font-bold">{estimatedTime}m</p></div></div></div></CardContent>
-                        <CardFooter className="pt-2 pb-6 relative z-10"><Sheet><SheetTrigger asChild><Button className="w-full h-12 bg-white text-slate-900 hover:bg-slate-200 font-bold shadow-lg rounded-xl" disabled={selectedQuestions.length === 0}>Review & Create <ArrowRight className="ml-2 h-4 w-4" /></Button></SheetTrigger>
-                        <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0 rounded-l-2xl"><SheetHeader className="p-6 pb-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b"><SheetTitle>Review Worksheet</SheetTitle><SheetDescription>Review your selections before finalizing.</SheetDescription>{userIsEditor && (<div className="flex items-center space-x-2 pt-4 p-1.5 bg-white dark:bg-slate-950 rounded-xl border w-fit shadow-sm"><Label htmlFor="worksheet-type-manual" className={cn("text-[10px] uppercase font-bold tracking-wider px-2 cursor-pointer transition-colors", worksheetType === 'sample' ? 'text-primary' : 'text-muted-foreground')}>Sample</Label><Switch id="worksheet-type-manual" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} className="scale-75" /><Label htmlFor="worksheet-type-manual" className={cn("text-[10px] uppercase font-bold tracking-wider px-2 cursor-pointer transition-colors", worksheetType === 'classroom' ? 'text-primary' : 'text-muted-foreground')}>Classroom</Label></div>)}</SheetHeader>
-                        {/* Review Content reused */}
-                        <div className="flex-grow flex flex-col h-full overflow-hidden"><Tabs defaultValue="blueprint" className="flex-grow flex flex-col"><div className="px-6 pt-4"><TabsList className="w-full grid grid-cols-2"><TabsTrigger value="blueprint">Blueprint</TabsTrigger><TabsTrigger value="review">Questions</TabsTrigger></TabsList></div><div className="flex-grow overflow-y-auto p-6"><TabsContent value="blueprint" className="mt-0 space-y-6"><div className="grid grid-cols-2 gap-4"><div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center"><p className="text-3xl font-bold text-primary">{selectedQuestions.length}</p><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Questions</p></div><div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center"><p className="text-3xl font-bold text-primary">{totalMarks}</p><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Total Marks</p></div></div>
-                        <div className="space-y-2 pt-4">
-                            <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Estimated Cost</h4>
-                            <div className="grid grid-cols-2 gap-3">
-                                {Object.entries(creationCost).filter(([_, val]) => val > 0).length > 0 ? Object.entries(creationCost).filter(([_, val]) => val > 0).map(([key, value]) => {
-                                    const Icon = currencyIcons[key as CurrencyType];
-                                    return (
-                                        <div key={key} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border dark:border-slate-700">
-                                            <Icon className={cn("h-5 w-5", currencyStyles[key as CurrencyType]?.badgeText)} />
-                                            <span className="font-bold text-slate-800 dark:text-slate-200">{value}</span>
-                                            <span className="text-xs text-muted-foreground capitalize">{key}</span>
+                        <CardContent className="relative z-10">
+                            <div className="space-y-6">
+                                <div>
+                                    <div className="flex justify-between items-baseline mb-2">
+                                        <span className="text-4xl font-bold tracking-tight">{selectedQuestions.length}</span>
+                                        <span className="text-sm font-medium text-slate-400 uppercase tracking-wide">Questions</span>
+                                    </div>
+                                    <Progress value={(selectedQuestions.length / 15) * 100} className="h-2 bg-slate-700" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 pt-2">
+                                    <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5">
+                                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Total Marks</p>
+                                        <p className="text-xl font-bold">{totalMarks}</p>
+                                    </div>
+                                    <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5">
+                                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Est. Time</p>
+                                        <p className="text-xl font-bold">{estimatedTime}m</p>
+                                    </div>
+                                </div>
+                                {!userIsEditor && (
+                                    <div className="space-y-2 pt-2">
+                                        <h4 className="text-sm font-semibold text-slate-400 flex items-center gap-2"><span className="w-1 h-3 bg-yellow-400 rounded-full" /> Estimated Cost</h4>
+                                        <div className="p-3 bg-black/20 rounded-lg space-y-2">
+                                            {Object.entries(creationCost).filter(([_, val]) => val > 0).length > 0 ? (
+                                                Object.entries(creationCost).filter(([_, val]) => val > 0).map(([key, value]) => {
+                                                    const Icon = currencyIcons[key as CurrencyType];
+                                                    return (
+                                                        <div key={key} className="flex justify-between items-center text-sm">
+                                                            <span className="flex items-center gap-2 capitalize text-slate-300">
+                                                                <Icon className="h-4 w-4 text-slate-400" /> {key}
+                                                            </span>
+                                                            <span className="font-mono font-bold text-white">{value}</span>
+                                                        </div>
+                                                    )
+                                                })
+                                            ) : <p className="text-xs text-slate-400 text-center">No cost for this selection.</p>}
                                         </div>
-                                    )
-                                }) : <p className="col-span-2 text-sm text-muted-foreground text-center py-2">No cost for this worksheet.</p>}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                        <div className="space-y-4"><h4 className="text-sm font-semibold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Filter className="h-4 w-4 text-muted-foreground" /> Unit Distribution</h4><div className="space-y-3">{Object.entries(breakdownByUnit).map(([name, data]) => (<div key={name}><div className="flex justify-between text-xs text-muted-foreground mb-1.5"><span>{name}</span><span className="font-mono font-medium">{Math.round((data.count / selectedQuestions.length) * 100)}%</span></div><Progress value={(data.count / selectedQuestions.length) * 100} className="h-2" /></div>))}</div></div></TabsContent><TabsContent value="review" className="mt-0 space-y-3 pb-20">{selectedQuestions.map(q => (<div key={q.id} className="flex items-start gap-3 p-3 rounded-xl border bg-white dark:bg-slate-900 shadow-sm relative group active:scale-[0.99] transition-transform"><div className="mt-0.5 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">{currencyIcons[q.currencyType] && (() => { const Icon = currencyIcons[q.currencyType]; return <Icon className="h-4 w-4 text-muted-foreground" />; })()}</div><div className="flex-1 min-w-0"><p className="text-sm font-medium line-clamp-2 text-slate-800 dark:text-slate-200 mb-0.5">{q.name || "Untitled Question"}</p></div><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 -mr-2" onClick={() => removeQuestion(q.id)}><Trash2 className="h-4 w-4" /></Button></div>))}</TabsContent></div></Tabs><div className="p-4 border-t bg-white dark:bg-slate-950 mt-auto"><div className="space-y-4"><div className="flex justify-between items-center text-sm font-medium px-1"><span className="text-muted-foreground">Estimated Time</span><span className="font-bold text-slate-900 dark:text-slate-100">{estimatedTime} mins</span></div><Button className="w-full h-12 text-base font-bold shadow-lg bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 rounded-xl" onClick={handleCreateClick} disabled={!canAfford || selectedQuestions.length === 0}>{!canAfford ? 'Insufficient Funds' : 'Generate Worksheet'} <ArrowRight className="ml-2 h-4 w-4" /></Button></div></div></div>
-                        </SheetContent></Sheet></CardFooter></Card>
+                        </CardContent>
+                        <CardFooter className="pt-2 pb-6 relative z-10">
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button className="w-full h-12 bg-white text-slate-900 hover:bg-slate-200 font-bold shadow-lg rounded-xl" disabled={selectedQuestions.length === 0}>Review & Create <ArrowRight className="ml-2 h-4 w-4" /></Button>
+                                </SheetTrigger>
+                                <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0 rounded-l-2xl">
+                                    <SheetHeader className="p-6 pb-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b">
+                                        <SheetTitle>Review Worksheet</SheetTitle>
+                                        <SheetDescription>Review your selections before finalizing.</SheetDescription>
+                                        {userIsEditor && (
+                                            <div className="flex items-center space-x-2 pt-4 p-1.5 bg-white dark:bg-slate-950 rounded-xl border w-fit shadow-sm">
+                                                <Label htmlFor="worksheet-type-manual" className={cn("text-[10px] uppercase font-bold tracking-wider px-2 cursor-pointer transition-colors", worksheetType === 'sample' ? 'text-primary' : 'text-muted-foreground')}>Sample</Label>
+                                                <Switch id="worksheet-type-manual" checked={worksheetType === 'classroom'} onCheckedChange={(checked) => setWorksheetType(checked ? 'classroom' : 'sample')} className="scale-75" />
+                                                <Label htmlFor="worksheet-type-manual" className={cn("text-[10px] uppercase font-bold tracking-wider px-2 cursor-pointer transition-colors", worksheetType === 'classroom' ? 'text-primary' : 'text-muted-foreground')}>Classroom</Label>
+                                            </div>
+                                        )}
+                                    </SheetHeader>
+                                    <div className="flex-grow flex flex-col h-full overflow-hidden">
+                                        <Tabs defaultValue="blueprint" className="flex-grow flex flex-col">
+                                            <div className="px-6 pt-4">
+                                                <TabsList className="w-full grid grid-cols-2">
+                                                    <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
+                                                    <TabsTrigger value="review">Questions</TabsTrigger>
+                                                </TabsList>
+                                            </div>
+                                            <div className="flex-grow overflow-y-auto p-6">
+                                                <TabsContent value="blueprint" className="mt-0 space-y-6">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center">
+                                                            <p className="text-3xl font-bold text-primary">{selectedQuestions.length}</p>
+                                                            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Questions</p>
+                                                        </div>
+                                                        <div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center">
+                                                            <p className="text-3xl font-bold text-primary">{totalMarks}</p>
+                                                            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Total Marks</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2 pt-4">
+                                                        <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Estimated Cost</h4>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            {Object.entries(creationCost).filter(([_, val]) => val > 0).length > 0 ? Object.entries(creationCost).filter(([_, val]) => val > 0).map(([key, value]) => {
+                                                                const Icon = currencyIcons[key as CurrencyType];
+                                                                return (
+                                                                    <div key={key} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border dark:border-slate-700">
+                                                                        <Icon className={cn("h-5 w-5", currencyStyles[key as CurrencyType]?.badgeText)} />
+                                                                        <span className="font-bold text-slate-800 dark:text-slate-200">{value}</span>
+                                                                        <span className="text-xs text-muted-foreground capitalize">{key}</span>
+                                                                    </div>
+                                                                )
+                                                            }) : <p className="col-span-2 text-sm text-muted-foreground text-center py-2">No cost for this worksheet.</p>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-4"><h4 className="text-sm font-semibold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Filter className="h-4 w-4 text-muted-foreground" /> Unit Distribution</h4><div className="space-y-3">{Object.entries(breakdownByUnit).map(([name, data]) => (<div key={name}><div className="flex justify-between text-xs text-muted-foreground mb-1.5"><span>{name}</span><span className="font-mono font-medium">{Math.round((data.count / selectedQuestions.length) * 100)}%</span></div><Progress value={(data.count / selectedQuestions.length) * 100} className="h-2" /></div>))}</div></div>
+                                                </TabsContent>
+                                                <TabsContent value="review" className="mt-0 space-y-3 pb-20">
+                                                    {selectedQuestions.map(q => (
+                                                        <div key={q.id} className="flex items-start gap-3 p-3 rounded-xl border bg-white dark:bg-slate-900 shadow-sm relative group active:scale-[0.99] transition-transform">
+                                                            <div className="mt-0.5 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">
+                                                                {currencyIcons[q.currencyType] && (() => { const Icon = currencyIcons[q.currencyType]; return <Icon className="h-4 w-4 text-muted-foreground" />; })()}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium line-clamp-2 text-slate-800 dark:text-slate-200 mb-0.5">{q.name || "Untitled Question"}</p>
+                                                            </div>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 -mr-2" onClick={() => removeQuestion(q.id)}><Trash2 className="h-4 w-4" /></Button>
+                                                        </div>
+                                                    ))}
+                                                </TabsContent>
+                                            </div>
+                                        </Tabs>
+                                        <div className="p-4 border-t bg-white dark:bg-slate-950 mt-auto">
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center text-sm font-medium px-1">
+                                                    <span className="text-muted-foreground">Estimated Time</span>
+                                                    <span className="font-bold text-slate-900 dark:text-slate-100">{estimatedTime} mins</span>
+                                                </div>
+                                                <Button className="w-full h-12 text-base font-bold shadow-lg bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 rounded-xl" onClick={handleCreateClick} disabled={!canAfford || selectedQuestions.length === 0}>
+                                                    {!canAfford ? 'Insufficient Funds' : 'Generate Worksheet'}
+                                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
+                        </CardFooter>
+                    </Card>
                 </div>
             </div>
 
-            <div className="lg:hidden fixed bottom-24 right-6 z-40">
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button size="lg" className={cn("rounded-full h-14 w-14 shadow-2xl bg-gradient-to-r from-primary to-indigo-600 hover:scale-105 transition-transform border-4 border-white dark:border-slate-950", animateCart && "animate-pulse ring-4 ring-primary/30")} disabled={selectedQuestions.length === 0}>
-                            <ShoppingCart className="h-6 w-6 text-white" />
-                            {selectedQuestions.length > 0 && (<span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md border-2 border-white dark:border-slate-950 animate-in zoom-in">{selectedQuestions.length}</span>)}
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent className="w-full flex flex-col p-0 h-[100dvh] rounded-none border-l-0">
-                        {/* Mobile Review Content (Duplicated for simplicity in this artifact, ideally componentized) */}
-                        <SheetHeader className="px-6 py-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b sticky top-0 z-10"><div className="flex items-center justify-between"><SheetTitle className="text-xl">Review Worksheet</SheetTitle><SheetClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-4 w-4" /></Button></SheetClose></div></SheetHeader>
-                        <div className="flex-grow flex flex-col h-full overflow-hidden"><Tabs defaultValue="blueprint" className="flex-grow flex flex-col"><div className="px-6 pt-4"><TabsList className="w-full grid grid-cols-2"><TabsTrigger value="blueprint">Blueprint</TabsTrigger><TabsTrigger value="review">Questions</TabsTrigger></TabsList></div><div className="flex-grow overflow-y-auto p-6"><TabsContent value="blueprint" className="mt-0 space-y-6"><div className="grid grid-cols-2 gap-4"><div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center"><p className="text-3xl font-bold text-primary">{selectedQuestions.length}</p><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Questions</p></div><div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center"><p className="text-3xl font-bold text-primary">{totalMarks}</p><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Total Marks</p></div></div><div className="space-y-2 pt-4">
-                            <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Estimated Cost</h4>
-                            <div className="grid grid-cols-2 gap-3">
-                                {Object.entries(creationCost).filter(([_, val]) => val > 0).length > 0 ? Object.entries(creationCost).filter(([_, val]) => val > 0).map(([key, value]) => {
-                                    const Icon = currencyIcons[key as CurrencyType];
-                                    return (
-                                        <div key={key} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border dark:border-slate-700">
-                                            <Icon className={cn("h-5 w-5", currencyStyles[key as CurrencyType]?.badgeText)} />
-                                            <span className="font-bold text-slate-800 dark:text-slate-200">{value}</span>
-                                            <span className="text-xs text-muted-foreground capitalize">{key}</span>
-                                        </div>
-                                    )
-                                }) : <p className="col-span-2 text-sm text-muted-foreground text-center py-2">No cost for this worksheet.</p>}
-                            </div>
-                        </div>
-                        </TabsContent><TabsContent value="review" className="mt-0 space-y-3 pb-20">{selectedQuestions.map(q => (<div key={q.id} className="flex items-start gap-3 p-3 rounded-xl border bg-white dark:bg-slate-900 shadow-sm relative group active:scale-[0.99] transition-transform"><div className="mt-0.5 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">{currencyIcons[q.currencyType] && (() => { const Icon = currencyIcons[q.currencyType]; return <Icon className="h-4 w-4 text-muted-foreground" />; })()}</div><div className="flex-1 min-w-0"><p className="text-sm font-medium line-clamp-2 text-slate-800 dark:text-slate-200 mb-0.5">{q.name || "Untitled Question"}</p></div><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 -mr-2" onClick={() => removeQuestion(q.id)}><Trash2 className="h-4 w-4" /></Button></div>))}</TabsContent></div></Tabs><div className="p-4 border-t bg-white dark:bg-slate-950 mt-auto"><div className="space-y-4"><Button className="w-full h-12 text-base font-bold shadow-lg bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 rounded-xl" onClick={handleCreateClick} disabled={!canAfford || selectedQuestions.length === 0}>{!canAfford ? 'Insufficient Funds' : 'Generate Worksheet'} <ArrowRight className="ml-2 h-4 w-4" /></Button></div></div></div>
-                    </SheetContent>
-                </Sheet>
-            </div>
+            <WorksheetReviewSheet
+              selectedQuestions={selectedQuestions}
+              removeQuestion={removeQuestion}
+              onCreateWorksheet={onCreateWorksheet}
+              animateCart={animateCart}
+              unitMap={unitMap}
+              categoryMap={categoryMap}
+            />
 
             {/* VIEW MODAL */}
             <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
