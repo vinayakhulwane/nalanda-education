@@ -65,7 +65,7 @@ export default function AiSettingsPage() {
   }
 
   return (
-    <div>
+    <div className="px-4">
       <PageHeader
         title="AI Settings"
         description="Configure the generative AI models for grading and content creation."
