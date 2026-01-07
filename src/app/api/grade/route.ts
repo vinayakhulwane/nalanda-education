@@ -1,14 +1,11 @@
-// Updated Backend Logic to fix "AI did not return valid JSON"
-// Issue: The regex was too simple. AI sometimes returns text BEFORE or AFTER the JSON block.
-// Solution: Use a more robust extraction method to find the first '{' and last '}'.
-
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { db } from '@/firebase/admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+// --- CONSTANTS & HELPERS ---
 
 const PATTERN_MAPPING: Record<string, string> = {
     'givenRequiredMapping': 'Given Data & Required Mapping',
@@ -33,17 +30,68 @@ function extractJSON(text: string): string {
         // 2. Locate the outermost curly braces
         const firstOpen = text.indexOf('{');
         const lastClose = text.lastIndexOf('}');
-        
+
         if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
             return text.substring(firstOpen, lastClose + 1);
         }
-        
+
         // 3. Fallback: Return original text (will fail parse in next step, triggering error)
         return text;
     }
 }
 
-async function generateContentWithFallback(systemPrompt: string, base64Image: string, mimeType: string) {
+// --- DYNAMIC AI CONFIGURATION ---
+
+async function getAiConfiguration() {
+    try {
+        // 1. Get the current active ID from global settings (specifically for grading)
+        const activeSnap = await db.collection('settings').doc('ai_active').get();
+        const activeData = activeSnap.data();
+        const targetId = activeData?.gradingId;
+
+        if (!targetId) {
+            console.warn("No active grading ID found, falling back to ENV key.");
+            return {
+                apiKey: process.env.GEMINI_API_KEY || "",
+                model: "gemini-2.0-flash-exp" // Default fallback
+            };
+        }
+
+        // 2. Fetch the provider details
+        const providerSnap = await db.collection('ai_providers').doc(targetId).get();
+        const config = providerSnap.data();
+
+        if (!config || !config.active) {
+            console.warn("Target AI Provider is missing or disabled, using fallback.");
+            return {
+                apiKey: process.env.GEMINI_API_KEY || "",
+                model: "gemini-2.0-flash-exp"
+            };
+        }
+
+        return {
+            apiKey: config.apiKey,
+            model: config.gradingModel,
+            provider: config.provider
+        };
+    } catch (error) {
+        console.error("Failed to fetch dynamic AI config:", error);
+        return {
+            apiKey: process.env.GEMINI_API_KEY || "",
+            model: "gemini-2.0-flash-exp"
+        };
+    }
+}
+
+// --- GENERATION LOGIC ---
+
+async function generateContentWithFallback(
+    genAI: GoogleGenerativeAI,
+    primaryModelName: string,
+    systemPrompt: string,
+    base64Image: string,
+    mimeType: string
+) {
     const promptParts = [
         systemPrompt,
         {
@@ -55,22 +103,24 @@ async function generateContentWithFallback(systemPrompt: string, base64Image: st
     ];
 
     try {
-        console.log("Attempting Primary Model: gemini-2.0-flash-exp");
-        const modelPrimary = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash-exp",
-            // Force JSON mode for 2.0 Flash (if supported by provider, helps significantly)
-            generationConfig: { responseMimeType: "application/json" } 
+        console.log(`Attempting Primary Model: ${primaryModelName}`);
+        const modelPrimary = genAI.getGenerativeModel({
+            model: primaryModelName,
+            generationConfig: { responseMimeType: "application/json" }
         });
+
         const resultPrimary = await modelPrimary.generateContent(promptParts);
         return await resultPrimary.response.text();
     } catch (error) {
-        console.warn("Primary model failed, switching to Fallback (Gemini 1.5 Flash). Error:", error);
-        
+        console.warn(`Primary model (${primaryModelName}) failed, switching to Fallback (Gemini 1.5 Flash). Error:`, error);
+
         try {
-            const modelFallback = genAI.getGenerativeModel({ 
+            // Fallback uses the SAME API key but a generally stable model
+            const modelFallback = genAI.getGenerativeModel({
                 model: "gemini-1.5-flash",
                 generationConfig: { responseMimeType: "application/json" }
             });
+
             const resultFallback = await modelFallback.generateContent(promptParts);
             return await resultFallback.response.text();
         } catch (fallbackError) {
@@ -79,6 +129,8 @@ async function generateContentWithFallback(systemPrompt: string, base64Image: st
         }
     }
 }
+
+// --- MAIN ROUTE ---
 
 export async function POST(request: Request) {
     try {
@@ -90,6 +142,7 @@ export async function POST(request: Request) {
 
         if (!imageFile) return NextResponse.json({ error: 'No image uploaded' }, { status: 400 });
 
+        // 1. Parse Rubric
         let parsedRubric: Record<string, number> = {};
         try {
             parsedRubric = JSON.parse(rubricJson);
@@ -101,6 +154,7 @@ export async function POST(request: Request) {
             .map(([category, weight]) => `- ${category}: Weightage ${weight}`)
             .join("\n");
 
+        // 2. Parse Feedback Patterns
         let feedbackFocusList = "";
         try {
             const patterns = JSON.parse(feedbackPatternsJson || '[]');
@@ -121,26 +175,37 @@ export async function POST(request: Request) {
         const systemPrompt = `
         You are an expert academic grader.
         TASK: Analyze the student's handwritten solution. Compare it against the Question and evaluate it strictly using the weighted Rubric provided.
-        
+
         QUESTION: "${questionText}"
         MAX MARKS: ${totalQuestionMarks}
         RUBRIC: ${rubricInstructions}
         FEEDBACK FOCUS: ${feedbackFocusList}
-        
+
         INSTRUCTIONS:
         1. Score (0-100) for each rubric criterion.
         2. Feedback as a markdown list. Use bold titles (e.g. "**Title:**").
-        
+
         OUTPUT JSON (Strictly JSON only):
         { "breakdown": { "Criteria": number }, "feedback": "markdown string" }
         `;
 
-        const textResponse = await generateContentWithFallback(systemPrompt, base64Image, mimeType);
+        // 3. Dynamic Model Initialization
+        const { apiKey, model: dynamicModelName } = await getAiConfiguration();
+        const genAI = new GoogleGenerativeAI(apiKey);
 
-        // --- FIXED PARSING LOGIC ---
+        // 4. Generate with Dynamic Config
+        const textResponse = await generateContentWithFallback(
+            genAI,
+            dynamicModelName,
+            systemPrompt,
+            base64Image,
+            mimeType
+        );
+
+        // 5. Parse & Score Logic (Preserved)
         const cleanJson = extractJSON(textResponse);
-        
         let rawResult;
+
         try {
             rawResult = JSON.parse(cleanJson);
         } catch (e) {
@@ -149,7 +214,6 @@ export async function POST(request: Request) {
         }
 
         const breakdown = rawResult.breakdown || {};
-
         let calculatedTotalScore = 0;
         let totalWeight = 0;
         const normalizedBreakdown: Record<string, number> = {};
@@ -189,7 +253,6 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error("Backend Error:", error);
-        // Return 500 so the frontend can catch the specific error message
         return NextResponse.json({ error: error.message || "Unknown error" }, { status: 500 });
     }
 }
