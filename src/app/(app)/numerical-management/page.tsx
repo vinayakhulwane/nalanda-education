@@ -69,7 +69,7 @@ export default function NumericalManagementPage() {
     }
 
     return (
-        <div>
+        <div className="p-4 md:p-6">
             <div className="flex justify-between items-center">
                 <PageHeader
                     title="Numerical Management"
