@@ -94,7 +94,7 @@ function NumericalManagementSubjectsPageContent({ classId }: { classId: string }
     }
 
     return (
-        <div>
+        <div className="p-4 md:p-6">
             <Button variant="ghost" onClick={() => router.push('/numerical-management')} className="mb-4">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Classes
