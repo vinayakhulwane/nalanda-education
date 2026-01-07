@@ -2,7 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { doc, collection, query, where, documentId, updateDoc, arrayUnion, addDoc, serverTimestamp, getDocs, limit, orderBy, increment } from 'firebase/firestore';
@@ -300,9 +300,11 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                     <div className={cn("h-8 w-8 rounded-full flex items-center justify-center shrink-0 border", isCorrect ? "bg-emerald-100 border-emerald-200 text-emerald-600" : "bg-red-100 border-red-200 text-red-600")}>
                       {isCorrect ? <CheckCircle className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     </div>
+                    {/* UPDATED: flex-1 and min-w-0 ensures text wraps instead of pushing width */}
                     <div className="text-left flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground font-semibold">Question {qIdx + 1}</p>
-                      <div className="text-xs text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap break-words min-w-0 w-full">
+                      {/* UPDATED: Full text, break-words, no truncation */}
+                      <div className="text-xs text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap break-words">
                           <span dangerouslySetInnerHTML={{ __html: processedMainQuestionText(q.mainQuestionText) }} />
                       </div>
                     </div>
@@ -323,16 +325,18 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                             const isSubCorrect = result?.isCorrect === true;
                             return (
                               <div key={subQ.id} className="bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 text-sm">
-                                <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed break-words whitespace-pre-wrap min-w-0 w-full"><span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} /></div>
+                                <div className="mb-2 text-slate-800 dark:text-slate-200 font-medium text-xs leading-relaxed break-words w-full"><span dangerouslySetInnerHTML={{ __html: subQ.questionText || "Solve:" }} /></div>
                                 <div className="grid grid-cols-1 gap-2 bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-800">
+                                  {/* Answer Wrapper with strict wrapping for long strings/UUIDs */}
                                   <div className="mt-1 min-w-0">
                                     <span className="text-[10px] uppercase text-slate-400 font-bold block mb-0.5">Your Answer</span>
-                                    <div className={cn("text-xs whitespace-pre-wrap break-words w-full font-medium min-w-0", isSubCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>{userReadableAnswer}</div>
+                                    {/* FIX: break-all forces wrapping even for long unbroken strings like UUIDs */}
+                                    <div className={cn("text-xs whitespace-pre-wrap break-words break-all w-full font-medium", isSubCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>{userReadableAnswer}</div>
                                   </div>
                                   {!isSubCorrect && (
                                     <div className="mt-1 pt-1 min-w-0">
                                         <span className="text-[10px] uppercase text-emerald-600/70 font-bold block mb-0.5">Correct Answer</span>
-                                        <div className="text-xs text-emerald-700 dark:text-emerald-400 whitespace-pre-wrap break-words w-full font-medium min-w-0">{correctReadableAnswer}</div>
+                                        <div className="text-xs text-emerald-700 dark:text-emerald-400 whitespace-pre-wrap break-words break-all w-full font-medium">{correctReadableAnswer}</div>
                                     </div>
                                   )}
                                 </div>
@@ -347,7 +351,7 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                         {unlockedSolution ? (
                             <div className="bg-indigo-50 dark:bg-indigo-950/30 p-3 rounded-lg border border-indigo-100">
                                 <h4 className="text-xs font-bold text-indigo-800 flex items-center gap-1 mb-2"><Unlock className="h-3 w-3" /> AI Solution</h4>
-                                <div className="prose prose-xs dark:prose-invert break-words break-all whitespace-pre-wrap min-w-0 w-full"><ReactMarkdown rehypePlugins={[rehypeRaw]}>{unlockedSolution}</ReactMarkdown></div>
+                                <div className="prose prose-xs dark:prose-invert"><ReactMarkdown rehypePlugins={[rehypeRaw]}>{unlockedSolution}</ReactMarkdown></div>
                             </div>
                         ) : (
                             <Button variant="outline" size="sm" onClick={() => onUnlockSolution(q)} disabled={loadingSolutions[q.id]} className="w-full text-xs h-8 border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100">
@@ -600,9 +604,12 @@ export default function SolveWorksheetPage() {
 
     return (
       <>
+        {/* 📱 MOBILE VIEW */}
         <div className="block sm:hidden animate-in fade-in duration-500">
           <MobileResultView worksheet={worksheet} results={results} answers={answers} questions={orderedQuestions} timeTaken={timeTaken} totalMarks={earnedMarks} maxMarks={totalMarks} onClaimReward={handleClaimReward} calculatedRewards={calculatedRewards} isClaiming={isClaiming} hasClaimed={hasClaimed} userProfile={userProfile} classData={classData} subjectData={subjectData} economySettings={settings} onUnlockSolution={handleUnlockSolution} unlockedSolutions={localUnlocked} loadingSolutions={loadingSolutions} />
         </div>
+
+        {/* 💻 DESKTOP VIEW */}
         <div className="hidden sm:block">
           <WorksheetResults worksheet={worksheet} questions={orderedQuestions} answers={answers} results={results} timeTaken={timeTaken} attempt={attempt ?? undefined} />
         </div>
@@ -630,7 +637,25 @@ export default function SolveWorksheetPage() {
   return (
     <>
       <div className="block sm:hidden">
-        <MobileQuestionRunner question={orderedQuestions[currentQuestionIndex]} currentIndex={currentQuestionIndex} totalQuestions={orderedQuestions.length} timeLeft={timeLeft} initialAnswers={answers} onAnswerSubmit={(subId, ans) => setAnswers(prev => ({ ...prev, [subId]: { answer: ans } }))} onResultCalculated={(subId, correct) => setResults(prev => ({ ...prev, [subId]: { isCorrect: correct } }))} onNext={handleNext} onPrevious={handlePrevious} onFinish={handleFinish} isLastQuestion={isLastQuestion} />
+        <MobileQuestionRunner 
+            question={orderedQuestions[currentQuestionIndex]} 
+            currentIndex={currentQuestionIndex} 
+            totalQuestions={orderedQuestions.length} 
+            timeLeft={timeLeft} 
+            initialAnswers={answers} 
+            onAnswerSubmit={(subId, ans) => setAnswers(prev => ({ ...prev, [subId]: { answer: ans } }))} 
+            onResultCalculated={(subId, correct) => setResults(prev => ({ ...prev, [subId]: { isCorrect: correct } }))} 
+            onNext={handleNext} 
+            onPrevious={handlePrevious} 
+            onFinish={handleFinish} 
+            isLastQuestion={isLastQuestion} 
+            // AI Props
+            aiImage={aiImages[activeQuestion.id]}
+            onAiImageSelect={(file) => setAiImages(prev => ({ ...prev, [activeQuestion.id]: file }))}
+            onAiGrade={() => handleAICheck(activeQuestion)}
+            isAiGrading={isAiGrading}
+            results={results}
+        />
       </div>
       <div className="hidden sm:flex flex-col h-screen bg-slate-50/30 dark:bg-slate-950/30">
         <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm shrink-0">
@@ -639,11 +664,11 @@ export default function SolveWorksheetPage() {
         </header>
         <main className="flex-grow flex flex-col items-center p-4 sm:p-6 overflow-y-auto">
           <div className="w-full max-w-4xl space-y-6 pb-20">
-            <Card className="border-none shadow-md overflow-hidden"><div className="h-1.5 bg-slate-100 dark:bg-slate-800 w-full"><div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }} /></div><CardHeader className="pb-4"><div className="flex justify-between items-start gap-4"><div className="space-y-1"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className="text-xs font-mono text-muted-foreground">Q{currentQuestionIndex + 1}</Badge>{isAIGradingMode && <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 gap-1"><Sparkles className="h-3 w-3" /> AI Graded</Badge>}</div><CardTitle className="text-lg sm:text-xl leading-tight">Question {currentQuestionIndex + 1}</CardTitle></div><div className="text-right shrink-0"><span className="text-sm font-bold text-slate-900 dark:text-slate-100">{qMaxMarks} Marks</span></div></div></CardHeader><CardContent className="p-4 sm:p-6"><div className="w-full overflow-x-auto"><div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-sm sm:text-base leading-relaxed bg-slate-50/50 dark:bg-slate-900/50 p-4 sm:p-6 rounded-xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap break-words min-w-0 w-full"><div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(activeQuestion.mainQuestionText) }} /></div></div></CardContent></Card>
+            <Card className="border-none shadow-md overflow-hidden"><div className="h-1.5 bg-slate-100 dark:bg-slate-800 w-full"><div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }} /></div><CardHeader className="pb-4"><div className="flex justify-between items-start gap-4"><div className="space-y-1"><div className="flex items-center gap-2 mb-1"><Badge variant="outline" className="text-xs font-mono text-muted-foreground">Q{currentQuestionIndex + 1}</Badge>{isAIGradingMode && <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 gap-1"><Sparkles className="h-3 w-3" /> AI Graded</Badge>}</div><CardTitle className="text-lg sm:text-xl leading-tight">Question {currentQuestionIndex + 1}</CardTitle></div><div className="text-right shrink-0"><span className="text-sm font-bold text-slate-900 dark:text-slate-100">{qMaxMarks} Marks</span></div></div></CardHeader><CardContent className="p-4 sm:p-6"><div className="w-full overflow-x-auto"><div className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-sm sm:text-base leading-relaxed bg-slate-50/50 dark:bg-slate-900/50 p-4 sm:p-6 rounded-xl border border-slate-100 dark:border-slate-800 whitespace-pre-wrap break-words min-w-0"><div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(activeQuestion.mainQuestionText) }} /></div></div></CardContent></Card>
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {isAIGradingMode ? (
                 <Card className="border-none shadow-md"><CardHeader><CardTitle className="text-lg">Your Answer</CardTitle><CardDescription>Upload a clear photo of your solution for AI grading.</CardDescription></CardHeader><CardContent className="space-y-6"><AIAnswerUploader questionId={activeQuestion.id} isGrading={isAiGrading} savedImage={aiImages[activeQuestion.id]} onImageSelected={(file) => setAiImages(prev => ({ ...prev, [activeQuestion.id]: file }))} disabled={isQuestionGraded} />
-                  {isQuestionGraded && (<div className="animate-in fade-in slide-in-from-bottom-2 space-y-6"><AIRubricBreakdown rubric={activeQuestion.aiRubric || {}} breakdown={(currentResult as any)?.aiBreakdown || {}} maxMarks={qMaxMarks} />{currentFeedback && (<div className="bg-white dark:bg-slate-900 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm overflow-hidden"><div className="bg-indigo-50/50 dark:bg-indigo-950/30 px-4 py-3 border-b border-indigo-100 dark:border-indigo-900/50 flex items-center gap-2"><Sparkles className="h-4 w-4 text-indigo-600" /><h4 className="font-semibold text-sm text-indigo-900 dark:text-indigo-200">AI Feedback</h4></div><div className="p-5 text-sm text-slate-700 dark:text-slate-300 leading-relaxed break-words break-all whitespace-pre-wrap min-w-0 w-full"><ReactMarkdown components={{ strong: ({ node, ...props }) => <span className="font-bold text-indigo-700 dark:text-indigo-400" {...props} />, ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1 my-2" {...props} />, li: ({ node, ...props }) => <li className="pl-1" {...props} />, p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} /> }}>{currentFeedback}</ReactMarkdown></div></div>)}</div>)}
+                  {isQuestionGraded && (<div className="animate-in fade-in slide-in-from-bottom-2 space-y-6"><AIRubricBreakdown rubric={activeQuestion.aiRubric || {}} breakdown={(currentResult as any)?.aiBreakdown || {}} maxMarks={qMaxMarks} />{currentFeedback && (<div className="bg-white dark:bg-slate-900 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm overflow-hidden"><div className="bg-indigo-50/50 dark:bg-indigo-950/30 px-4 py-3 border-b border-indigo-100 dark:border-indigo-900/50 flex items-center gap-2"><Sparkles className="h-4 w-4 text-indigo-600" /><h4 className="font-semibold text-sm text-indigo-900 dark:text-indigo-200">AI Feedback</h4></div><div className="p-5 text-sm text-slate-700 dark:text-slate-300 leading-relaxed"><ReactMarkdown components={{ strong: ({ node, ...props }) => <span className="font-bold text-indigo-700 dark:text-indigo-400" {...props} />, ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1 my-2" {...props} />, li: ({ node, ...props }) => <li className="pl-1" {...props} />, p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} /> }}>{currentFeedback}</ReactMarkdown></div></div>)}</div>)}
                   {!isQuestionGraded && (<div className="flex justify-end pt-2"><Button onClick={() => handleAICheck(activeQuestion)} disabled={isAiGrading} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/20 w-full sm:w-auto" size="lg">{isAiGrading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2 h-4 w-4" /> Grade My Answer</>}</Button></div>)}
                 </CardContent></Card>
               ) : (<QuestionRunner key={activeQuestion.id} question={activeQuestion} onAnswerSubmit={(subQuestionId, answer) => setAnswers(prev => ({ ...prev, [subQuestionId]: { answer } }))} onResultCalculated={(subQuestionId, isCorrect) => setResults((prev: ResultState) => ({ ...prev, [subQuestionId]: { isCorrect } }))} initialAnswers={answers} />)}
