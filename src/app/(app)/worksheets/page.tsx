@@ -53,7 +53,7 @@ export default function WorksheetsPage() {
     const { data: classes, isLoading: areClassesLoading } = useCollection<Class>(classesCollectionRef);
 
     return (
-        <div>
+        <div className="p-4 md:p-6">
             <PageHeader
                 title="Worksheet Generator"
                 description="Select a class to begin creating or managing worksheets."
