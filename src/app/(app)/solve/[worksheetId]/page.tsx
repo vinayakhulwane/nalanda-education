@@ -111,7 +111,8 @@ const getCorrectAnswerText = (subQ: any): string => {
 const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, totalMarks, maxMarks, onClaimReward, calculatedRewards, isClaiming, hasClaimed, userProfile, classData, subjectData, economySettings, onUnlockSolution, unlockedSolutions, loadingSolutions }: any) => {
   const router = useRouter();
   const { toast } = useToast();
-  const percentage = maxMarks > 0 ? Math.round((totalMarks / maxMarks) * 100) : 0;
+  // FIX: Added clamp to ensure percentage never exceeds 100% in display
+  const percentage = maxMarks > 0 ? Math.min(100, Math.round((totalMarks / maxMarks) * 100)) : 0;
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   
@@ -133,17 +134,10 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
     if (!element) return;
 
     try {
-      // 1. Show PDF Header
       if (pdfHeader) pdfHeader.classList.remove('hidden');
-
-      // 2. Open ALL Collapsibles
       const triggers = document.querySelectorAll('[data-state="closed"]');
       triggers.forEach((t: any) => t.click());
-
-      // 3. Wait for expansion
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // 4. Capture
       const canvas = await html2canvas(element, { scale: 2, useCORS: true, scrollY: -window.scrollY });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
@@ -152,7 +146,6 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
       const imgHeight = canvas.height * pdfWidth / canvas.width;
       let heightLeft = imgHeight;
       let position = 0;
-
       pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
       heightLeft -= pdfHeight;
       while (heightLeft >= 0) {
@@ -167,7 +160,6 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
         toast({ title: "PDF Failed", description: "Could not generate PDF", variant: "destructive" });
     } finally { 
         setIsDownloading(false);
-        // 5. Hide PDF Header again
         if (pdfHeader) pdfHeader.classList.add('hidden');
     }
   };
@@ -175,7 +167,7 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-24 overflow-x-hidden" id="mobile-result-content">
       
-      {/* --- HIDDEN PDF HEADER (Visible only during capture) --- */}
+      {/* PDF Header */}
       <div id="pdf-header" className="hidden bg-white p-8 border-b-2 border-slate-100 mb-6">
          <div className="flex justify-between items-start mb-6">
              <div className="flex items-center gap-4">
@@ -190,39 +182,23 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                  <p className="text-sm font-medium text-slate-900">{formattedDate}</p>
              </div>
          </div>
-
          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
              <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-sm">
-                <div>
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Student Name</p>
-                    <p className="font-semibold text-slate-900">{userProfile?.name || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Class</p>
-                    <p className="font-semibold text-slate-900">{classData?.name || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Subject</p>
-                    <p className="font-semibold text-slate-900">{subjectData?.name || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Worksheet</p>
-                    <p className="font-semibold text-slate-900">{worksheet.title}</p>
-                </div>
+                <div><p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Student Name</p><p className="font-semibold text-slate-900">{userProfile?.name || 'N/A'}</p></div>
+                <div><p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Class</p><p className="font-semibold text-slate-900">{classData?.name || 'N/A'}</p></div>
+                <div><p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Subject</p><p className="font-semibold text-slate-900">{subjectData?.name || 'N/A'}</p></div>
+                <div><p className="text-xs text-slate-400 uppercase font-bold mb-0.5">Worksheet</p><p className="font-semibold text-slate-900">{worksheet.title}</p></div>
              </div>
          </div>
       </div>
 
-      {/* HEADER WITH DATE & DETAILS */}
+      {/* RESULT HEADER */}
       <div className="bg-white dark:bg-slate-900 pt-4 pb-10 px-4 rounded-b-[2.5rem] shadow-sm border-b border-slate-100 dark:border-slate-800 relative">
-        
-        {/* Top Back Button */}
         <div className="absolute top-4 left-4">
             <Button variant="ghost" size="icon" onClick={handleBack} className="text-slate-400 hover:text-slate-700">
                 <ArrowLeft className="h-6 w-6" />
             </Button>
         </div>
-
         <div className="text-center space-y-1 mb-6 mt-4">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white px-4 leading-tight">{worksheet.title}</h1>
           <p className="text-xs text-slate-500 font-medium">{formattedDate}</p>
@@ -293,7 +269,7 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
             const isCorrect = allSubQuestions.every(sq => results[sq.id]?.isCorrect === true);
             const unlockedSolution = unlockedSolutions?.[q.id];
             
-            // For AI questions, get the result from the first sub-question
+            // AI Data Retrieval
             const isAiGraded = q.gradingMode === 'ai';
             const firstSubId = q.solutionSteps[0]?.subQuestions[0]?.id;
             const aiResult = isAiGraded ? results[firstSubId] : null;
@@ -308,10 +284,9 @@ const MobileResultView = ({ worksheet, results, answers, questions, timeTaken, t
                     <div className={cn("h-8 w-8 rounded-full flex items-center justify-center shrink-0 border", isCorrect ? "bg-emerald-100 border-emerald-200 text-emerald-600" : "bg-red-100 border-red-200 text-red-600")}>
                       {isCorrect ? <CheckCircle className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     </div>
-                    {/* UPDATED: flex-1 and min-w-0 ensures text wraps instead of pushing width */}
+                    {/* Flex layout for text wrapping */}
                     <div className="text-left flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground font-semibold">Question {qIdx + 1}</p>
-                      {/* UPDATED: Full text, break-words, no truncation */}
                       <div className="text-xs text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap break-words">
                           <span dangerouslySetInnerHTML={{ __html: processedMainQuestionText(q.mainQuestionText) }} />
                       </div>
@@ -586,26 +561,53 @@ export default function SolveWorksheetPage() {
       const formData = new FormData();
       formData.append('image', imageFile);
       formData.append('questionText', question.mainQuestionText);
-      const qMaxMarks = question.solutionSteps.reduce((acc, s) => acc + s.subQuestions.reduce((ss, sq) => ss + sq.marks, 0), 0);
+      
+      // Calculate total marks for the question
+      const allSubQuestions = question.solutionSteps.flatMap(s => s.subQuestions);
+      const qMaxMarks = allSubQuestions.reduce((acc, sq) => acc + sq.marks, 0);
+      
       formData.append('totalMarks', qMaxMarks.toString());
       const rubricToSend = question.aiRubric || { "General Accuracy": "100%" };
       formData.append('rubric', JSON.stringify(rubricToSend));
       formData.append('feedbackPatterns', JSON.stringify(question.aiFeedbackPatterns || []));
+      
       const response = await fetch('/api/grade', { method: 'POST', body: formData });
       if (!response.ok) throw new Error("API call failed");
+      
       const aiResult = await response.json();
-      const subQuestionIds = question.solutionSteps.flatMap(s => s.subQuestions).map(sq => sq.id);
+      
+      // Calculate total earned marks based on AI percentage score
+      const totalEarnedMarks = (aiResult.totalScore / 100) * qMaxMarks;
+      
       const newResults: ResultState = {};
       const newAnswers: AnswerState = {};
-      const finalActualMarks = (aiResult.totalScore / 100) * qMaxMarks;
-      subQuestionIds.forEach(id => {
-        newResults[id] = { isCorrect: aiResult.isCorrect, score: finalActualMarks, feedback: aiResult.feedback, aiBreakdown: aiResult.breakdown } as any;
-        newAnswers[id] = { answer: aiResult.driveLink };
+      
+      // Distribute marks proportionally to sub-questions
+      allSubQuestions.forEach(sq => {
+          // If total marks is 0, avoid division by zero
+          const weight = qMaxMarks > 0 ? (sq.marks / qMaxMarks) : 0;
+          const assignedScore = totalEarnedMarks * weight;
+          
+          newResults[sq.id] = { 
+              isCorrect: aiResult.isCorrect, 
+              score: assignedScore, // Correctly weighted score per sub-question
+              feedback: aiResult.feedback, 
+              aiBreakdown: aiResult.breakdown 
+          } as any;
+          
+          newAnswers[sq.id] = { answer: aiResult.driveLink };
       });
+
       setResults(prev => ({ ...prev, ...newResults }));
       setAnswers(prev => ({ ...prev, ...newAnswers }));
-      toast({ title: "Grading Complete!", description: `Score: ${finalActualMarks.toFixed(2)} / ${qMaxMarks}` });
-    } catch (error: any) { console.error("AI Grading Error", error); toast({ variant: 'destructive', title: "Grading Failed", description: error.message }); } finally { setIsAiGrading(false); }
+      
+      toast({ title: "Grading Complete!", description: `Score: ${totalEarnedMarks.toFixed(2)} / ${qMaxMarks}` });
+    } catch (error: any) { 
+        console.error("AI Grading Error", error); 
+        toast({ variant: 'destructive', title: "Grading Failed", description: error.message }); 
+    } finally { 
+        setIsAiGrading(false); 
+    }
   };
 
   if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
@@ -638,12 +640,28 @@ export default function SolveWorksheetPage() {
 
     return (
       <>
-        {/* 📱 MOBILE VIEW */}
         <div className="block sm:hidden animate-in fade-in duration-500">
-          <MobileResultView worksheet={worksheet} results={results} answers={answers} questions={orderedQuestions} timeTaken={timeTaken} totalMarks={earnedMarks} maxMarks={totalMarks} onClaimReward={handleClaimReward} calculatedRewards={calculatedRewards} isClaiming={isClaiming} hasClaimed={hasClaimed} userProfile={userProfile} classData={classData} subjectData={subjectData} economySettings={settings} onUnlockSolution={handleUnlockSolution} unlockedSolutions={localUnlocked} loadingSolutions={loadingSolutions} />
+          <MobileResultView 
+            worksheet={worksheet} 
+            results={results} 
+            answers={answers} 
+            questions={orderedQuestions} 
+            timeTaken={timeTaken} 
+            totalMarks={earnedMarks} 
+            maxMarks={totalMarks} 
+            onClaimReward={handleClaimReward} 
+            calculatedRewards={calculatedRewards} 
+            isClaiming={isClaiming} 
+            hasClaimed={hasClaimed} 
+            userProfile={userProfile} 
+            classData={classData} 
+            subjectData={subjectData} 
+            economySettings={settings} 
+            onUnlockSolution={handleUnlockSolution} 
+            unlockedSolutions={localUnlocked} 
+            loadingSolutions={loadingSolutions} 
+          />
         </div>
-
-        {/* 💻 DESKTOP VIEW */}
         <div className="hidden sm:block">
           <WorksheetResults worksheet={worksheet} questions={orderedQuestions} answers={answers} results={results} timeTaken={timeTaken} attempt={attempt ?? undefined} />
         </div>
@@ -671,8 +689,18 @@ export default function SolveWorksheetPage() {
   return (
     <>
       <div className="block sm:hidden">
-        <MobileQuestionRunner question={orderedQuestions[currentQuestionIndex]} currentIndex={currentQuestionIndex} totalQuestions={orderedQuestions.length} timeLeft={timeLeft} initialAnswers={answers} onAnswerSubmit={(subId, ans) => setAnswers(prev => ({ ...prev, [subId]: { answer: ans } }))} onResultCalculated={(subId, correct) => setResults(prev => ({ ...prev, [subId]: { isCorrect: correct } }))} onNext={handleNext} onPrevious={handlePrevious} onFinish={handleFinish} isLastQuestion={isLastQuestion} 
-            // AI Props
+        <MobileQuestionRunner 
+            question={orderedQuestions[currentQuestionIndex]} 
+            currentIndex={currentQuestionIndex} 
+            totalQuestions={orderedQuestions.length} 
+            timeLeft={timeLeft} 
+            initialAnswers={answers} 
+            onAnswerSubmit={(subId, ans) => setAnswers(prev => ({ ...prev, [subId]: { answer: ans } }))} 
+            onResultCalculated={(subId, correct) => setResults(prev => ({ ...prev, [subId]: { isCorrect: correct } }))} 
+            onNext={handleNext} 
+            onPrevious={handlePrevious} 
+            onFinish={handleFinish} 
+            isLastQuestion={isLastQuestion} 
             aiImage={aiImages[activeQuestion.id]}
             onAiImageSelect={(file) => setAiImages(prev => ({ ...prev, [activeQuestion.id]: file }))}
             onAiGrade={() => handleAICheck(activeQuestion)}
