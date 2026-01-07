@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useUser } from "@/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { WorksheetManualBuilder } from "@/components/worksheet-manual-builder";
+import WorksheetManualBuilder from "@/components/worksheet-manual-builder";
 import { calculateWorksheetCost } from "@/lib/wallet";
 
 // Add a source property to track where the question came from
