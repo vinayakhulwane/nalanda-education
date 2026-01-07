@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Question, Unit, Category, CurrencyType, EconomySettings } from '@/types';
@@ -33,22 +32,37 @@ type WorksheetManualBuilderProps = {
     onCreateWorksheet: (worksheetType: 'classroom' | 'sample' | 'practice') => void;
 };
 
-const currencyIcons: Record<CurrencyType, React.ElementType> = {
+// Map with Singular and Plural keys to ensure icons always match
+const currencyIcons: Record<string, React.ElementType> = {
     spark: Sparkles,
-    coin: Gem,
+    sparks: Sparkles,
+    coin: Coins,
+    coins: Coins,
     gold: Crown,
+    golds: Crown,
     diamond: Gem,
+    diamonds: Gem,
+    aicredits: BrainCircuit, // Lowercase for safety
     aiCredits: BrainCircuit,
 };
 
 const allCurrencyTypes: CurrencyType[] = ['spark', 'coin', 'gold', 'diamond'];
 
 // Premium styling for currency badges
-const currencyStyles: Record<CurrencyType, { badgeBg: string, badgeText: string, border: string }> = {
+const currencyStyles: Record<string, { badgeBg: string, badgeText: string, border: string }> = {
     spark: { badgeBg: 'bg-slate-100 dark:bg-slate-800', badgeText: 'text-slate-600 dark:text-slate-300', border: 'border-slate-200 dark:border-slate-700' },
+    sparks: { badgeBg: 'bg-slate-100 dark:bg-slate-800', badgeText: 'text-slate-600 dark:text-slate-300', border: 'border-slate-200 dark:border-slate-700' },
+    
     coin: { badgeBg: 'bg-yellow-100 dark:bg-yellow-900/40', badgeText: 'text-yellow-700 dark:text-yellow-300', border: 'border-yellow-200 dark:border-yellow-800' },
+    coins: { badgeBg: 'bg-yellow-100 dark:bg-yellow-900/40', badgeText: 'text-yellow-700 dark:text-yellow-300', border: 'border-yellow-200 dark:border-yellow-800' },
+    
     gold: { badgeBg: 'bg-amber-100 dark:bg-amber-900/40', badgeText: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800' },
+    golds: { badgeBg: 'bg-amber-100 dark:bg-amber-900/40', badgeText: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800' },
+    
     diamond: { badgeBg: 'bg-blue-100 dark:bg-blue-900/40', badgeText: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' },
+    diamonds: { badgeBg: 'bg-blue-100 dark:bg-blue-900/40', badgeText: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' },
+    
+    aicredits: { badgeBg: 'bg-indigo-100 dark:bg-indigo-900/40', badgeText: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800' },
     aiCredits: { badgeBg: 'bg-indigo-100 dark:bg-indigo-900/40', badgeText: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800' },
 };
 
@@ -61,9 +75,7 @@ const getCleanText = (html: string | undefined) => {
 };
 
 // --- COST DISPLAY COMPONENT ---
-// Safe handling of any object type passed in
 const CostDisplay = ({ creationCost }: { creationCost: any }) => {
-    // Filter to ensure only valid numbers are displayed
     const costs = Object.entries(creationCost || {}).filter(([_, val]) => typeof val === 'number' && val > 0);
     
     if (costs.length === 0) return <span className="text-emerald-400 font-bold text-sm">Free</span>;
@@ -71,8 +83,9 @@ const CostDisplay = ({ creationCost }: { creationCost: any }) => {
     return (
         <div className="flex flex-wrap gap-2">
             {costs.map(([key, val]) => {
-                // Fallback to Coins if icon missing, but diamond will use Gem
-                const Icon = currencyIcons[key as CurrencyType] || Coins; 
+                const lowerKey = key.toLowerCase();
+                // Check exact key, lowercase key, or pluralized lowercase key
+                const Icon = currencyIcons[key] || currencyIcons[lowerKey] || currencyIcons[lowerKey + 's'] || Coins; 
                 return (
                     <div key={key} className="flex items-center gap-1 text-xs font-bold bg-white/20 px-2 py-0.5 rounded-md text-white">
                         <Icon className="h-3 w-3" /> {val as number}
@@ -84,8 +97,7 @@ const CostDisplay = ({ creationCost }: { creationCost: any }) => {
 };
 
 // --- MAIN COMPONENT ---
-// Removed "export" from here to avoid duplicate export error
-function WorksheetManualBuilder({
+export function WorksheetManualBuilder({
     availableQuestions,
     selectedQuestions,
     addQuestion,
@@ -164,19 +176,22 @@ function WorksheetManualBuilder({
     const canAfford = useMemo(() => {
         if (userIsEditor) return true;
         if (!userProfile) return false;
-        // Safe check for undefined userProfile properties
+        
         const userCoins = userProfile.coins || 0;
         const userGold = userProfile.gold || 0;
         const userDiamonds = userProfile.diamonds || 0;
         const userAiCredits = userProfile.aiCredits || 0;
 
-        // Cast creationCost to any to avoid strict indexing errors on dynamic keys
         const cost = creationCost as any;
+        const costCoins = cost.coins || cost.coin || 0;
+        const costGold = cost.gold || 0;
+        const costDiamonds = cost.diamonds || cost.diamond || 0;
+        const costAiCredits = cost.aiCredits || 0;
 
-        return (userCoins >= (cost.coins || 0)) && 
-               (userGold >= (cost.gold || 0)) &&
-               (userDiamonds >= (cost.diamonds || 0)) && 
-               (userAiCredits >= (cost.aiCredits || 0));
+        return (userCoins >= costCoins) && 
+               (userGold >= costGold) &&
+               (userDiamonds >= costDiamonds) && 
+               (userAiCredits >= costAiCredits);
     }, [userProfile, creationCost, userIsEditor]);
 
     const handleFilterChange = (filterType: 'units' | 'categories' | 'currencies', value: string, isChecked: boolean) => {
@@ -229,9 +244,9 @@ function WorksheetManualBuilder({
                             <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Estimated Cost</h4>
                             <div className="grid grid-cols-2 gap-3">
                                 {Object.entries(creationCost).filter(([_, val]) => typeof val === 'number' && val > 0).length > 0 ? Object.entries(creationCost).filter(([_, val]) => typeof val === 'number' && val > 0).map(([key, value]) => {
-                                    // SAFE FALLBACK: If icon doesn't exist, use Coins
-                                    const Icon = currencyIcons[key as CurrencyType] || Coins;
-                                    const style = currencyStyles[key as CurrencyType] || currencyStyles.coin;
+                                    const lowerKey = key.toLowerCase();
+                                    const Icon = currencyIcons[key] || currencyIcons[lowerKey] || currencyIcons[lowerKey + 's'] || Coins;
+                                    const style = currencyStyles[key] || currencyStyles[lowerKey] || currencyStyles[lowerKey + 's'] || currencyStyles.coin;
                                     return (
                                         <div key={key} className={cn("flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border dark:border-slate-700")}>
                                             <Icon className={cn("h-5 w-5", style.badgeText)} />
@@ -263,8 +278,9 @@ function WorksheetManualBuilder({
                     
                     <TabsContent value="review" className="mt-0 space-y-3 pb-20">
                         {selectedQuestions.map(q => {
-                            // SAFE FALLBACK for icon inside review list
-                            const Icon = currencyIcons[q.currencyType] || Coins;
+                            // Robust key checking for icon
+                            const qType = q.currencyType;
+                            const Icon = currencyIcons[qType] || currencyIcons[qType + 's'] || Coins;
                             return (
                                 <div key={q.id} className="flex items-start gap-3 p-3 rounded-xl border bg-white dark:bg-slate-900 shadow-sm relative group active:scale-[0.99] transition-transform">
                                     <div className="mt-0.5 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">
@@ -376,8 +392,8 @@ function WorksheetManualBuilder({
                         const isAiAndDisabled = q.gradingMode === 'ai' && hasSelectedAiQuestion && !isSelected;
                         
                         // SAFE FALLBACK for main grid icons
-                        const CurrencyIcon = currencyIcons[q.currencyType] || Coins;
-                        const styles = currencyStyles[q.currencyType] || currencyStyles.coin;
+                        const CurrencyIcon = currencyIcons[q.currencyType] || currencyIcons[q.currencyType + 's'] || Coins;
+                        const styles = currencyStyles[q.currencyType] || currencyStyles[q.currencyType + 's'] || currencyStyles.coin;
                         
                         const unitName = unitMap.get(q.unitId) || "Unknown Unit";
                         const categoryName = categoryMap.get(q.categoryId) || "Unknown Category";
@@ -385,7 +401,7 @@ function WorksheetManualBuilder({
                         return (
                             <Card key={q.id} className={cn(
                                 "group p-4 flex flex-col gap-3 rounded-2xl transition-all border relative",
-                                isSelected ? "border-emerald-500/50 bg-emerald-50/10 dark:bg-emerald-900/1 ring-1 ring-emerald-500/20" : "border-slate-200 dark:border-slate-800 hover:shadow-md",
+                                isSelected ? "border-emerald-500/50 bg-emerald-50/10 dark:bg-emerald-900/5 ring-1 ring-emerald-500/20" : "border-slate-200 dark:border-slate-800 hover:shadow-md",
                                 isAiAndDisabled && "opacity-60 cursor-not-allowed"
                             )}>
                                 {/* 1. Title Row */}
@@ -460,26 +476,24 @@ function WorksheetManualBuilder({
                     <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none shadow-xl overflow-hidden relative rounded-2xl">
                         <div className="absolute top-0 right-0 p-8 opacity-5"><FileText className="w-32 h-32" /></div>
                         <CardHeader className="pb-2 relative z-10"><CardTitle className="flex items-center gap-2 text-lg font-medium text-slate-200"><ShoppingCart className="h-5 w-5" /> Current Draft</CardTitle></CardHeader>
-                        <CardContent className="relative z-10">
-                            <div className="space-y-6">
-                                <div className="space-y-2 pt-4">
-                                    <h4 className="text-sm font-semibold text-slate-400">Estimated Cost</h4>
-                                    <CostDisplay creationCost={creationCost} />
-                                </div>
-                                <div>
-                                    <div className="flex justify-between items-baseline mb-2"><span className="text-4xl font-bold tracking-tight">{selectedQuestions.length}</span><span className="text-sm font-medium text-slate-400 uppercase tracking-wide">Questions</span></div>
-                                    <Progress value={(selectedQuestions.length / 15) * 100} className="h-2 bg-slate-700" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 pt-2">
-                                    <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5">
-                                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Total Marks</p>
-                                        <p className="text-xl font-bold">{totalMarks}</p>
-                                    </div>
-                                    <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5">
-                                        <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Est. Time</p>
-                                        <p className="text-xl font-bold">{estimatedTime}m</p>
-                                    </div>
-                                </div>
+                        <CardContent className="relative z-10"><div className="space-y-6"><div><div className="flex justify-between items-baseline mb-2"><span className="text-4xl font-bold tracking-tight">{selectedQuestions.length}</span><span className="text-sm font-medium text-slate-400 uppercase tracking-wide">Questions</span></div><Progress value={(selectedQuestions.length / 15) * 100} className="h-2 bg-slate-700" /></div>
+                        
+                        {/* DESKTOP COST DISPLAY */}
+                        <div className="grid grid-cols-2 gap-4 pt-2">
+                            <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5">
+                                <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Total Marks</p>
+                                <p className="text-xl font-bold">{totalMarks}</p>
+                            </div>
+                            <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5">
+                                <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Est. Time</p>
+                                <p className="text-xl font-bold">{estimatedTime}m</p>
+                            </div>
+                            {/* Added Cost Card */}
+                            <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm border border-white/5 col-span-2">
+                                <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Total Cost</p>
+                                <CostDisplay creationCost={creationCost} />
+                            </div>
+                        </div>
                         
                         </div></CardContent>
                         <CardFooter className="pt-2 pb-6 relative z-10">
@@ -557,5 +571,4 @@ function WorksheetManualBuilder({
 }
 
 // Ensure safe double export to prevent import issues
-export { WorksheetManualBuilder };
 export default WorksheetManualBuilder;
