@@ -44,7 +44,7 @@ export function CompletedSubQuestionSummary({ subQuestion, answer, index }: Comp
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3 border rounded-lg bg-card text-sm text-muted-foreground runner-summary-card w-full text-left hover:bg-muted/50 cursor-pointer">
             <div className="font-medium">{index + 1}.</div>
             <div className="flex-grow min-w-0">
-                <p className="break-words">{questionText}</p>
+                <p className="break-words break-all whitespace-pre-wrap min-w-0">{questionText}</p>
             </div>
             <div className="flex items-center gap-2">
                 <p className="font-semibold text-card-foreground break-all">{answerText}</p>
