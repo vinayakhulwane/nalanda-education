@@ -265,10 +265,10 @@ export function MobileQuestionRunner({
       <div key={subQ.id} className="relative pl-6 pb-2 border-l-2 border-slate-200 last:border-0 last:pb-0">
         <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-slate-200 ring-4 ring-white" />
         <div
-          className="text-xs text-slate-500 mb-1 line-clamp-2"
+          className="text-xs text-slate-500 mb-1 line-clamp-2 break-words break-all whitespace-pre-wrap min-w-0 w-full"
           dangerouslySetInnerHTML={{ __html: processedHtml(subQ.questionText) }}
         />
-        <div className="text-sm font-medium text-slate-800 bg-slate-100/50 px-2 py-1 rounded inline-block">
+        <div className="text-sm font-medium text-slate-800 bg-slate-100/50 px-2 py-1 rounded inline-block break-words break-all whitespace-pre-wrap min-w-0 w-full">
           {displayAnswer || <span className="text-slate-400 italic">Skipped</span>}
         </div>
       </div>
@@ -329,7 +329,7 @@ export function MobileQuestionRunner({
             <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200">Main Problem</Badge>
           </div>
           <div
-            className="prose prose-slate prose-sm max-w-none text-slate-800 leading-relaxed font-medium"
+            className="prose prose-slate prose-sm max-w-none text-slate-800 leading-relaxed font-medium break-words break-all whitespace-pre-wrap min-w-0 w-full"
             dangerouslySetInnerHTML={{ __html: processedHtml(question.mainQuestionText) }}
           />
         </div>
@@ -374,7 +374,7 @@ export function MobileQuestionRunner({
               <div className="p-5">
                 {/* SubQuestion Text */}
                 <div
-                  className="prose prose-slate prose-sm max-w-none text-slate-700 mb-6"
+                  className="prose prose-slate prose-sm max-w-none text-slate-700 mb-6 break-words break-all whitespace-pre-wrap min-w-0 w-full"
                   dangerouslySetInnerHTML={{ __html: processedHtml(activeSubQuestion.questionText) }}
                 />
 

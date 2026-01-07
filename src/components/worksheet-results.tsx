@@ -621,7 +621,7 @@ export function WorksheetResults({
                       <span className="flex items-center justify-center h-8 w-8 rounded-full bg-primary text-primary-foreground font-bold text-sm shrink-0">
                         {qIndex + 1}
                       </span>
-                      <div className="prose dark:prose-invert max-w-none prose-p:my-1 break-words break-all whitespace-pre-wrap min-w-0">
+                      <div className="prose dark:prose-invert max-w-none prose-p:my-1 break-words break-all whitespace-pre-wrap min-w-0 w-full">
                         <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(question.mainQuestionText) }} />
                       </div>
                     </div>
@@ -639,7 +639,7 @@ export function WorksheetResults({
                           </div>
                           <div className="space-y-1">
                             <h4 className="font-bold text-purple-900 dark:text-purple-300">AI Feedback</h4>
-                            <div className="text-sm text-purple-800 dark:text-purple-200 leading-relaxed">
+                            <div className="text-sm text-purple-800 dark:text-purple-200 leading-relaxed break-words break-all whitespace-pre-wrap min-w-0 w-full">
                               <ReactMarkdown rehypePlugins={[rehypeRaw]}>{feedback}</ReactMarkdown>
                             </div>
                           </div>
@@ -660,7 +660,7 @@ export function WorksheetResults({
                           <h4 className="font-bold text-green-800 dark:text-green-300 flex items-center gap-2">
                             <Unlock className="h-4 w-4" /> Expert Solution
                           </h4>
-                          <div className="text-sm text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none">
+                          <div className="text-sm text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none break-words break-all whitespace-pre-wrap min-w-0 w-full">
                             <ReactMarkdown rehypePlugins={[rehypeRaw]}>{unlockedSolution}</ReactMarkdown>
                           </div>
                         </div>
@@ -691,7 +691,7 @@ export function WorksheetResults({
                     <span className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-sm shrink-0">
                       {qIndex + 1}
                     </span>
-                    <div className="prose dark:prose-invert max-w-none prose-p:my-1 break-words break-all whitespace-pre-wrap min-w-0">
+                    <div className="prose dark:prose-invert max-w-none prose-p:my-1 break-words break-all whitespace-pre-wrap min-w-0 w-full">
                       <div dangerouslySetInnerHTML={{ __html: processedMainQuestionText(question.mainQuestionText) }} />
                     </div>
                   </div>
@@ -707,7 +707,7 @@ export function WorksheetResults({
                         <div key={subQ.id} className="p-5 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors">
                           <div className="flex flex-col md:flex-row md:items-start gap-4 justify-between">
                             <div className="flex-1 space-y-2">
-                              <div className="prose-sm dark:prose-invert max-w-none text-muted-foreground break-words break-all whitespace-pre-wrap min-w-0" dangerouslySetInnerHTML={{ __html: subQ.questionText }} />
+                              <div className="prose-sm dark:prose-invert max-w-none text-muted-foreground break-words break-all whitespace-pre-wrap min-w-0 w-full" dangerouslySetInnerHTML={{ __html: subQ.questionText }} />
                             </div>
                             <div className="shrink-0">
                               <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border", isCorrect ? "bg-green-100 text-green-800 border-green-200" : "bg-red-100 text-red-800 border-red-200")}>
@@ -717,14 +717,14 @@ export function WorksheetResults({
                             </div>
                           </div>
                           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="p-3 bg-slate-100 dark:bg-slate-900 rounded-lg">
+                            <div className="p-3 bg-slate-100 dark:bg-slate-900 rounded-lg min-w-0">
                               <span className="text-xs font-bold uppercase text-slate-500 tracking-wider block mb-1">Your Answer</span>
-                              <span className="font-medium break-words break-all whitespace-pre-wrap min-w-0">{getAnswerText(subQ, studentAnswer)}</span>
+                              <span className="font-medium break-words break-all whitespace-pre-wrap min-w-0 w-full">{getAnswerText(subQ, studentAnswer)}</span>
                             </div>
                             {!isCorrect && (
-                              <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900 rounded-lg">
+                              <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900 rounded-lg min-w-0">
                                 <span className="text-xs font-bold uppercase text-green-600 tracking-wider block mb-1">Correct Answer</span>
-                                <div className="font-medium text-green-800 dark:text-green-300 break-words break-all whitespace-pre-wrap min-w-0" dangerouslySetInnerHTML={{ __html: getCorrectAnswerText(subQ) }} />
+                                <div className="font-medium text-green-800 dark:text-green-300 break-words break-all whitespace-pre-wrap min-w-0 w-full" dangerouslySetInnerHTML={{ __html: getCorrectAnswerText(subQ) }} />
                               </div>
                             )}
                           </div>
@@ -739,7 +739,7 @@ export function WorksheetResults({
                           <h4 className="font-bold text-green-800 dark:text-green-300 flex items-center gap-2">
                             <Unlock className="h-4 w-4" /> Expert Solution
                           </h4>
-                          <div className="text-sm text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none">
+                          <div className="text-sm text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none break-words break-all whitespace-pre-wrap min-w-0 w-full">
                             <ReactMarkdown rehypePlugins={[rehypeRaw]}>{unlockedSolution}</ReactMarkdown>
                           </div>
                         </div>
