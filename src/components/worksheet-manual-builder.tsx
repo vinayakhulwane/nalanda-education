@@ -1,12 +1,12 @@
+
 'use client';
 
 import type { Question, Unit, Category, CurrencyType, EconomySettings } from '@/types';
 import { Card, CardHeader, CardContent, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
-import { Plus, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Filter, X, Eye, Check, Search, FileText, BrainCircuit } from 'lucide-react';
+import { Plus, Bot, Coins, Crown, Gem, Sparkles, ShoppingCart, ArrowRight, Trash2, Filter, X, Eye, Check, Search, FileText, BrainCircuit, AlertCircle } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from './ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from './ui/sheet';
 import { useState, useMemo, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Progress } from './ui/progress';
@@ -35,7 +35,7 @@ type WorksheetManualBuilderProps = {
 
 const currencyIcons: Record<CurrencyType, React.ElementType> = {
     spark: Sparkles,
-    coin: Coins,
+    coin: Gem,
     gold: Crown,
     diamond: Gem,
     aiCredits: BrainCircuit,
@@ -60,7 +60,32 @@ const getCleanText = (html: string | undefined) => {
     return text.replace(/\s+/g, ' ').trim();
 };
 
-export default function WorksheetManualBuilder({
+// --- COST DISPLAY COMPONENT ---
+// Safe handling of any object type passed in
+const CostDisplay = ({ creationCost }: { creationCost: any }) => {
+    // Filter to ensure only valid numbers are displayed
+    const costs = Object.entries(creationCost || {}).filter(([_, val]) => typeof val === 'number' && val > 0);
+    
+    if (costs.length === 0) return <span className="text-emerald-400 font-bold text-sm">Free</span>;
+    
+    return (
+        <div className="flex flex-wrap gap-2">
+            {costs.map(([key, val]) => {
+                // Fallback to Coins if icon missing, but diamond will use Gem
+                const Icon = currencyIcons[key as CurrencyType] || Coins; 
+                return (
+                    <div key={key} className="flex items-center gap-1 text-xs font-bold bg-white/20 px-2 py-0.5 rounded-md text-white">
+                        <Icon className="h-3 w-3" /> {val as number}
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+// --- MAIN COMPONENT ---
+// Removed "export" from here to avoid duplicate export error
+function WorksheetManualBuilder({
     availableQuestions,
     selectedQuestions,
     addQuestion,
@@ -139,8 +164,19 @@ export default function WorksheetManualBuilder({
     const canAfford = useMemo(() => {
         if (userIsEditor) return true;
         if (!userProfile) return false;
-        return (userProfile.coins >= creationCost.coins) && (userProfile.gold >= creationCost.gold) &&
-            (userProfile.diamonds >= creationCost.diamonds) && ((userProfile.aiCredits || 0) >= (creationCost.aiCredits || 0));
+        // Safe check for undefined userProfile properties
+        const userCoins = userProfile.coins || 0;
+        const userGold = userProfile.gold || 0;
+        const userDiamonds = userProfile.diamonds || 0;
+        const userAiCredits = userProfile.aiCredits || 0;
+
+        // Cast creationCost to any to avoid strict indexing errors on dynamic keys
+        const cost = creationCost as any;
+
+        return (userCoins >= (cost.coins || 0)) && 
+               (userGold >= (cost.gold || 0)) &&
+               (userDiamonds >= (cost.diamonds || 0)) && 
+               (userAiCredits >= (cost.aiCredits || 0));
     }, [userProfile, creationCost, userIsEditor]);
 
     const handleFilterChange = (filterType: 'units' | 'categories' | 'currencies', value: string, isChecked: boolean) => {
@@ -166,6 +202,118 @@ export default function WorksheetManualBuilder({
 
     const hasSelectedAiQuestion = useMemo(() => selectedQuestions.some(q => q.gradingMode === 'ai'), [selectedQuestions]);
 
+    // --- REUSABLE REVIEW CONTENT COMPONENT ---
+    const reviewSheetContent = (
+        <div className="flex-grow flex flex-col h-full overflow-hidden">
+            <Tabs defaultValue="blueprint" className="flex-grow flex flex-col">
+                <div className="px-6 pt-4">
+                    <TabsList className="w-full grid grid-cols-2">
+                        <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
+                        <TabsTrigger value="review">Questions</TabsTrigger>
+                    </TabsList>
+                </div>
+                <div className="flex-grow overflow-y-auto p-6">
+                    <TabsContent value="blueprint" className="mt-0 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center">
+                                <p className="text-3xl font-bold text-primary">{selectedQuestions.length}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Questions</p>
+                            </div>
+                            <div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center">
+                                <p className="text-3xl font-bold text-primary">{totalMarks}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Total Marks</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 pt-4">
+                            <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Estimated Cost</h4>
+                            <div className="grid grid-cols-2 gap-3">
+                                {Object.entries(creationCost).filter(([_, val]) => typeof val === 'number' && val > 0).length > 0 ? Object.entries(creationCost).filter(([_, val]) => typeof val === 'number' && val > 0).map(([key, value]) => {
+                                    // SAFE FALLBACK: If icon doesn't exist, use Coins
+                                    const Icon = currencyIcons[key as CurrencyType] || Coins;
+                                    const style = currencyStyles[key as CurrencyType] || currencyStyles.coin;
+                                    return (
+                                        <div key={key} className={cn("flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border dark:border-slate-700")}>
+                                            <Icon className={cn("h-5 w-5", style.badgeText)} />
+                                            <span className="font-bold text-slate-800 dark:text-slate-200">{value as number}</span>
+                                            <span className="text-xs text-muted-foreground capitalize">{key}</span>
+                                        </div>
+                                    )
+                                }) : <p className="col-span-2 text-sm text-muted-foreground text-center py-2">No cost for this worksheet.</p>}
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-semibold flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                <Filter className="h-4 w-4 text-muted-foreground" /> Unit Distribution
+                            </h4>
+                            <div className="space-y-3">
+                                {Object.entries(breakdownByUnit).map(([name, data]) => (
+                                    <div key={name}>
+                                        <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                                            <span>{name}</span>
+                                            <span className="font-mono font-medium">{Math.round((data.count / selectedQuestions.length) * 100)}%</span>
+                                        </div>
+                                        <Progress value={(data.count / selectedQuestions.length) * 100} className="h-2" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="review" className="mt-0 space-y-3 pb-20">
+                        {selectedQuestions.map(q => {
+                            // SAFE FALLBACK for icon inside review list
+                            const Icon = currencyIcons[q.currencyType] || Coins;
+                            return (
+                                <div key={q.id} className="flex items-start gap-3 p-3 rounded-xl border bg-white dark:bg-slate-900 shadow-sm relative group active:scale-[0.99] transition-transform">
+                                    <div className="mt-0.5 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">
+                                        <Icon className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium line-clamp-2 text-slate-800 dark:text-slate-200 mb-0.5">{q.name || "Untitled Question"}</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 -mr-2" onClick={() => removeQuestion(q.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            );
+                        })}
+                    </TabsContent>
+                </div>
+            </Tabs>
+            <div className="p-4 border-t bg-white dark:bg-slate-950 mt-auto">
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center text-sm font-medium px-1">
+                        <span className="text-muted-foreground">Estimated Time</span>
+                        <span className="font-bold text-slate-900 dark:text-slate-100">{estimatedTime} mins</span>
+                    </div>
+
+                    {!canAfford && (
+                        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded-lg text-red-600 dark:text-red-400 text-sm font-medium animate-in fade-in slide-in-from-bottom-2">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            <span>Not enough balance to create this worksheet.</span>
+                        </div>
+                    )}
+
+                    <Button 
+                        className={cn(
+                            "w-full h-12 text-base font-bold shadow-lg rounded-xl transition-all",
+                            !canAfford 
+                                ? "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 shadow-none cursor-not-allowed" 
+                                : "bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 text-white"
+                        )}
+                        onClick={handleCreateClick} 
+                        disabled={!canAfford || selectedQuestions.length === 0}
+                    >
+                        {!canAfford ? 'Insufficient Balance' : 'Generate Worksheet'} 
+                        {!canAfford ? <X className="ml-2 h-4 w-4" /> : <ArrowRight className="ml-2 h-4 w-4" />}
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pb-24 md:pb-0">
             <div className="lg:col-span-2 space-y-6">
@@ -188,7 +336,6 @@ export default function WorksheetManualBuilder({
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[320px] p-0" align="end">
-                            {/* Filter Tabs Content (Same as previous) */}
                             <Tabs defaultValue="unit" className="w-full">
                                 <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 dark:bg-slate-800 m-2 rounded-md">
                                     <TabsTrigger value="unit" className="rounded-sm">Unit</TabsTrigger>
@@ -205,7 +352,6 @@ export default function WorksheetManualBuilder({
                                         ))}
                                     </div>
                                 </TabsContent>
-                                {/* Category and Currency contents omitted for brevity, same logic as Unit */}
                                 <TabsContent value="category" className="mt-0"><div className="px-3 pt-2 pb-3 border-b"><div className="relative"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search categories..." className="pl-8 h-9" value={filterSearch.category} onChange={(e) => setFilterSearch(prev => ({ ...prev, category: e.target.value }))} /></div></div><div className="max-h-[240px] overflow-y-auto py-1 px-1">{filteredCategoriesList.map(cat => (<div key={cat.id} className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Checkbox id={`manual-filter-cat-${cat.id}`} checked={filters.categories.includes(cat.id)} onCheckedChange={(checked) => handleFilterChange('categories', cat.id, !!checked)} /><Label htmlFor={`manual-filter-cat-${cat.id}`} className="capitalize flex-grow cursor-pointer">{cat.name}</Label></div>))}</div></TabsContent>
                                 <TabsContent value="currency" className="mt-0"><div className="px-3 pt-2 pb-3 border-b"><div className="relative"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search types..." className="pl-8 h-9" value={filterSearch.currency} onChange={(e) => setFilterSearch(prev => ({ ...prev, currency: e.target.value }))} /></div></div><div className="max-h-[240px] overflow-y-auto py-1 px-1">{filteredCurrenciesList.map(currency => (<div key={currency} className="flex items-center space-x-2 px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Checkbox id={`manual-filter-currency-${currency}`} checked={filters.currencies.includes(currency)} onCheckedChange={(checked) => handleFilterChange('currencies', currency, !!checked)} /><Label htmlFor={`manual-filter-currency-${currency}`} className="capitalize flex-grow cursor-pointer">{currency}</Label></div>))}</div></TabsContent>
                                 {(filters.units.length > 0 || filters.categories.length > 0 || filters.currencies.length > 0) && (<div className="p-2 border-t bg-slate-50 dark:bg-slate-900/50"><Button variant="ghost" size="sm" className="w-full h-8 font-normal text-muted-foreground hover:text-foreground" onClick={() => setFilters({ units: [], categories: [], currencies: [] })}>Clear all filters</Button></div>)}
@@ -228,15 +374,18 @@ export default function WorksheetManualBuilder({
                     {filteredQuestions.map(q => {
                         const isSelected = selectedQuestions.some(sq => sq.id === q.id);
                         const isAiAndDisabled = q.gradingMode === 'ai' && hasSelectedAiQuestion && !isSelected;
-                        const CurrencyIcon = currencyIcons[q.currencyType];
-                        const styles = currencyStyles[q.currencyType];
+                        
+                        // SAFE FALLBACK for main grid icons
+                        const CurrencyIcon = currencyIcons[q.currencyType] || Coins;
+                        const styles = currencyStyles[q.currencyType] || currencyStyles.coin;
+                        
                         const unitName = unitMap.get(q.unitId) || "Unknown Unit";
                         const categoryName = categoryMap.get(q.categoryId) || "Unknown Category";
 
                         return (
                             <Card key={q.id} className={cn(
                                 "group p-4 flex flex-col gap-3 rounded-2xl transition-all border relative",
-                                isSelected ? "border-emerald-500/50 bg-emerald-50/10 dark:bg-emerald-900/5 ring-1 ring-emerald-500/20" : "border-slate-200 dark:border-slate-800 hover:shadow-md",
+                                isSelected ? "border-emerald-500/50 bg-emerald-50/10 dark:bg-emerald-900/1 ring-1 ring-emerald-500/20" : "border-slate-200 dark:border-slate-800 hover:shadow-md",
                                 isAiAndDisabled && "opacity-60 cursor-not-allowed"
                             )}>
                                 {/* 1. Title Row */}
@@ -313,11 +462,12 @@ export default function WorksheetManualBuilder({
                         <CardHeader className="pb-2 relative z-10"><CardTitle className="flex items-center gap-2 text-lg font-medium text-slate-200"><ShoppingCart className="h-5 w-5" /> Current Draft</CardTitle></CardHeader>
                         <CardContent className="relative z-10">
                             <div className="space-y-6">
+                                <div className="space-y-2 pt-4">
+                                    <h4 className="text-sm font-semibold text-slate-400">Estimated Cost</h4>
+                                    <CostDisplay creationCost={creationCost} />
+                                </div>
                                 <div>
-                                    <div className="flex justify-between items-baseline mb-2">
-                                        <span className="text-4xl font-bold tracking-tight">{selectedQuestions.length}</span>
-                                        <span className="text-sm font-medium text-slate-400 uppercase tracking-wide">Questions</span>
-                                    </div>
+                                    <div className="flex justify-between items-baseline mb-2"><span className="text-4xl font-bold tracking-tight">{selectedQuestions.length}</span><span className="text-sm font-medium text-slate-400 uppercase tracking-wide">Questions</span></div>
                                     <Progress value={(selectedQuestions.length / 15) * 100} className="h-2 bg-slate-700" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 pt-2">
@@ -330,33 +480,11 @@ export default function WorksheetManualBuilder({
                                         <p className="text-xl font-bold">{estimatedTime}m</p>
                                     </div>
                                 </div>
-                                {!userIsEditor && (
-                                    <div className="space-y-2 pt-2">
-                                        <h4 className="text-sm font-semibold text-slate-400 flex items-center gap-2"><span className="w-1 h-3 bg-yellow-400 rounded-full" /> Estimated Cost</h4>
-                                        <div className="p-3 bg-black/20 rounded-lg space-y-2">
-                                            {Object.entries(creationCost).filter(([_, val]) => val > 0).length > 0 ? (
-                                                Object.entries(creationCost).filter(([_, val]) => val > 0).map(([key, value]) => {
-                                                    const Icon = currencyIcons[key as CurrencyType];
-                                                    return (
-                                                        <div key={key} className="flex justify-between items-center text-sm">
-                                                            <span className="flex items-center gap-2 capitalize text-slate-300">
-                                                                <Icon className="h-4 w-4 text-slate-400" /> {key}
-                                                            </span>
-                                                            <span className="font-mono font-bold text-white">{value}</span>
-                                                        </div>
-                                                    )
-                                                })
-                                            ) : <p className="text-xs text-slate-400 text-center">No cost for this selection.</p>}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
+                        
+                        </div></CardContent>
                         <CardFooter className="pt-2 pb-6 relative z-10">
                             <Sheet>
-                                <SheetTrigger asChild>
-                                    <Button className="w-full h-12 bg-white text-slate-900 hover:bg-slate-200 font-bold shadow-lg rounded-xl" disabled={selectedQuestions.length === 0}>Review & Create <ArrowRight className="ml-2 h-4 w-4" /></Button>
-                                </SheetTrigger>
+                                <SheetTrigger asChild><Button className="w-full h-12 bg-white text-slate-900 hover:bg-slate-200 font-bold shadow-lg rounded-xl" disabled={selectedQuestions.length === 0}>Review & Create <ArrowRight className="ml-2 h-4 w-4" /></Button></SheetTrigger>
                                 <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0 rounded-l-2xl">
                                     <SheetHeader className="p-6 pb-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b">
                                         <SheetTitle>Review Worksheet</SheetTitle>
@@ -369,71 +497,10 @@ export default function WorksheetManualBuilder({
                                             </div>
                                         )}
                                     </SheetHeader>
-                                    <div className="flex-grow flex flex-col h-full overflow-hidden">
-                                        <Tabs defaultValue="blueprint" className="flex-grow flex flex-col">
-                                            <div className="px-6 pt-4">
-                                                <TabsList className="w-full grid grid-cols-2">
-                                                    <TabsTrigger value="blueprint">Blueprint</TabsTrigger>
-                                                    <TabsTrigger value="review">Questions</TabsTrigger>
-                                                </TabsList>
-                                            </div>
-                                            <div className="flex-grow overflow-y-auto p-6">
-                                                <TabsContent value="blueprint" className="mt-0 space-y-6">
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center">
-                                                            <p className="text-3xl font-bold text-primary">{selectedQuestions.length}</p>
-                                                            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Questions</p>
-                                                        </div>
-                                                        <div className="bg-primary/5 p-4 rounded-xl text-center border border-primary/10 flex flex-col items-center justify-center">
-                                                            <p className="text-3xl font-bold text-primary">{totalMarks}</p>
-                                                            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mt-1">Total Marks</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-2 pt-4">
-                                                        <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Estimated Cost</h4>
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            {Object.entries(creationCost).filter(([_, val]) => val > 0).length > 0 ? Object.entries(creationCost).filter(([_, val]) => val > 0).map(([key, value]) => {
-                                                                const Icon = currencyIcons[key as CurrencyType];
-                                                                return (
-                                                                    <div key={key} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 border dark:border-slate-700">
-                                                                        <Icon className={cn("h-5 w-5", currencyStyles[key as CurrencyType]?.badgeText)} />
-                                                                        <span className="font-bold text-slate-800 dark:text-slate-200">{value}</span>
-                                                                        <span className="text-xs text-muted-foreground capitalize">{key}</span>
-                                                                    </div>
-                                                                )
-                                                            }) : <p className="col-span-2 text-sm text-muted-foreground text-center py-2">No cost for this worksheet.</p>}
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-4"><h4 className="text-sm font-semibold flex items-center gap-2 text-slate-900 dark:text-slate-100"><Filter className="h-4 w-4 text-muted-foreground" /> Unit Distribution</h4><div className="space-y-3">{Object.entries(breakdownByUnit).map(([name, data]) => (<div key={name}><div className="flex justify-between text-xs text-muted-foreground mb-1.5"><span>{name}</span><span className="font-mono font-medium">{Math.round((data.count / selectedQuestions.length) * 100)}%</span></div><Progress value={(data.count / selectedQuestions.length) * 100} className="h-2" /></div>))}</div></div>
-                                                </TabsContent>
-                                                <TabsContent value="review" className="mt-0 space-y-3 pb-20">
-                                                    {selectedQuestions.map(q => (
-                                                        <div key={q.id} className="flex items-start gap-3 p-3 rounded-xl border bg-white dark:bg-slate-900 shadow-sm relative group active:scale-[0.99] transition-transform">
-                                                            <div className="mt-0.5 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">
-                                                                {currencyIcons[q.currencyType] && (() => { const Icon = currencyIcons[q.currencyType]; return <Icon className="h-4 w-4 text-muted-foreground" />; })()}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm font-medium line-clamp-2 text-slate-800 dark:text-slate-200 mb-0.5">{q.name || "Untitled Question"}</p>
-                                                            </div>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 -mr-2" onClick={() => removeQuestion(q.id)}><Trash2 className="h-4 w-4" /></Button>
-                                                        </div>
-                                                    ))}
-                                                </TabsContent>
-                                            </div>
-                                        </Tabs>
-                                        <div className="p-4 border-t bg-white dark:bg-slate-950 mt-auto">
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-center text-sm font-medium px-1">
-                                                    <span className="text-muted-foreground">Estimated Time</span>
-                                                    <span className="font-bold text-slate-900 dark:text-slate-100">{estimatedTime} mins</span>
-                                                </div>
-                                                <Button className="w-full h-12 text-base font-bold shadow-lg bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-600/90 rounded-xl" onClick={handleCreateClick} disabled={!canAfford || selectedQuestions.length === 0}>
-                                                    {!canAfford ? 'Insufficient Funds' : 'Generate Worksheet'}
-                                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    
+                                    {/* Using the defined content */}
+                                    {reviewSheetContent}
+                                    
                                 </SheetContent>
                             </Sheet>
                         </CardFooter>
@@ -441,14 +508,32 @@ export default function WorksheetManualBuilder({
                 </div>
             </div>
 
-            <WorksheetReviewSheet
-              selectedQuestions={selectedQuestions}
-              removeQuestion={removeQuestion}
-              onCreateWorksheet={onCreateWorksheet}
-              animateCart={animateCart}
-              unitMap={unitMap}
-              categoryMap={categoryMap}
-            />
+            {/* MOBILE FLOATING CART */}
+            <div className="lg:hidden fixed bottom-24 right-6 z-40 flex flex-col items-end gap-2">
+                {/* Cost Label on Mobile */}
+                {selectedQuestions.length > 0 && (
+                    <div className="bg-slate-900/90 text-white backdrop-blur-md px-3 py-1.5 rounded-lg shadow-lg border border-slate-700 mb-1">
+                        <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 text-right">Total Cost</p>
+                        <CostDisplay creationCost={creationCost} />
+                    </div>
+                )}
+                
+                <Sheet>
+                    <SheetTrigger asChild>
+                        <Button size="lg" className={cn("rounded-full h-14 w-14 shadow-2xl bg-gradient-to-r from-primary to-indigo-600 hover:scale-105 transition-transform border-4 border-white dark:border-slate-950", animateCart && "animate-pulse ring-4 ring-primary/30")} disabled={selectedQuestions.length === 0}>
+                            <ShoppingCart className="h-6 w-6 text-white" />
+                            {selectedQuestions.length > 0 && (<span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-md border-2 border-white dark:border-slate-950 animate-in zoom-in">{selectedQuestions.length}</span>)}
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent className="w-full flex flex-col p-0 h-[100dvh] rounded-none border-l-0">
+                        <SheetHeader className="px-6 py-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-b sticky top-0 z-10"><div className="flex items-center justify-between"><SheetTitle className="text-xl">Review Worksheet</SheetTitle><SheetClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-4 w-4" /></Button></SheetClose></div></SheetHeader>
+                        
+                        {/* Using the defined content */}
+                        {reviewSheetContent}
+
+                    </SheetContent>
+                </Sheet>
+            </div>
 
             {/* VIEW MODAL */}
             <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
@@ -470,3 +555,7 @@ export default function WorksheetManualBuilder({
         </div>
     );
 }
+
+// Ensure safe double export to prevent import issues
+export { WorksheetManualBuilder };
+export default WorksheetManualBuilder;
