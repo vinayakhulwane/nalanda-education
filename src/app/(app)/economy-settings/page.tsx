@@ -246,7 +246,7 @@ export default function EconomySettingsPage() {
   }
 
   return (
-    <div>
+    <div className="p-4 md:p-6">
       <PageHeader title="Economy Settings" description="Configure currency exchange rates, costs, and rewards." />
 
       <div className="space-y-6 max-w-4xl mt-6">

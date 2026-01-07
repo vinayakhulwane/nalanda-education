@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
-import { Loader2, AlertTriangle, Save, BrainCircuit, Key, Wand2, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertTriangle, Save, BrainCircuit, Key, Wand2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { useToast } from '@/hooks/use-toast';
 
-// Define constant model options to prevent typos
+// 1. FIXED: Added the missing interface definition
+interface AISettings {
+  provider?: 'google-gemini';
+  apiKey?: string;
+  gradingModel?: string;
+  questionModel?: string;
+}
+
 const GEMINI_MODELS = [
   { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Fast/Cheap)' },
   { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Complex Tasks)' },
@@ -35,19 +42,16 @@ export default function AiSettingsPage() {
   const settingsDocRef = useMemoFirebase(() => firestore ? doc(firestore, 'settings', 'ai') : null, [firestore]);
   const { data: remoteSettings, isLoading: areSettingsLoading } = useDoc<AISettings>(settingsDocRef);
 
-  // Sync remote data to local state
   useEffect(() => {
     if (remoteSettings) setSettings(remoteSettings);
   }, [remoteSettings]);
 
-  // Authorization Check
   useEffect(() => {
     if (!isUserProfileLoading && userProfile?.role !== 'admin') {
       router.push('/dashboard');
     }
   }, [userProfile, isUserProfileLoading, router]);
 
-  // Check if local settings differ from remote settings (for button state)
   const isDirty = useMemo(() => {
     return JSON.stringify(settings) !== JSON.stringify(remoteSettings);
   }, [settings, remoteSettings]);
@@ -65,10 +69,8 @@ export default function AiSettingsPage() {
     }
   };
 
-  // Optional: Mock function for testing connection
   const testConnection = async () => {
     setIsTesting(true);
-    // Add an actual API call to your backend/edge function here to verify the key
     await new Promise(res => setTimeout(res, 1500)); 
     toast({ title: 'Connection Successful', description: 'The API key is valid.' });
     setIsTesting(false);
@@ -78,6 +80,8 @@ export default function AiSettingsPage() {
     return <div className="flex h-[calc(100vh-4rem)] w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
+  if (userProfile?.role !== 'admin') return null;
+
   return (
     <div className="px-4 pb-10">
       <PageHeader
@@ -86,7 +90,8 @@ export default function AiSettingsPage() {
       />
 
       <div className="space-y-6 max-w-2xl mt-6">
-        <Alert variant="warning" className="bg-amber-50 border-amber-200 text-amber-800">
+        {/* 2. FIXED: Changed variant="warning" to variant="default" (standard Shadcn variant) */}
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Admin Only</AlertTitle>
           <AlertDescription>
@@ -102,12 +107,12 @@ export default function AiSettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Provider Selection */}
             <div className="space-y-2">
               <Label>AI Provider</Label>
               <Select
-                value={settings.provider}
-                onValueChange={(v) => setSettings(p => ({ ...p, provider: v as any }))}
+                value={settings.provider || 'google-gemini'}
+                // 3. FIXED: Added explicit type to 'v'
+                onValueChange={(v: 'google-gemini') => setSettings(p => ({ ...p, provider: v }))}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -116,7 +121,6 @@ export default function AiSettingsPage() {
               </Select>
             </div>
             
-            {/* API Key with Test Button */}
             <div className="space-y-2">
               <Label htmlFor="api-key" className="flex items-center gap-2"><Key className="h-4 w-4" /> API Key</Label>
               <div className="flex gap-2">
@@ -124,6 +128,7 @@ export default function AiSettingsPage() {
                     id="api-key"
                     type="password"
                     value={settings.apiKey || ''}
+                    // 4. FIXED: TypeScript inferring 'prev' from state correctly now
                     onChange={(e) => setSettings(prev => ({ ...prev, apiKey: e.target.value }))}
                     placeholder="Enter Google AI Studio Key"
                 />
@@ -133,13 +138,13 @@ export default function AiSettingsPage() {
               </div>
             </div>
             
-            {/* Model Dropdowns */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Grading Model</Label>
                 <Select 
                     value={settings.gradingModel} 
-                    onValueChange={(v) => setSettings(p => ({ ...p, gradingModel: v }))}
+                    // 5. FIXED: Added explicit type to 'v'
+                    onValueChange={(v: string) => setSettings(p => ({ ...p, gradingModel: v }))}
                 >
                   <SelectTrigger><SelectValue placeholder="Select model" /></SelectTrigger>
                   <SelectContent>
@@ -152,7 +157,8 @@ export default function AiSettingsPage() {
                 <Label className="flex items-center gap-2"><Wand2 className="h-4 w-4" /> Creation Model</Label>
                 <Select 
                     value={settings.questionModel} 
-                    onValueChange={(v) => setSettings(p => ({ ...p, questionModel: v }))}
+                    // 6. FIXED: Added explicit type to 'v'
+                    onValueChange={(v: string) => setSettings(p => ({ ...p, questionModel: v }))}
                 >
                   <SelectTrigger><SelectValue placeholder="Select model" /></SelectTrigger>
                   <SelectContent>
