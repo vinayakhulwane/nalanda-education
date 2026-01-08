@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { FirebaseClientProvider } from '@/firebase'; // <--- UNCOMMENTED THIS
+import { FirebaseClientProvider } from '@/firebase';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import { cn } from '@/lib/utils';
-// import { MobileHeader } from '@/components/mobile-header'; // Keep commented out for now
-// import { MobileNav } from '@/components/mobile-nav';       // Keep commented out for now
+// We need these for Mobile First. If they crash, share the error and we will fix them.
+import { MobileHeader } from '@/components/mobile-header'; 
+import { MobileNav } from '@/components/mobile-nav';       
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -23,11 +24,12 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 };
 
+// 1. Improved Viewport for Mobile
 export const viewport: Viewport = {
-  maximumScale: 1,
-  userScalable: false,
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 5, // Allow zooming for accessibility (best practice)
+  userScalable: true, 
 };
 
 export default function RootLayout({
@@ -37,19 +39,30 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn("flex flex-col min-h-screen font-body antialiased", fontBody.variable, fontHeadline.variable)}>
-        {/* We brought the Provider back so the Login Page works */}
+      <body className={cn(
+        "flex flex-col min-h-screen font-body antialiased bg-background text-foreground", 
+        fontBody.variable, 
+        fontHeadline.variable
+      )}>
         <FirebaseClientProvider>
           
-          {/* MobileHeader is still off because it might be crashing the build */}
-          {/* <MobileHeader /> */}
+          {/* 2. Mobile Header: Visible on mobile, hidden on Desktop */}
+          {/* Add 'lg:hidden' to the component itself or a wrapper here if it doesn't hide itself */}
+          <div className="block lg:hidden sticky top-0 z-50">
+             <MobileHeader /> 
+          </div>
 
-          <main className="flex-1 pb-20 lg:pb-0 overflow-x-hidden max-w-[100vw]">
+          {/* 3. Main Content Area */}
+          {/* pb-20: Adds bottom padding on mobile so content isn't hidden behind the Bottom Nav */}
+          {/* lg:pb-0: Removes that padding on Desktop */}
+          <main className="flex-1 w-full overflow-x-hidden pb-20 lg:pb-0">
             {children}
           </main>
 
-          {/* MobileNav is still off because it might be crashing the build */}
-          {/* <MobileNav /> */}
+          {/* 4. Mobile Bottom Nav: Fixed to bottom on mobile, hidden on Desktop */}
+          <div className="block lg:hidden">
+             <MobileNav /> 
+          </div>
 
         </FirebaseClientProvider>
         <Toaster />
