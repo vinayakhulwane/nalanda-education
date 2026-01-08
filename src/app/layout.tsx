@@ -1,12 +1,11 @@
-
-import type {Metadata, Viewport} from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { FirebaseClientProvider } from '@/firebase';
+import { FirebaseClientProvider } from '@/firebase'; // <--- UNCOMMENTED THIS
 import { Inter, Space_Grotesk } from 'next/font/google';
 import { cn } from '@/lib/utils';
-import { MobileHeader } from '@/components/mobile-header';
-import { MobileNav } from '@/components/mobile-nav';
+// import { MobileHeader } from '@/components/mobile-header'; // Keep commented out for now
+// import { MobileNav } from '@/components/mobile-nav';       // Keep commented out for now
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -31,7 +30,6 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,12 +38,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn("flex flex-col min-h-screen font-body antialiased", fontBody.variable, fontHeadline.variable)}>
+        {/* We brought the Provider back so the Login Page works */}
         <FirebaseClientProvider>
-          <MobileHeader />
+          
+          {/* MobileHeader is still off because it might be crashing the build */}
+          {/* <MobileHeader /> */}
+
           <main className="flex-1 pb-20 lg:pb-0 overflow-x-hidden max-w-[100vw]">
             {children}
           </main>
-          <MobileNav />
+
+          {/* MobileNav is still off because it might be crashing the build */}
+          {/* <MobileNav /> */}
+
         </FirebaseClientProvider>
         <Toaster />
       </body>
