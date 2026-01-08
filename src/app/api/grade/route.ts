@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from '@/firebase/admin';
+import { logAiUsage } from '@/lib/ai-logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -53,7 +54,8 @@ async function getAiConfiguration() {
             console.warn("No active grading ID found, falling back to ENV key.");
             return {
                 apiKey: process.env.GEMINI_API_KEY || "",
-                model: "gemini-2.0-flash-exp" // Default fallback
+                model: "gemini-2.0-flash-exp", // Default fallback
+                provider: "google-gemini"
             };
         }
 
@@ -65,20 +67,22 @@ async function getAiConfiguration() {
             console.warn("Target AI Provider is missing or disabled, using fallback.");
             return {
                 apiKey: process.env.GEMINI_API_KEY || "",
-                model: "gemini-2.0-flash-exp"
+                model: "gemini-2.0-flash-exp",
+                provider: "google-gemini"
             };
         }
 
         return {
             apiKey: config.apiKey,
             model: config.gradingModel,
-            provider: config.provider
+            provider: config.provider || "google-gemini"
         };
     } catch (error) {
         console.error("Failed to fetch dynamic AI config:", error);
         return {
             apiKey: process.env.GEMINI_API_KEY || "",
-            model: "gemini-2.0-flash-exp"
+            model: "gemini-2.0-flash-exp",
+            provider: "google-gemini"
         };
     }
 }
@@ -190,7 +194,7 @@ export async function POST(request: Request) {
         `;
 
         // 3. Dynamic Model Initialization
-        const { apiKey, model: dynamicModelName } = await getAiConfiguration();
+        const { apiKey, model: dynamicModelName, provider } = await getAiConfiguration();
         const genAI = new GoogleGenerativeAI(apiKey);
 
         // 4. Generate with Dynamic Config
@@ -242,6 +246,16 @@ export async function POST(request: Request) {
             const scores = Object.values(breakdown).map(v => Number(v));
             calculatedTotalScore = scores.reduce((a, b) => a + b, 0) / scores.length;
         }
+
+        // 6. Log Usage (AWAITED for Serverless Reliability)
+        // We must await this, otherwise Vercel kills the process before writing.
+        await logAiUsage({
+            action: 'grade_submission',
+            model: dynamicModelName,
+            provider: provider || 'google-gemini',
+            success: true,
+            details: `Graded assignment with ${totalQuestionMarks} marks`
+        });
 
         return NextResponse.json({
             totalScore: Math.round(calculatedTotalScore),

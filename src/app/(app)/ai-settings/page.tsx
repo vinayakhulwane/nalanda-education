@@ -317,6 +317,10 @@ export default function AiSettingsPage() {
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
+                    {/* --- FIXED: Added DialogHeader and DialogTitle to satisfy accessibility --- */}
+                    <DialogHeader>
+                        <DialogTitle>AI Usage Analytics</DialogTitle>
+                    </DialogHeader>
                     <AiUsagePage />
                 </DialogContent>
             </Dialog>

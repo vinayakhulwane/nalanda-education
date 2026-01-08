@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from '@/firebase/admin';
+import { logAiUsage } from '@/lib/ai-logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,8 @@ async function getAiConfiguration() {
        console.warn("No active generation ID found, falling back to ENV key and default model.");
        return { 
          apiKey: process.env.GEMINI_API_KEY || "", 
-         model: "gemini-1.5-flash" 
+         model: "gemini-1.5-flash",
+         provider: "google-gemini"
        };
     }
 
@@ -46,20 +48,22 @@ async function getAiConfiguration() {
       console.warn("Target AI Provider is missing or disabled, using fallback.");
       return { 
         apiKey: process.env.GEMINI_API_KEY || "", 
-        model: "gemini-1.5-flash" 
+        model: "gemini-1.5-flash",
+        provider: "google-gemini"
       };
     }
 
     return {
       apiKey: config.apiKey,
       model: config.gradingModel, // Using the model name stored in the 'gradingModel' field
-      provider: config.provider
+      provider: config.provider || "google-gemini"
     };
   } catch (error) {
     console.error("Failed to fetch dynamic AI config:", error);
     return { 
       apiKey: process.env.GEMINI_API_KEY || "", 
-      model: "gemini-1.5-flash" 
+      model: "gemini-1.5-flash",
+      provider: "google-gemini"
     };
   }
 }
@@ -186,7 +190,7 @@ export async function POST(req: Request) {
     } 
     
     // 1. Fetch Dynamic Configuration
-    const { apiKey, model: modelName } = await getAiConfiguration();
+    const { apiKey, model: modelName, provider } = await getAiConfiguration();
 
     // 2. Initialize Model
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -215,6 +219,7 @@ export async function POST(req: Request) {
     const textResponse = result.response.text();
     
     if (!textResponse) {
+       // Log failure attempt if needed, or rely on catch block
        return NextResponse.json({ 
          error: "AI model returned empty response.", 
          details: "Please check your API key or try a different model." 
@@ -225,6 +230,17 @@ export async function POST(req: Request) {
     
     try { 
       const jsonResponse = JSON.parse(cleanJson); 
+      
+      // 4. Log Successful Usage (AWAITED for Serverless Reliability)
+      // We must await this, otherwise Vercel kills the process before writing.
+      await logAiUsage({
+        action: 'generate_question',
+        model: modelName,
+        provider: provider,
+        success: true,
+        details: 'Question Generation'
+      });
+
       return NextResponse.json(jsonResponse); 
     } catch (parseError) { 
       console.error("JSON Parse Error. Raw text:", textResponse); 
