@@ -1,7 +1,8 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  swcMinify: true, // Recommended for performance
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -29,6 +30,14 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  // Optimize webpack for development to prevent timeouts
+  webpack: (config, { dev, isServer }) => {
+    // Disable source maps in development for faster builds and reloads.
+    if (dev && !isServer) {
+      config.devtool = false;
+    }
+    return config;
   },
 };
 
